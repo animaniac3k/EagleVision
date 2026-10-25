@@ -25,7 +25,8 @@ export function saveSettings(state) {
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
-      themeColor: state.themeColor || '#2dd4bf'
+      themeColor: state.themeColor || '#2dd4bf',
+      ringKeyMap: state.ringKeyMap || {}
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));
   } catch {

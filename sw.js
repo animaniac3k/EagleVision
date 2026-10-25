@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eaglevision-v7';
+const CACHE_NAME = 'eaglevision-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const ASSETS = [
   './js/ui/hudController.js',
   './js/ui/sidebarControls.js',
   './js/ui/videoBrowser.js',
+  './js/ui/ringController.js',
   './assets/icons/icon.svg'
 ];
 

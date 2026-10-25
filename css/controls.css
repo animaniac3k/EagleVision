@@ -267,3 +267,74 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   border: none;
   border-radius: 2px;
 }
+
+/* Top-Center 5-Button Bluetooth Ring Mode Pill */
+.ring-hud-pill {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.72;
+  transition: opacity 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ring-hud-pill:hover,
+.ring-hud-pill.ring-hud-active {
+  opacity: 1;
+  border-color: var(--radar-border-strong);
+  box-shadow: var(--shadow-glow);
+}
+
+.ring-mode-badge {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: var(--radar-accent);
+  color: var(--radar-accent-contrast);
+  letter-spacing: 0.04em;
+}
+
+.ring-action-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--radar-text);
+  white-space: nowrap;
+}
+
+/* 5-Button Bluetooth Ring D-Pad Calibration Grid in Settings */
+.ring-signal-readout {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--radar-text-muted);
+  background: #051216;
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.ring-dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ring-dpad-grid .radar-btn-sm {
+  height: 36px;
+  font-size: 12px;
+  padding: 0 4px;
+}

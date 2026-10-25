@@ -256,11 +256,14 @@ export function initZoomWindow() {
   });
 
   // Sync UI state
-  subscribeState((state) => {
+  subscribeState((state, patch) => {
     pipWindowEl.classList.toggle('hidden', !state.pipEnabled);
     const showCrosshair = state.pipEnabled && state.roiTargetVisible;
     crosshairEl.classList.toggle('hidden', !showCrosshair);
     btnPipToggleRoi.classList.toggle('radar-btn-active', state.roiTargetVisible);
     pipZoomBadge.textContent = `${state.pipZoom.toFixed(1)}x`;
+    if (patch && (patch.roiX !== undefined || patch.roiY !== undefined)) {
+      syncRoiCrosshairPosition();
+    }
   });
 }

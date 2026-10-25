@@ -106,6 +106,12 @@
         </button>
       </nav>
 
+      <!-- TOP-CENTER BLUETOOTH 5-BUTTON RING MODE PILL -->
+      <div id="ringHudPill" class="ring-hud-pill" title="5-Button Bluetooth Ring Mode (Tap or press Ring Center button to cycle)">
+        <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
+        <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
+      </div>
+
       <!-- TOP-RIGHT FLOATING ICON STRIP (RAM Buffer Toggle + Saved Recordings Screen) -->
       <nav class="floating-strip strip-top-right">
         <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable In-Memory Video Buffer">
@@ -270,6 +276,26 @@
               <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
               <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
               <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
+            </div>
+          </div>
+
+          <!-- 7. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">BT Ring Remote</span>
+              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
+            </div>
+            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
+            <div class="ring-dpad-grid">
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
+              <div></div>
             </div>
           </div>
         </div>

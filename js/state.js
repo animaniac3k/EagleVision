@@ -56,8 +56,9 @@ export const appState = {
   bufferBytes: 0,
   replayActive: false,
 
-  // Interface Theme Color
-  themeColor: '#2dd4bf'
+  // Interface Theme Color & 5-Button Bluetooth Ring Custom Mapping
+  themeColor: '#2dd4bf',
+  ringKeyMap: {}
 };
 
 export function updateState(patch) {

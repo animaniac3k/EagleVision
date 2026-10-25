@@ -12,6 +12,7 @@ import { initInstantReplay } from './recorder/instantReplay.js';
 import { initHudController } from './ui/hudController.js';
 import { initSidebarAndTopControls } from './ui/sidebarControls.js';
 import { initVideoBrowser } from './ui/videoBrowser.js';
+import { initRingController } from './ui/ringController.js';
 
 async function bootstrapApp() {
   // 1. Restore saved user settings
@@ -27,13 +28,14 @@ async function bootstrapApp() {
   // 3. Start 60fps Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
   const mainCanvas = initCompositor(videoEl);
 
-  // 4. Initialize Overlays, Draggable ROI Target & Zoom Window, HUD, and Controls
+  // 4. Initialize Overlays, Draggable ROI Target & Zoom Window, HUD, Controls, and 5-Button BT Ring
   initOverlayManager();
   initZoomWindow();
   initHudController();
   initInstantReplay();
   await initSidebarAndTopControls(videoEl, mainCanvas);
   await initVideoBrowser();
+  initRingController();
 
   // 5. Start 20-Second Rolling In-Memory Video Buffer if enabled
   if (appState.bufferEnabled) {
