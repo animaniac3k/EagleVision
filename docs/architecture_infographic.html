@@ -57,20 +57,20 @@
       <div>
         <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC</div>
         <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">EAGLEVISION — MODULE STRUCTURE &amp; DATA PIPELINE</h1>
-        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App for ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop Execution</p>
+        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App for ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop Execution • 5-Button BT Ring Enabled</p>
       </div>
       <div class="flex gap-3 font-mono text-xs">
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">RENDER LOOP</div>
-          <div class="text-base font-bold text-[#ccfbf1]">60 FPS GPU</div>
+          <div class="text-[#5eead4]">HEATMAP &amp; RENDER</div>
+          <div class="text-base font-bold text-[#ccfbf1]">60 FPS + SHAKE GATE</div>
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
           <div class="text-[#5eead4]">RAM RING BUFFER</div>
-          <div class="text-base font-bold text-[#2dd4bf]">20.0s (300 FRAMES)</div>
+          <div class="text-base font-bold text-[#2dd4bf]">5–60s @ 5–30 FPS (NATIVE RES)</div>
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">STORAGE</div>
-          <div class="text-base font-bold text-[#ccfbf1]">IndexedDB + WebM</div>
+          <div class="text-[#5eead4]">REMOTE CONTROL</div>
+          <div class="text-base font-bold text-[#ccfbf1]">5-BTN BT RING</div>
         </div>
       </div>
     </header>
@@ -88,9 +88,9 @@
             <span class="badge">ROOT</span>
           </div>
           <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">index.html</strong> — Screen 1 (Live) &amp; Screen 2 (Archive)</div>
-            <div><strong class="text-[#ccfbf1]">js/main.js</strong> — Bootstraps modules &amp; Screen WakeLock</div>
-            <div><strong class="text-[#ccfbf1]">sw.js + manifest.json</strong> — Offline Service Worker</div>
+            <div><strong class="text-[#ccfbf1]">index.html</strong> — Screen 1 (Live) &amp; Screen 2 (Fullscreen Player)</div>
+            <div><strong class="text-[#ccfbf1]">js/main.js</strong> — Bootstraps modules, Ring Remote &amp; WakeLock</div>
+            <div><strong class="text-[#ccfbf1]">sw.js (v9) + manifest.json</strong> — Offline Service Worker</div>
             <div><strong class="text-[#ccfbf1]">start_eaglevision.bat</strong> — Portable USB stick launcher</div>
           </div>
         </div>
@@ -104,7 +104,7 @@
             <div><strong class="text-[#ccfbf1]">streamManager.js</strong></div>
             <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
               <li>Enumerates UVC USB cameras via <code class="text-[#ccfbf1]">enumerateDevices()</code></li>
-              <li>Streams 1920×1080 @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
+              <li>Streams native 1920×1080 @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
               <li>Pre-rendered 1080p radar test board fallback</li>
             </ul>
             <div class="pt-1"><strong class="text-[#ccfbf1]">streamStats.js</strong> — Live FPS &amp; resolution counter</div>
@@ -120,35 +120,38 @@
             <div class="text-[#2dd4bf] font-bold">Pub/Sub: updateState(patch) → subscribeState(fn)</div>
             <div class="grid grid-cols-2 gap-1.5 pt-1">
               <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• pipZoom / roiX,Y</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• overlayType<br/>• opacity / scale</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• brightness/contrast<br/>• invert / mono</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• temporalMode<br/>• themeColor</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• overlayEnabled<br/>• opacity / scale</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens (10-95%)<br/>• heatmapDuration (0.5-10s)</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• bufferMaxSeconds<br/>• bufferTargetFps</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• themeColor<br/>• uiOpacity (15-100%)</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• ringKeyMap (5-Btn)<br/>• GPU image filters</div>
             </div>
             <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
           </div>
         </div>
       </div>
 
-      <!-- COLUMN 2: 60fps Renderer & Temporal Compositor -->
+      <!-- COLUMN 2: 60fps Renderer, Micro-Change Heatmap & Overlays -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. 60FPS Dual-Canvas &amp; Overlays</div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. 60FPS Dual-Canvas, Heatmap &amp; Overlays</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>DUAL-CANVAS COMPOSITOR</span>
+            <span>DUAL-CANVAS + HEATMAP ENGINE</span>
             <span class="badge">compositor.js</span>
           </div>
           <div class="p-4 text-xs space-y-3 font-mono">
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas)</div>
+              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Heatmap</div>
+              <div class="text-[#99f6e4]">• 160×90 luma grid with <strong class="text-[#ccfbf1]">&gt;18% Global Motion Rejection</strong> (ignores camera shake)</div>
+              <div class="text-[#99f6e4]">• Adjustable <strong class="text-[#ccfbf1]">Sensitivity (10–95%)</strong> &amp; <strong class="text-[#ccfbf1]">Display Duration (0.5–10s)</strong></div>
               <div class="text-[#99f6e4]">• Aspect-correct 1.0x–8.0x digital zoom &amp; touch pan</div>
-              <div class="text-[#99f6e4]">• Blends Temporal <strong class="text-[#ccfbf1]">GHOST</strong> (50% past frame) or <strong class="text-[#ccfbf1]">DELTA</strong> (difference Change-Radar)</div>
             </div>
 
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
               <div class="text-sm font-bold text-[#2dd4bf]">B. Digital Zoom Window (#pipCanvas)</div>
               <div class="text-[#99f6e4]">• Samples source around decoupled ROI Crosshair <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
-              <div class="text-[#99f6e4]">• Scales crop by <code class="text-[#ccfbf1]">(cropW * (pw/cw)) / pipZoom</code> for true screen magnification</div>
+              <div class="text-[#99f6e4]">• Scales crop by <code class="text-[#ccfbf1]">(cropW * (pw/cw)) / pipZoom</code> + overlays Heatmap</div>
             </div>
 
             <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
@@ -163,8 +166,8 @@
             <span class="badge">zoomWindow.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Draggable <strong class="text-[#ccfbf1]">#zoomTargetCrosshair</strong> aims the Zoom Window</div>
-            <div>• Single Show/Hide ROI button inside Zoom Window header</div>
+            <div>• Touch-draggable or BT-Ring-steered <strong class="text-[#ccfbf1]">#zoomTargetCrosshair</strong></div>
+            <div>• Top-Left PiP toggle &amp; header ROI toggle share the POI target reticle icon</div>
             <div>• Bottom-Left &amp; Bottom-Right Corner Resize handles</div>
             <div>• Automatic viewport boundary clamping on window resize</div>
           </div>
@@ -172,35 +175,31 @@
 
         <div class="node-card">
           <div class="node-header">
-            <span>SUPERIMPOSED GUIDES</span>
+            <span>OPEN-CENTER CROSSHAIR &amp; IMG</span>
             <span class="badge">overlayManager.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Vector presets: Crosshair, Alignment Grid, Concentric Rings</div>
-            <div>• Custom local PNG / SVG / WebP image upload</div>
-            <div>• Dynamic <code class="text-[#2dd4bf]">var(--radar-accent)</code> color adaptation</div>
+            <div>• Unobstructed <strong class="text-[#ccfbf1]">Open-Center Crosshair</strong> (64×64px center gap + bracket ticks, no outer circle)</div>
+            <div>• Custom local PNG / SVG / WebP image upload (<code class="text-[#ccfbf1]">LOAD IMG</code>)</div>
+            <div>• Quick On/Off button on Top-Left Bar (<code class="text-[#2dd4bf]">#btnToggleOverlayTop</code>) &amp; in Settings</div>
           </div>
         </div>
       </div>
 
-      <!-- COLUMN 3: 20s RAM Ring Buffer, Replay & Archive -->
+      <!-- COLUMN 3: Configurable Native-Res RAM Buffer, Replay & Fullscreen Player -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. 20s RAM Buffer &amp; Video Archive</div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. Native-Res RAM Buffer &amp; Fullscreen Player</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>20s RAM FRAME RING BUFFER</span>
+            <span>CONFIGURABLE RAM RING BUFFER</span>
             <span class="badge">memoryRingBuffer.js</span>
           </div>
           <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
-            <div class="text-[#2dd4bf] font-bold">Circular Array in RAM (15 FPS × 20s = 300 Frames)</div>
-            <div>• Captures 854×480 JPEG ArrayBuffer + GPU <code class="text-[#ccfbf1]">ImageBitmap</code></div>
-            <div>• Uses only ~5 MB RAM; zero disk wear while running</div>
-            <div>• Frames older than 20.0s are evicted &amp; <code class="text-[#ccfbf1]">bitmap.close()</code>d</div>
-            <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57] text-[#5eead4] mt-2">
-              <div>1. Feeds <strong class="text-[#ccfbf1]">getDelayedFrameBitmap(Δt)</strong> to Compositor</div>
-              <div>2. Feeds <strong class="text-[#ccfbf1]">snapshotMemoryBuffer()</strong> to Instant Replay</div>
-            </div>
+            <div class="text-[#2dd4bf] font-bold">Native Camera Resolution in RAM (5–60s @ 5–30 FPS)</div>
+            <div>• Captures exact <code class="text-[#ccfbf1]">videoWidth × videoHeight</code> JPEG ArrayBuffers</div>
+            <div>• Live <strong class="text-[#ccfbf1]">Memory Budget Meter</strong> in Settings (USED MB vs. EST MB vs. FREE RAM)</div>
+            <div>• Auto-evicts oldest frames when exceeding target duration or RAM cap</div>
           </div>
         </div>
 
@@ -210,32 +209,36 @@
             <span class="badge">instantReplay.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by single <strong class="text-[#2dd4bf]">REPLAY</strong> button on bottom bar</div>
-            <div>• 60fps <code class="text-[#ccfbf1]">requestAnimationFrame</code> clock drives <code class="text-[#ccfbf1]">#replayCanvas</code> and moving scrubber bar</div>
-            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> the 20s clip to IndexedDB</div>
+            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button or Bluetooth Ring Double-Press (<strong class="text-[#2dd4bf]">●●</strong>)</div>
+            <div>• Streams Blob ObjectURLs onto native-resolution <code class="text-[#ccfbf1]">#replayCanvas</code></div>
+            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> the native-resolution clip to IndexedDB</div>
           </div>
         </div>
 
         <div class="node-card">
           <div class="node-header">
-            <span>STORED VIDEO ARCHIVE</span>
+            <span>FULLSCREEN STORED VIDEO PLAYER</span>
             <span class="badge">videoStore + videoBrowser</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">videoStore.js</strong>: Stores frame arrays in IndexedDB (<code class="text-[#5eead4]">EagleVisionVideoDB</code>)</div>
-            <div>• <strong class="text-[#ccfbf1]">videoBrowser.js</strong>: Screen 2 player (<code class="text-[#5eead4]">#galleryPlayerCanvas</code>) with scrubber, 0.5x slow-mo &amp; +1 frame step</div>
-            <div>• <strong class="text-[#2dd4bf]">EXPORT TO DISK</strong> encodes &amp; downloads a <code class="text-[#ccfbf1]">.webm</code> video file</div>
+            <div>• <strong class="text-[#ccfbf1]">100% Fullscreen</strong> <code class="text-[#5eead4]">#galleryPlayerCanvas</code> with floating GUI overlay</div>
+            <div>• Collapsible left <code class="text-[#ccfbf1]">CLIPS</code> drawer + floating transport bar (Play/Pause, 0.5x Slow-Mo, STEP +1)</div>
+            <div>• <strong class="text-[#2dd4bf]">EXPORT</strong> encodes &amp; downloads a native-resolution <code class="text-[#ccfbf1]">.webm</code> file</div>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Bottom UI & Theme Engine Bar -->
-    <div class="node-card p-4 font-mono text-xs flex flex-wrap items-center justify-between gap-4">
+    <!-- Bottom UI, Global Opacity & 5-Button Bluetooth Ring Bar -->
+    <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
       <div>
-        <span class="text-[#2dd4bf] font-bold">UI &amp; HSL THEME ENGINE (sidebarControls.js / hudController.js):</span>
-        <span class="text-[#99f6e4] ml-2">6 Tactical Color Swatches + 2D Color Picker → <code class="text-[#ccfbf1]">applyThemeColor(hex)</code> updates all <code class="text-[#5eead4]">--radar-*</code> CSS tokens &amp; SVG reticles live.</span>
+        <span class="text-[#2dd4bf] font-bold">TOP-LEFT TOOLBAR &amp; GLOBAL OPACITY (sidebarControls.js):</span>
+        <span class="text-[#99f6e4] ml-2">Settings Toggle • PiP Zoom Window (POI Icon) • Overlay Guide On/Off • Heatmap Toggle • Telemetry HUD • Whole-Image Zoom Pod (− / 1.0x / + / 1:1). Global <strong class="text-[#ccfbf1]">Interface Opacity</strong> slider (15%–100%, <code class="text-[#5eead4]">--ui-opacity</code>) fades all UI chrome together.</span>
+      </div>
+      <div>
+        <span class="text-[#2dd4bf] font-bold">5-BUTTON BLUETOOTH RING REMOTE (ringController.js):</span>
+        <span class="text-[#99f6e4] ml-2">Single-Press <strong class="text-[#ccfbf1]">● CENTER</strong> cycles Live Modes (<code class="text-[#5eead4]">AIM ROI</code> → <code class="text-[#5eead4]">ZOOM</code> → <code class="text-[#5eead4]">TOOLS</code>) • Double-Press <strong class="text-[#ccfbf1]">●● CENTER</strong> triggers Instant Replay • Automatic <code class="text-[#5eead4]">PLAYER</code> transport mode in Replay/Archive • Built-in 5-Button D-Pad calibration in Settings.</span>
       </div>
     </div>
   </div>

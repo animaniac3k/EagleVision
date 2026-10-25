@@ -22,10 +22,12 @@ export function saveSettings(state) {
       overlayOpacity: state.overlayOpacity,
       overlayScale: state.overlayScale,
       heatmapSensitivity: state.heatmapSensitivity,
+      heatmapDuration: state.heatmapDuration || 2.0,
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
       themeColor: state.themeColor || '#2dd4bf',
+      uiOpacity: state.uiOpacity ?? 100,
       ringKeyMap: state.ringKeyMap || {}
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));

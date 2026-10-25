@@ -47,6 +47,7 @@ export const appState = {
   // Localized Micro-Change Heatmap (ignores global camera shake)
   heatmapEnabled: false,
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
+  heatmapDuration: 2.0,   // Adjustable: 0.5s to 10.0s display duration
 
   // Configurable In-Memory Rolling Recording Buffer
   bufferEnabled: true,
@@ -56,8 +57,9 @@ export const appState = {
   bufferBytes: 0,
   replayActive: false,
 
-  // Interface Theme Color & 5-Button Bluetooth Ring Custom Mapping
+  // Interface Theme Color, Global UI Opacity & 5-Button Bluetooth Ring Custom Mapping
   themeColor: '#2dd4bf',
+  uiOpacity: 100,
   ringKeyMap: {}
 };
 

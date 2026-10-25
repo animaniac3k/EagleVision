@@ -78,7 +78,7 @@
         </div>
       </div>
 
-      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, Zoom Window, Micro-Change Heatmap, Telemetry HUD) -->
+      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, PiP Window, Overlay Guide, Heatmap, HUD, Whole-Image Zoom) -->
       <nav class="floating-strip strip-top-left">
         <button id="btnToggleOptions" class="radar-btn radar-btn-active" title="Show / Hide Settings Window">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -86,9 +86,17 @@
           </svg>
         </button>
 
+        <!-- PiP Digital Zoom Window Toggle (Uses POI Target Icon) -->
         <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Show / Hide Digital Zoom Window">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-4.35-4.35M11 8v6M8 11h6"/>
+            <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+          </svg>
+        </button>
+
+        <!-- Overlay Guide On/Off Toggle on Top-Left Main Interface -->
+        <button id="btnToggleOverlayTop" class="radar-btn radar-btn-active" title="Toggle Superimposed Overlay Guide On / Off">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" d="M12 2v7M12 15v7M2 12h7M15 12h7M9 10v4M15 10v4M10 9h4M10 15h4"/>
           </svg>
         </button>
 
@@ -104,13 +112,15 @@
             <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
           </svg>
         </button>
-      </nav>
 
-      <!-- TOP-CENTER BLUETOOTH 5-BUTTON RING MODE PILL -->
-      <div id="ringHudPill" class="ring-hud-pill" title="5-Button Bluetooth Ring Mode (Tap or press Ring Center button to cycle)">
-        <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
-        <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
-      </div>
+        <!-- Whole-Image Zoom Tool at the end of the Top-Left Icons -->
+        <div class="control-pod control-pod-top">
+          <button id="mainZoomMinus" class="radar-btn" title="Zoom Out Whole Image">−</button>
+          <span id="mainZoomBadge" class="zoom-readout">1.0x</span>
+          <button id="mainZoomPlus" class="radar-btn" title="Zoom In Whole Image">+</button>
+          <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan & Zoom">1:1</button>
+        </div>
+      </nav>
 
       <!-- TOP-RIGHT FLOATING ICON STRIP (RAM Buffer Toggle + Saved Recordings Screen) -->
       <nav class="floating-strip strip-top-right">
@@ -215,14 +225,26 @@
             </div>
           </div>
 
-          <!-- 4. Micro-Change Heatmap Sensitivity (Toggle is on Main Interface) -->
+          <!-- 4. Micro-Change Heatmap Sensitivity & Display Duration -->
           <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Heatmap Config</span>
+            </div>
+
             <div class="slider-group">
               <div class="slider-header">
-                <span class="settings-label">Heatmap Sensitivity</span>
+                <span>Sensitivity</span>
                 <span id="valHeatmapSens" class="slider-val">60%</span>
               </div>
               <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Display Duration</span>
+                <span id="valHeatmapDuration" class="slider-val">2.0s</span>
+              </div>
+              <input id="sliderHeatmapDuration" type="range" min="0.5" max="10" step="0.5" value="2.0" class="radar-slider" />
             </div>
           </div>
 
@@ -263,10 +285,10 @@
             </div>
           </div>
 
-          <!-- 6. Interface Theme Color Swatch -->
+          <!-- 6. Interface Theme Color & Global UI Opacity -->
           <div class="settings-card">
             <div class="settings-card-header">
-              <span class="settings-label">Interface Color</span>
+              <span class="settings-label">Interface Appearance</span>
               <input id="colorPickerCustom" type="color" value="#2dd4bf" class="theme-color-input" title="Pick Custom Interface Color" />
             </div>
             <div class="swatch-row">
@@ -276,6 +298,14 @@
               <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
               <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
               <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Interface Opacity</span>
+                <span id="valUiOpacity" class="slider-val">100%</span>
+              </div>
+              <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
             </div>
           </div>
 
@@ -316,12 +346,10 @@
 
       <!-- BOTTOM CONTROL STRIP -->
       <footer class="strip-bottom">
-        <!-- Left: Whole-Image Zoom Stepper -->
-        <div class="control-pod">
-          <button id="mainZoomMinus" class="radar-btn" title="Zoom Out Whole Image">−</button>
-          <span id="mainZoomBadge" class="zoom-readout">1.0x</span>
-          <button id="mainZoomPlus" class="radar-btn" title="Zoom In Whole Image">+</button>
-          <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan & Zoom">1:1</button>
+        <!-- Left: 5-Button Bluetooth Ring Mode Pill -->
+        <div id="ringHudPill" class="ring-hud-pill" title="5-Button Bluetooth Ring Mode (Tap or press Ring Center button to cycle)">
+          <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
+          <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
         </div>
 
         <!-- Center: Instant Replay Scrubber Bar -->
@@ -333,7 +361,7 @@
         </div>
 
         <!-- Right: Instant Replay (Automatically saves the clip to Archive) -->
-        <div class="control-pod">
+        <div class="control-pod" style="margin-left:auto;">
           <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Memory Buffer">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>

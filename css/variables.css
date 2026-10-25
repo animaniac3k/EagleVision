@@ -20,6 +20,7 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   --touch-target: 52px;
+  --ui-opacity: 1;
   --radius-sm: 4px;
   --radius-md: 6px;
   --shadow-panel: 0 14px 32px rgba(0, 0, 0, 0.78), 0 0 1px rgba(45, 212, 191, 0.3);

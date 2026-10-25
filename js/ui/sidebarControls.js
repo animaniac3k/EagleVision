@@ -62,6 +62,7 @@ export async function initSidebarAndTopControls(videoEl) {
   const btnToggleOptions = document.getElementById('btnToggleOptions');
   const btnCloseOptionsInner = document.getElementById('btnCloseOptionsInner');
   const btnTogglePip = document.getElementById('btnTogglePip');
+  const btnToggleOverlayTop = document.getElementById('btnToggleOverlayTop');
   const btnToggleHeatmap = document.getElementById('btnToggleHeatmap');
   const btnToggleHud = document.getElementById('btnToggleHud');
   const btnToggleBuffer = document.getElementById('btnToggleBuffer');
@@ -87,6 +88,14 @@ export async function initSidebarAndTopControls(videoEl) {
     updateState({ pipEnabled: !appState.pipEnabled });
     saveSettings(appState);
   });
+
+  // 2b. Toggle Overlay Guide from Top-Left Bar
+  if (btnToggleOverlayTop) {
+    btnToggleOverlayTop.addEventListener('click', () => {
+      updateState({ overlayEnabled: !appState.overlayEnabled });
+      saveSettings(appState);
+    });
+  }
 
   // 3. Toggle Localized Micro-Change Heatmap from Main Interface
   btnToggleHeatmap.addEventListener('click', () => {
@@ -246,11 +255,26 @@ export async function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 10. Heatmap Sensitivity Slider in Settings
+  // 10. Heatmap Sensitivity & Display Duration Sliders in Settings
   const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');
   const valHeatmapSens = document.getElementById('valHeatmapSens');
+  const sliderHeatmapDuration = document.getElementById('sliderHeatmapDuration');
+  const valHeatmapDuration = document.getElementById('valHeatmapDuration');
+
   sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
   valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
+
+  const initHeatDur = Number(appState.heatmapDuration) || 2.0;
+  if (sliderHeatmapDuration && valHeatmapDuration) {
+    sliderHeatmapDuration.value = String(initHeatDur);
+    valHeatmapDuration.textContent = `${initHeatDur.toFixed(1)}s`;
+    sliderHeatmapDuration.addEventListener('input', (e) => {
+      const dur = Number(e.target.value) || 2.0;
+      valHeatmapDuration.textContent = `${dur.toFixed(1)}s`;
+      updateState({ heatmapDuration: dur });
+      saveSettings(appState);
+    });
+  }
 
   sliderHeatmapSens.addEventListener('input', (e) => {
     const sens = Number(e.target.value) || 60;
@@ -343,11 +367,32 @@ export async function initSidebarAndTopControls(videoEl) {
     });
   }
 
+  // 13. Global Interface Opacity Slider (Fades all UI chrome together)
+  const sliderUiOpacity = document.getElementById('sliderUiOpacity');
+  const valUiOpacity = document.getElementById('valUiOpacity');
+  const initUiOpacity = Math.max(15, Math.min(100, Number(appState.uiOpacity ?? 100)));
+  document.documentElement.style.setProperty('--ui-opacity', String(initUiOpacity / 100));
+
+  if (sliderUiOpacity && valUiOpacity) {
+    sliderUiOpacity.value = String(initUiOpacity);
+    valUiOpacity.textContent = `${initUiOpacity}%`;
+    sliderUiOpacity.addEventListener('input', (e) => {
+      const op = Math.max(15, Math.min(100, Number(e.target.value) || 100));
+      valUiOpacity.textContent = `${op}%`;
+      document.documentElement.style.setProperty('--ui-opacity', String(op / 100));
+      updateState({ uiOpacity: op });
+      saveSettings(appState);
+    });
+  }
+
   // Reactive UI Sync
   subscribeState((state) => {
     optionsPanel.classList.toggle('hidden', !state.optionsOpen);
     btnToggleOptions.classList.toggle('radar-btn-active', state.optionsOpen);
     btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
+    if (btnToggleOverlayTop) {
+      btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
+    }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
     btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 

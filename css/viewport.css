@@ -63,6 +63,7 @@
   align-items: center;
   justify-content: center;
   touch-action: none;
+  opacity: var(--ui-opacity, 1);
 }
 
 #zoomTargetCrosshair:active {
@@ -93,6 +94,7 @@
   flex-direction: column;
   overflow: hidden;
   z-index: 25;
+  opacity: var(--ui-opacity, 1);
 }
 
 #pipHeader {

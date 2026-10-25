@@ -64,7 +64,7 @@
   background-color: var(--radar-border);
 }
 
-/* Control Pod Containers (Bottom Bar) */
+/* Control Pod Containers */
 .control-pod {
   display: flex;
   align-items: center;
@@ -74,6 +74,16 @@
   padding: 6px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
+}
+
+.control-pod-top {
+  height: var(--touch-target);
+  padding: 0 6px;
+}
+
+.control-pod-top .radar-btn {
+  height: 40px;
+  min-width: 40px;
 }
 
 .zoom-readout {
@@ -268,30 +278,24 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   border-radius: 2px;
 }
 
-/* Top-Center 5-Button Bluetooth Ring Mode Pill */
+/* 5-Button Bluetooth Ring Mode Pill (Bottom-Left in .strip-bottom) */
 .ring-hud-pill {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 48;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  height: var(--touch-target);
+  padding: 0 14px;
   background: var(--radar-panel);
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   cursor: pointer;
   user-select: none;
-  opacity: 0.72;
-  transition: opacity 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .ring-hud-pill:hover,
 .ring-hud-pill.ring-hud-active {
-  opacity: 1;
   border-color: var(--radar-border-strong);
   box-shadow: var(--shadow-glow);
 }

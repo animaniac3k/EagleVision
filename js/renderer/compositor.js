@@ -38,8 +38,13 @@ export function initCompositor(videoEl) {
   const refLuma = new Float32Array(HEAT_CELLS);
   const heatAccum = new Float32Array(HEAT_CELLS);
   let refInitialized = false;
+  let lastHeatTimeMs = performance.now();
 
   function updateHeatmap(videoSource) {
+    const nowMs = performance.now();
+    const dtSec = Math.max(0.005, Math.min(0.25, (nowMs - lastHeatTimeMs) / 1000));
+    lastHeatTimeMs = nowMs;
+
     sampleCtx.drawImage(videoSource, 0, 0, HEAT_W, HEAT_H);
     const src = sampleCtx.getImageData(0, 0, HEAT_W, HEAT_H).data;
     const out = heatImgData.data;
@@ -47,6 +52,11 @@ export function initCompositor(videoEl) {
     // Map sensitivity (10..95) to pixel delta threshold (75..8)
     const sens = Math.max(10, Math.min(95, appState.heatmapSensitivity));
     const threshold = 82 - sens * 0.76;
+
+    // Compute per-frame decay factor so peak heat (255) decays to visibility threshold (20)
+    // over the exact user-selected heatmapDuration (0.5s .. 10.0s)
+    const durationSec = Math.max(0.2, Number(appState.heatmapDuration) || 2.0);
+    const decayFactor = Math.exp((-2.545 * dtSec) / durationSec);
 
     if (!refInitialized) {
       for (let i = 0; i < HEAT_CELLS; i++) {
@@ -80,13 +90,13 @@ export function initCompositor(videoEl) {
         heatAccum[i] *= 0.4; // Rapidly clear stale markings when camera moves
       }
     } else {
-      // Localized change: accumulate heat on small changes and slowly adapt reference
+      // Localized change: accumulate heat on small changes and decay over heatmapDuration seconds
       for (let i = 0; i < HEAT_CELLS; i++) {
         const delta = Math.abs(currentLuma[i] - refLuma[i]);
         if (delta > threshold) {
-          heatAccum[i] = Math.min(255, heatAccum[i] + (delta - threshold) * 3.6);
+          heatAccum[i] = Math.min(255, heatAccum[i] + (delta - threshold) * 3.8);
         } else {
-          heatAccum[i] *= 0.88;
+          heatAccum[i] *= decayFactor;
         }
         refLuma[i] += (currentLuma[i] - refLuma[i]) * 0.15;
       }

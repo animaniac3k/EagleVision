@@ -20,9 +20,6 @@ const OPEN_CENTER_CROSSHAIR_SVG = `
   <line x1="432" y1="242" x2="432" y2="258" stroke="var(--radar-accent)" stroke-width="1.8" />
   <line x1="392" y1="218" x2="408" y2="218" stroke="var(--radar-accent)" stroke-width="1.8" />
   <line x1="392" y1="282" x2="408" y2="282" stroke="var(--radar-accent)" stroke-width="1.8" />
-
-  <!-- Outer reference circle well outside the center gap -->
-  <circle cx="400" cy="250" r="76" stroke="var(--radar-accent)" stroke-width="1.4" stroke-dasharray="8 6" fill="none" />
 `;
 
 export function initOverlayManager() {

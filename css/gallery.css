@@ -60,6 +60,7 @@
   flex-direction: column;
   z-index: 30;
   overflow: hidden;
+  opacity: var(--ui-opacity, 1);
 }
 
 .clips-list-container {
