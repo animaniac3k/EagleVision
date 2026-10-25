@@ -1,0 +1,18 @@
+{
+  "name": "EagleVision Camera Overlay & Inspection System",
+  "short_name": "EagleVision",
+  "description": "USB Camera Stream Viewer, Overlay Superimposer, Digital Zoom Loupe & 20s RAM Recorder for ChromeOS/Android.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#040d10",
+  "theme_color": "#0b2229",
+  "icons": [
+    {
+      "src": "./assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

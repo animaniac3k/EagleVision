@@ -1,0 +1,227 @@
+/* Radar Buttons & Touch Controls */
+.radar-btn {
+  height: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: 0 14px;
+  background-color: var(--radar-surface);
+  color: var(--radar-text-secondary);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.radar-btn:hover {
+  background-color: var(--radar-surface-hover);
+  border-color: var(--radar-border-strong);
+}
+
+.radar-btn:active {
+  transform: translateY(1px);
+}
+
+.radar-btn-active {
+  background-color: var(--radar-accent) !important;
+  color: var(--radar-accent-contrast) !important;
+  border-color: var(--radar-text-secondary) !important;
+  box-shadow: var(--shadow-glow);
+}
+
+.radar-btn-sm {
+  height: 40px;
+  min-width: 42px;
+  padding: 0 10px;
+  font-size: 15px;
+}
+
+.radar-btn-danger {
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #fda4af;
+}
+
+.radar-btn-danger:hover {
+  background-color: rgba(244, 63, 94, 0.2);
+  border-color: var(--radar-danger);
+}
+
+/* Status Indicator Dot */
+.status-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background-color: var(--radar-accent-contrast);
+  display: inline-block;
+}
+
+.status-dot-off {
+  background-color: var(--radar-border);
+}
+
+/* Control Pod Containers (Bottom Bar) */
+.control-pod {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.zoom-readout {
+  min-width: 64px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--radar-text);
+}
+
+/* Select Dropdown */
+.radar-select {
+  width: 100%;
+  height: 48px;
+  background-color: var(--radar-surface);
+  color: var(--radar-text);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  outline: none;
+}
+
+.radar-select:focus {
+  border-color: var(--radar-border-strong);
+}
+
+/* Touch Range Sliders */
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  color: var(--radar-text-secondary);
+}
+
+.slider-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--radar-text);
+}
+
+input[type="range"].radar-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 14px;
+  background: #051216;
+  border: 1px solid var(--radar-border);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"].radar-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 3px;
+  background: var(--radar-accent);
+  border: 2px solid var(--radar-text);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+}
+
+/* 2x2 Grid for Overlay Buttons */
+.overlay-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.overlay-grid .radar-btn {
+  height: 46px;
+  font-size: 14px;
+}
+
+.temporal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* Replay Scrubber Bar */
+#replayBar {
+  flex: 1;
+  max-width: 520px;
+  background: var(--radar-panel);
+  border: 2px solid var(--radar-border-strong);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Interface Color Swatches & Photoshop-Style Picker */
+.swatch-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.theme-swatch {
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.theme-swatch:hover {
+  transform: scale(1.06);
+  border-color: #ffffff;
+}
+
+.theme-swatch.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 10px var(--radar-accent);
+}
+
+.theme-color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 44px;
+  height: 34px;
+  border: 1px solid var(--radar-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.theme-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.theme-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}

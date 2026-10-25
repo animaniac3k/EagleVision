@@ -1,0 +1,160 @@
+================================================================================
+EAGLEVISION - PROJECT PLAN & TECHNICAL DOCUMENTATION
+Target Platform: Progressive Web App (PWA) for ChromeOS / Android (Lenovo Duet 3)
+                 & Portable Desktop/Laptop Execution
+================================================================================
+
+1. OVERVIEW & DESIGN PHILOSOPHY
+-------------------------------
+EagleVision is an installable, offline-capable Progressive Web App (PWA) built
+for the Lenovo IdeaPad Duet 3 (10.95" 2000x1200 16:10 touch display, ChromeOS),
+Android tablets, and Windows/Linux/macOS laptops. It connects to external USB
+cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provides:
+
+  - 100% Full-Screen Camera Viewport with minimal UI footprint
+  - Touch-first controls (52px hit targets, 16px-18px high-contrast typography)
+  - Dynamic Radar/Instrument Theme Engine (6 tactical presets + live 2D color
+    picker that recalculates all HSL CSS tokens and SVG reticles in real time)
+  - Movable, Corner-Resizable Digital Zoom Window (PiP Magnifier) with a
+    decoupled, hideable ROI Target Crosshair
+  - Preset & Custom Image Overlays (Crosshair, Alignment Grid, Concentric Rings,
+    and user-loaded PNG/SVG/WebP guides)
+  - GPU-Accelerated Image Adjustments (Brightness, Contrast, Saturation, Invert,
+    Monochrome)
+  - Frame-Accurate 20-Second Rolling In-Memory Ring Buffer (~5 MB RAM) that
+    never touches disk until Replay is triggered
+  - One-Tap Instant Replay with Auto-Save to IndexedDB Archive
+  - Temporal Compare ("Chrono-Ghost" & "Change-Radar Delta" overlay modes
+    comparing the live stream against frames from 0.5s to 15.0s ago)
+  - Stored Video Browser & Frame-Accurate Canvas Player with 0.5x slow-motion,
+    single-frame step (+1), timeline scrubbing, and .webm file export to disk
+
+
+2. DIRECTORY & MODULE STRUCTURE
+-------------------------------
+/EagleVision
+├── index.html                        # Main app shell (Screen 1: Live, Screen 2: Archive)
+├── manifest.json                     # PWA manifest (standalone, landscape)
+├── sw.js                             # Network-first Service Worker with offline caching
+├── start_eaglevision.bat             # One-click portable USB launcher for Windows
+├── README.md                         # Quickstart & portable usage instructions
+├── /docs
+│   ├── project_plan.txt              # Complete technical documentation & specification
+│   ├── architecture_infographic.svg  # Standalone vector architecture infographic
+│   └── architecture_infographic.html # Interactive HTML architecture infographic
+├── /assets
+│   └── /icons
+│       └── icon.svg                  # Vector radar reticle PWA icon
+├── /css
+│   ├── variables.css                 # Dynamic --radar-* HSL CSS custom properties
+│   ├── layout.css                    # Full-screen layout, floating strips, draggable panels
+│   ├── viewport.css                  # Main canvas, PiP window, corner resize handles, ROI
+│   ├── controls.css                  # Touch buttons, sliders, color swatches, replay bar
+│   └── gallery.css                   # Stored Video Browser & canvas player layout
+└── /js
+    ├── main.js                       # Application bootstrap, WakeLock & Service Worker init
+    ├── state.js                      # Central reactive pub/sub state store (appState)
+    ├── /camera
+    │   ├── streamManager.js          # USB camera enumeration, hot-plug & 1080p test signal
+    │   └── streamStats.js            # Real-time FPS & resolution telemetry tracker
+    ├── /renderer
+    │   ├── compositor.js             # 60fps dual-canvas renderer + Temporal Ghost/Delta
+    │   ├── zoomWindow.js             # Draggable ROI crosshair, resizable PiP & resize clamp
+    │   ├── imageFilters.js           # GPU CSS filter string builder
+    │   └── overlayManager.js         # Vector SVG & custom image overlay controller
+    ├── /recorder
+    │   ├── memoryRingBuffer.js       # 20s rolling RAM frame ring buffer (JPEG + ImageBitmap)
+    │   └── instantReplay.js          # 60fps RAM replay player + automatic archive save
+    ├── /storage
+    │   ├── videoStore.js             # IndexedDB CRUD for frame archives + .webm disk export
+    │   └── settingsStore.js          # LocalStorage persistence for user UI & theme settings
+    └── /ui
+        ├── hudController.js          # Toggleable live telemetry overlay
+        ├── sidebarControls.js        # Settings window, camera select, filters & HSL theme
+        └── videoBrowser.js           # Stored Video Browser & frame-accurate player
+
+
+3. HOW KEY SUBSYSTEMS WORK & CONNECT
+------------------------------------
+
+3.1 Central Reactive State (js/state.js)
+  - Holds the single source of truth (`appState`) for zoom levels, ROI target
+    coordinates (`roiX`, `roiY`), active overlays, image adjustments, temporal
+    comparison mode, memory buffer telemetry, and interface color.
+  - Modules call `updateState(patch)` to mutate state and `subscribeState(fn)`
+    to reactively update DOM elements or rendering parameters.
+
+3.2 USB Camera & Pre-Rendered Test Signal (js/camera/streamManager.js)
+  - Queries `navigator.mediaDevices.enumerateDevices()` for USB/UVC video inputs
+    and listens to `devicechange` for plug-and-play detection.
+  - Requests 1920x1080 @ 60fps via `getUserMedia` and feeds `<video id="cameraVideoEl">`.
+  - If no camera is connected (or "BUILT-IN TEST SIGNAL" is chosen), pre-renders
+    a static 1080p inspection board onto an offscreen bitmap and animates a radar
+    scanline and timecode at 30fps with near-zero CPU overhead.
+
+3.3 60fps Dual-Canvas Compositor & Temporal Compare (js/renderer/compositor.js)
+  - Runs a `requestAnimationFrame` loop that reads `<video id="cameraVideoEl">`
+    and draws aspect-correct, pan/zoom-cropped frames onto `#mainCanvas`.
+  - Simultaneously renders the magnified region centered on `(roiX, roiY)` onto
+    `#pipCanvas`, scaled relative to the main canvas pixel ratio (`(cropW * (pw / cw)) / pipZoom`)
+    so `3.0x` in the Zoom Window is physically 3.0x larger on screen.
+  - Image adjustments (`brightness`, `contrast`, `saturation`, `invert`, `grayscale`)
+    are applied via GPU-accelerated CSS `canvas.style.filter` only when values change.
+  - When Temporal Compare is set to `GHOST` or `DELTA`, fetches the historical
+    `ImageBitmap` from `N` seconds ago via `getDelayedFrameBitmap(delaySec)` and
+    composites it over both `#mainCanvas` and `#pipCanvas` using `source-over`
+    (50% opacity ghost) or `difference` (Change-Radar where static pixels cancel
+    to black and only movement/changes light up).
+
+3.4 Decoupled ROI Crosshair & Corner-Resizable Zoom Window (js/renderer/zoomWindow.js)
+  - `#zoomTargetCrosshair` can be dragged anywhere on the feed to update `(roiX, roiY)`
+    and then hidden via the reticle button inside the Zoom Window header so it
+    does not clutter the main view.
+  - `#pipZoomWindow` can be dragged by its header/viewport or resized from either
+    its bottom-left (`#pipResizeSW`) or bottom-right (`#pipResizeSE`) corner handle.
+  - A `window.resize` listener automatically clamps `#pipZoomWindow`, `#optionsPanel`,
+    and `#zoomTargetCrosshair` inside the visible viewport so nothing is ever lost
+    off-screen when resizing the window.
+
+3.5 20-Second Rolling In-Memory Frame Ring Buffer (js/recorder/memoryRingBuffer.js)
+  - When `20s RAM` is active, samples `videoEl` onto an 854x480 offscreen canvas
+    at 15 FPS (up to 300 frames = 20.0 seconds, ~5 MB total in RAM).
+  - Stores each frame as `{ timestampMs, jpegBuffer, bitmap }`. Old frames >20s
+    are shifted off the array and `bitmap.close()` is called immediately so RAM
+    usage stays flat indefinitely with zero disk writes.
+
+3.6 Auto-Saving Instant Replay & Stored Video Browser (instantReplay.js, videoBrowser.js)
+  - Pressing `REPLAY` takes a snapshot of the 20s RAM ring buffer, opens the
+    in-memory `#replayCanvas` player driven by a 60fps `requestAnimationFrame`
+    scrubber clock, and automatically saves the 20s clip into IndexedDB (`EagleVisionVideoDB`).
+  - Switching to the Stored Video Browser (`Saved Recordings`) decodes any saved
+    clip's JPEG frames into `ImageBitmap[]` for deterministic playback, scrubbing,
+    `0.5x` slow-motion, and `+1` single-frame stepping on `#galleryPlayerCanvas`.
+  - Clicking `EXPORT TO DISK` encodes the frames into a standard `.webm` video
+    file and saves it via the File System Access API (or browser download).
+
+
+4. PORTABLE USAGE GUIDE (USB STICK / LAPTOP / CHROMEBOOK)
+---------------------------------------------------------
+Because browsers enforce security policies on camera permissions (`getUserMedia`)
+and ES6 modules (`<script type="module">`), the app must be opened via `http://localhost`
+or installed once as a Progressive Web App (PWA).
+
+Option A: Running Directly from a USB Stick on Any Laptop (Windows / Mac / Linux)
+  1. Copy the `/EagleVision` folder onto your USB drive.
+  2. On Windows: Double-click `start_eaglevision.bat` inside the folder.
+     - It automatically detects Python or Node.js, starts a local web server on
+       port 8080, and opens `http://localhost:8080` in your browser.
+  3. On macOS / Linux terminal:
+     - Open a terminal in the `EagleVision` folder and run:
+       `python3 -m http.server 8080`
+     - Open `http://localhost:8080` in Chrome, Edge, or Brave.
+
+Option B: Installing as a 100% Offline App on Lenovo Duet 3 / Laptop (Recommended)
+  1. Connect the Lenovo Duet 3 to the same Wi-Fi network as your laptop (or run
+     the server in ChromeOS Linux terminal), and open the app URL in Chrome.
+  2. Click the "Install EagleVision" icon in the right side of Chrome's address bar.
+  3. Chrome installs EagleVision onto the Duet 3 app shelf/launcher and caches all
+     HTML, CSS, and JS files locally via `sw.js`.
+  4. Once installed, you can launch EagleVision from the Chromebook shelf anytime
+     100% offline—without needing the USB stick or a web server!

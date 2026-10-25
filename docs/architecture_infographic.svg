@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 940" width="1400" height="940">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#040d10"/>
+      <stop offset="100%" stop-color="#020709"/>
+    </linearGradient>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#2dd4bf"/>
+    </marker>
+    <marker id="arrowMuted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#5eead4"/>
+    </marker>
+  </defs>
+
+  <!-- Background & Technical Grid -->
+  <rect width="1400" height="940" fill="url(#bgGrad)"/>
+  <g stroke="rgba(45,212,191,0.05)" stroke-width="1">
+    <line x1="0" y1="80" x2="1400" y2="80"/><line x1="0" y1="160" x2="1400" y2="160"/><line x1="0" y1="240" x2="1400" y2="240"/><line x1="0" y1="320" x2="1400" y2="320"/><line x1="0" y1="400" x2="1400" y2="400"/><line x1="0" y1="480" x2="1400" y2="480"/><line x1="0" y1="560" x2="1400" y2="560"/><line x1="0" y1="640" x2="1400" y2="640"/><line x1="0" y1="720" x2="1400" y2="720"/><line x1="0" y1="800" x2="1400" y2="800"/><line x1="0" y1="880" x2="1400" y2="880"/>
+    <line x1="100" y1="0" x2="100" y2="940"/><line x1="260" y1="0" x2="260" y2="940"/><line x1="420" y1="0" x2="420" y2="940"/><line x1="580" y1="0" x2="580" y2="940"/><line x1="740" y1="0" x2="740" y2="940"/><line x1="900" y1="0" x2="900" y2="940"/><line x1="1060" y1="0" x2="1060" y2="940"/><line x1="1220" y1="0" x2="1220" y2="940"/>
+  </g>
+
+  <!-- Title Banner -->
+  <rect x="30" y="22" width="1340" height="66" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2"/>
+  <text x="54" y="52" fill="#ccfbf1" font-family="monospace" font-size="22" font-weight="bold">EAGLEVISION — SYSTEM ARCHITECTURE &amp; MODULE DATA FLOW</text>
+  <text x="54" y="74" fill="#5eead4" font-family="monospace" font-size="13">Progressive Web App (ChromeOS / Lenovo Duet 3 / Android / Desktop) • Modular ES6 Architecture</text>
+  <text x="1345" y="58" text-anchor="end" fill="#2dd4bf" font-family="monospace" font-size="14" font-weight="bold">60 FPS PIPELINE + 20s RAM RING BUFFER</text>
+
+  <!-- ===================================================================== -->
+  <!-- COLUMN 1: BOOTSTRAP, CAMERA INPUT & CENTRAL STATE                     -->
+  <!-- ===================================================================== -->
+  <text x="40" y="122" fill="#2dd4bf" font-family="monospace" font-size="15" font-weight="bold">1. ENTRY, INPUT &amp; STATE</text>
+
+  <!-- index.html / main.js / sw.js -->
+  <rect x="40" y="136" width="320" height="145" rx="6" fill="#07161b" stroke="#1b4d57" stroke-width="2"/>
+  <rect x="40" y="136" width="320" height="32" rx="6" fill="#0b2229"/>
+  <text x="54" y="157" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">APP SHELL &amp; BOOTSTRAP</text>
+  <text x="54" y="188" fill="#5eead4" font-family="monospace" font-size="13">• index.html (Screen 1 &amp; Screen 2 DOM)</text>
+  <text x="54" y="210" fill="#5eead4" font-family="monospace" font-size="13">• js/main.js (Init pipeline &amp; WakeLock)</text>
+  <text x="54" y="232" fill="#5eead4" font-family="monospace" font-size="13">• sw.js &amp; manifest.json (Offline PWA)</text>
+  <text x="54" y="254" fill="#99f6e4" font-family="monospace" font-size="12">• css/variables, layout, viewport, controls, gallery</text>
+
+  <!-- Camera Stream Manager -->
+  <rect x="40" y="315" width="320" height="175" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2"/>
+  <rect x="40" y="315" width="320" height="32" rx="6" fill="#0b2229"/>
+  <text x="54" y="336" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">CAMERA &amp; TELEMETRY (/js/camera)</text>
+  <text x="54" y="368" fill="#ccfbf1" font-family="monospace" font-size="13" font-weight="bold">streamManager.js</text>
+  <text x="54" y="388" fill="#99f6e4" font-family="monospace" font-size="12">• USB UVC getUserMedia (1920×1080 @ 60fps)</text>
+  <text x="54" y="406" fill="#99f6e4" font-family="monospace" font-size="12">• Hot-plug devicechange detection</text>
+  <text x="54" y="424" fill="#99f6e4" font-family="monospace" font-size="12">• Pre-rendered 1080p Test Signal fallback</text>
+  <text x="54" y="452" fill="#ccfbf1" font-family="monospace" font-size="13" font-weight="bold">streamStats.js</text>
+  <text x="54" y="472" fill="#99f6e4" font-family="monospace" font-size="12">• Live rendered FPS &amp; resolution counter</text>
+
+  <!-- Central State & Settings Store -->
+  <rect x="40" y="525" width="320" height="230" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2"/>
+  <rect x="40" y="525" width="320" height="32" rx="6" fill="#0b2229"/>
+  <text x="54" y="546" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">REACTIVE STATE BUS (js/state.js)</text>
+  <text x="54" y="578" fill="#5eead4" font-family="monospace" font-size="13">appState + updateState() + subscribeState()</text>
+  <text x="54" y="604" fill="#99f6e4" font-family="monospace" font-size="12">• mainZoom, mainPanX, mainPanY</text>
+  <text x="54" y="624" fill="#99f6e4" font-family="monospace" font-size="12">• pipEnabled, pipZoom, roiX, roiY, roiVisible</text>
+  <text x="54" y="644" fill="#99f6e4" font-family="monospace" font-size="12">• overlayType, overlayOpacity, overlayScale</text>
+  <text x="54" y="664" fill="#99f6e4" font-family="monospace" font-size="12">• brightness, contrast, saturation, invert, mono</text>
+  <text x="54" y="684" fill="#99f6e4" font-family="monospace" font-size="12">• temporalMode (off | ghost | delta), delaySec</text>
+  <text x="54" y="704" fill="#99f6e4" font-family="monospace" font-size="12">• bufferEnabled, bufferedSeconds, themeColor</text>
+  <text x="54" y="734" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">↔ js/storage/settingsStore.js (localStorage)</text>
+
+
+  <!-- ===================================================================== -->
+  <!-- COLUMN 2: 60FPS DUAL-CANVAS COMPOSITOR & OVERLAY ENGINE               -->
+  <!-- ===================================================================== -->
+  <text x="440" y="122" fill="#2dd4bf" font-family="monospace" font-size="15" font-weight="bold">2. 60FPS RENDERING &amp; OVERLAY PIPELINE (/js/renderer)</text>
+
+  <!-- Compositor Box -->
+  <rect x="440" y="136" width="460" height="305" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2.5"/>
+  <rect x="440" y="136" width="460" height="34" rx="6" fill="#0b2229"/>
+  <text x="456" y="158" fill="#ccfbf1" font-family="monospace" font-size="15" font-weight="bold">compositor.js — 60FPS DUAL-CANVAS ENGINE</text>
+
+  <!-- Sub-box: Main Canvas -->
+  <rect x="460" y="186" width="420" height="82" rx="4" fill="#091a20" stroke="#1b4d57" stroke-width="1.5"/>
+  <text x="476" y="210" fill="#2dd4bf" font-family="monospace" font-size="13" font-weight="bold">1. Primary Viewport (#mainCanvas)</text>
+  <text x="476" y="232" fill="#99f6e4" font-family="monospace" font-size="12">• Aspect-correct crop + Main Zoom (1.0x–8.0x) &amp; Touch Pan</text>
+  <text x="476" y="252" fill="#99f6e4" font-family="monospace" font-size="12">• Composites Temporal Ghost (50%) or Delta (Difference) layer</text>
+
+  <!-- Sub-box: PiP Canvas -->
+  <rect x="460" y="282" width="420" height="82" rx="4" fill="#091a20" stroke="#1b4d57" stroke-width="1.5"/>
+  <text x="476" y="306" fill="#2dd4bf" font-family="monospace" font-size="13" font-weight="bold">2. Digital Zoom Loupe (#pipCanvas)</text>
+  <text x="476" y="328" fill="#99f6e4" font-family="monospace" font-size="12">• Samples source around normalized ROI target (roiX, roiY)</text>
+  <text x="476" y="348" fill="#99f6e4" font-family="monospace" font-size="12">• Scales by (cropW * (pw/cw)) / pipZoom for true magnification</text>
+
+  <!-- Sub-box: GPU Filter Pipeline -->
+  <rect x="460" y="376" width="420" height="48" rx="4" fill="#091a20" stroke="#1b4d57" stroke-width="1.5"/>
+  <text x="476" y="398" fill="#ccfbf1" font-family="monospace" font-size="13" font-weight="bold">imageFilters.js → GPU CSS Filter Compositing</text>
+  <text x="476" y="415" fill="#99f6e4" font-family="monospace" font-size="12">• Applies brightness / contrast / saturate / invert / grayscale on GPU</text>
+
+  <!-- Zoom Window & ROI Controller -->
+  <rect x="440" y="465" width="460" height="140" rx="6" fill="#07161b" stroke="#1b4d57" stroke-width="2"/>
+  <rect x="440" y="465" width="460" height="32" rx="6" fill="#0b2229"/>
+  <text x="456" y="486" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">zoomWindow.js — ROI TARGET &amp; RESIZABLE PIP</text>
+  <text x="456" y="516" fill="#99f6e4" font-family="monospace" font-size="12">• Draggable #zoomTargetCrosshair updates (roiX, roiY)</text>
+  <text x="456" y="538" fill="#99f6e4" font-family="monospace" font-size="12">• Single Show/Hide ROI button inside Zoom Window header</text>
+  <text x="456" y="560" fill="#99f6e4" font-family="monospace" font-size="12">• Bottom-Left &amp; Bottom-Right Corner Resize (#pipResizeSW / SE)</text>
+  <text x="456" y="582" fill="#99f6e4" font-family="monospace" font-size="12">• Window resize listener clamps all floating windows in bounds</text>
+
+  <!-- Overlay Manager -->
+  <rect x="440" y="630" width="460" height="125" rx="6" fill="#07161b" stroke="#1b4d57" stroke-width="2"/>
+  <rect x="440" y="630" width="460" height="32" rx="6" fill="#0b2229"/>
+  <text x="456" y="651" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">overlayManager.js — SUPERIMPOSED GUIDES</text>
+  <text x="456" y="681" fill="#99f6e4" font-family="monospace" font-size="12">• Vector SVG Presets: Crosshair, Alignment Grid, Concentric Rings</text>
+  <text x="456" y="703" fill="#99f6e4" font-family="monospace" font-size="12">• Custom local PNG / SVG / WebP image loader (#customOverlayImg)</text>
+  <text x="456" y="725" fill="#99f6e4" font-family="monospace" font-size="12">• PreserveAspectRatio="xMidYMid meet" + Opacity &amp; Scale sliders</text>
+
+
+  <!-- ===================================================================== -->
+  <!-- COLUMN 3: 20s RAM BUFFER, AUTO-SAVE REPLAY & VIDEO ARCHIVE            -->
+  <!-- ===================================================================== -->
+  <text x="970" y="122" fill="#2dd4bf" font-family="monospace" font-size="15" font-weight="bold">3. 20s RAM BUFFER &amp; ARCHIVE</text>
+
+  <!-- 20s RAM Ring Buffer -->
+  <rect x="970" y="136" width="390" height="205" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2.5"/>
+  <rect x="970" y="136" width="390" height="34" rx="6" fill="#0b2229"/>
+  <text x="986" y="158" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">memoryRingBuffer.js (RAM ONLY)</text>
+  <text x="986" y="188" fill="#5eead4" font-family="monospace" font-size="13" font-weight="bold">Circular Frame Ring (300 frames = 20.0s)</text>
+  <text x="986" y="212" fill="#99f6e4" font-family="monospace" font-size="12">• Samples 854×480 @ 15 FPS (~5 MB RAM total)</text>
+  <text x="986" y="234" fill="#99f6e4" font-family="monospace" font-size="12">• Stores { timestampMs, jpegBuffer, bitmap }</text>
+  <text x="986" y="256" fill="#99f6e4" font-family="monospace" font-size="12">• Auto-evicts &amp; closes bitmaps &gt; 20.0s old</text>
+  <text x="986" y="282" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">→ getDelayedFrameBitmap(delaySec) [O(1)]</text>
+  <text x="986" y="304" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">→ snapshotMemoryBuffer() [Instant Clone]</text>
+
+  <!-- Instant Replay & Auto-Save -->
+  <rect x="970" y="375" width="390" height="165" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2"/>
+  <rect x="970" y="375" width="390" height="32" rx="6" fill="#0b2229"/>
+  <text x="986" y="396" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">instantReplay.js — REPLAY &amp; AUTO-SAVE</text>
+  <text x="986" y="426" fill="#99f6e4" font-family="monospace" font-size="12">• Triggered by single REPLAY button on main bar</text>
+  <text x="986" y="448" fill="#99f6e4" font-family="monospace" font-size="12">• 60fps rAF clock drives #replayCanvas &amp; scrubber</text>
+  <text x="986" y="470" fill="#99f6e4" font-family="monospace" font-size="12">• Instant frame-accurate scrubbing &amp; Play/Pause</text>
+  <text x="986" y="496" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">• Automatically saves clip to videoStore.js!</text>
+
+  <!-- IndexedDB Video Store & Screen 2 Browser -->
+  <rect x="970" y="575" width="390" height="180" rx="6" fill="#07161b" stroke="#2dd4bf" stroke-width="2"/>
+  <rect x="970" y="575" width="390" height="32" rx="6" fill="#0b2229"/>
+  <text x="986" y="596" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">videoStore.js &amp; videoBrowser.js</text>
+  <text x="986" y="626" fill="#5eead4" font-family="monospace" font-size="13" font-weight="bold">IndexedDB Archive + Screen 2 Player</text>
+  <text x="986" y="650" fill="#99f6e4" font-family="monospace" font-size="12">• Persists compressed JPEG frame arrays in DB</text>
+  <text x="986" y="672" fill="#99f6e4" font-family="monospace" font-size="12">• #galleryPlayerCanvas + timeline scrubber</text>
+  <text x="986" y="694" fill="#99f6e4" font-family="monospace" font-size="12">• Play/Pause, 0.5x Slow-Mo, +1 Frame Step</text>
+  <text x="986" y="716" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">• Export to Disk encodes standard .webm file</text>
+
+
+  <!-- ===================================================================== -->
+  <!-- BOTTOM ROW: UI CONTROLLERS & DYNAMIC HSL THEME ENGINE                 -->
+  <!-- ===================================================================== -->
+  <rect x="40" y="790" width="1320" height="118" rx="6" fill="#07161b" stroke="#1b4d57" stroke-width="2"/>
+  <rect x="40" y="790" width="1320" height="32" rx="6" fill="#0b2229"/>
+  <text x="56" y="811" fill="#ccfbf1" font-family="monospace" font-size="14" font-weight="bold">4. UI CONTROLLERS &amp; DYNAMIC HSL COLOR ENGINE (/js/ui/sidebarControls.js &amp; hudController.js)</text>
+  <text x="56" y="845" fill="#99f6e4" font-family="monospace" font-size="13">• Floating Corner Icon Strips (52×52px touch targets): Settings Toggle, Zoom Window Toggle, Telemetry HUD Toggle, 20s RAM Switch, Archive</text>
+  <text x="56" y="868" fill="#99f6e4" font-family="monospace" font-size="13">• Movable &amp; Collapsible Settings Window (#optionsPanel): Camera Select, Overlay Guides, Image Adjust, Temporal Compare, Interface Color</text>
+  <text x="56" y="891" fill="#2dd4bf" font-family="monospace" font-size="13" font-weight="bold">• applyThemeColor(hex): Converts chosen swatch or 2D color picker hex → HSL and updates all --radar-* CSS variables &amp; SVG reticles live</text>
+
+
+  <!-- ===================================================================== -->
+  <!-- CONNECTING DATA-FLOW ARROWS                                           -->
+  <!-- ===================================================================== -->
+  <!-- Camera to Compositor -->
+  <line x1="360" y1="380" x2="432" y2="240" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#arrowTeal)"/>
+  <!-- Camera to 20s RAM Ring Buffer -->
+  <path d="M 360 350 L 400 350 L 400 110 L 950 110 L 950 190 L 964 190" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowTeal)"/>
+  <text x="675" y="103" text-anchor="middle" fill="#5eead4" font-family="monospace" font-size="12">Live Video Frames (15 FPS Sample)</text>
+
+  <!-- RAM Ring Buffer to Compositor (Temporal Ghost/Delta) -->
+  <line x1="970" y1="240" x2="906" y2="240" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#arrowTeal)"/>
+  <text x="938" y="230" text-anchor="middle" fill="#2dd4bf" font-family="monospace" font-size="11" font-weight="bold">t - Δt</text>
+
+  <!-- RAM Ring Buffer to Instant Replay -->
+  <line x1="1165" y1="341" x2="1165" y2="369" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#arrowTeal)"/>
+
+  <!-- Instant Replay to Video Store (Auto-Save) -->
+  <line x1="1165" y1="540" x2="1165" y2="569" stroke="#2dd4bf" stroke-width="2.5" marker-end="url(#arrowTeal)"/>
+
+  <!-- State Bus to Compositor / Zoom / Overlays -->
+  <line x1="360" y1="580" x2="432" y2="535" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowMuted)"/>
+  <line x1="360" y1="650" x2="432" y2="680" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowMuted)"/>
+
+  <!-- UI Controls to State Bus -->
+  <line x1="200" y1="790" x2="200" y2="761" stroke="#5eead4" stroke-width="2" marker-end="url(#arrowMuted)"/>
+</svg>

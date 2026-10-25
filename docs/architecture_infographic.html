@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EagleVision — Architecture & Data Flow Infographic</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      background-color: #03090c;
+      color: #ccfbf1;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(45, 212, 191, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    .node-card {
+      background: rgba(7, 22, 27, 0.94);
+      border: 1px solid #1b4d57;
+      border-radius: 6px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.65);
+    }
+    .node-card-strong {
+      border-color: #2dd4bf;
+      box-shadow: 0 0 16px rgba(45, 212, 191, 0.2);
+    }
+    .node-header {
+      background: #0b2229;
+      border-bottom: 1px solid #1b4d57;
+      padding: 8px 14px;
+      font-family: ui-monospace, monospace;
+      font-weight: 700;
+      font-size: 14px;
+      color: #ccfbf1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      background: #2dd4bf;
+      color: #041316;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body class="p-6 grid-bg min-h-screen">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    <!-- Top Banner -->
+    <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC</div>
+        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">EAGLEVISION — MODULE STRUCTURE &amp; DATA PIPELINE</h1>
+        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App for ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop Execution</p>
+      </div>
+      <div class="flex gap-3 font-mono text-xs">
+        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
+          <div class="text-[#5eead4]">RENDER LOOP</div>
+          <div class="text-base font-bold text-[#ccfbf1]">60 FPS GPU</div>
+        </div>
+        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
+          <div class="text-[#5eead4]">RAM RING BUFFER</div>
+          <div class="text-base font-bold text-[#2dd4bf]">20.0s (300 FRAMES)</div>
+        </div>
+        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
+          <div class="text-[#5eead4]">STORAGE</div>
+          <div class="text-base font-bold text-[#ccfbf1]">IndexedDB + WebM</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 3-Column Core Architecture Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- COLUMN 1: Input & Central State -->
+      <div class="lg:col-span-4 space-y-5">
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">1. Input &amp; Reactive State</div>
+
+        <div class="node-card">
+          <div class="node-header">
+            <span>APP SHELL &amp; PWA</span>
+            <span class="badge">ROOT</span>
+          </div>
+          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
+            <div><strong class="text-[#ccfbf1]">index.html</strong> — Screen 1 (Live) &amp; Screen 2 (Archive)</div>
+            <div><strong class="text-[#ccfbf1]">js/main.js</strong> — Bootstraps modules &amp; Screen WakeLock</div>
+            <div><strong class="text-[#ccfbf1]">sw.js + manifest.json</strong> — Offline Service Worker</div>
+            <div><strong class="text-[#ccfbf1]">start_eaglevision.bat</strong> — Portable USB stick launcher</div>
+          </div>
+        </div>
+
+        <div class="node-card node-card-strong">
+          <div class="node-header">
+            <span>USB CAMERA &amp; TEST FEED</span>
+            <span class="badge">/js/camera</span>
+          </div>
+          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
+            <div><strong class="text-[#ccfbf1]">streamManager.js</strong></div>
+            <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
+              <li>Enumerates UVC USB cameras via <code class="text-[#ccfbf1]">enumerateDevices()</code></li>
+              <li>Streams 1920×1080 @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
+              <li>Pre-rendered 1080p radar test board fallback</li>
+            </ul>
+            <div class="pt-1"><strong class="text-[#ccfbf1]">streamStats.js</strong> — Live FPS &amp; resolution counter</div>
+          </div>
+        </div>
+
+        <div class="node-card node-card-strong">
+          <div class="node-header">
+            <span>CENTRAL REACTIVE STORE</span>
+            <span class="badge">js/state.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
+            <div class="text-[#2dd4bf] font-bold">Pub/Sub: updateState(patch) → subscribeState(fn)</div>
+            <div class="grid grid-cols-2 gap-1.5 pt-1">
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• pipZoom / roiX,Y</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• overlayType<br/>• opacity / scale</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• brightness/contrast<br/>• invert / mono</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• temporalMode<br/>• themeColor</div>
+            </div>
+            <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUMN 2: 60fps Renderer & Temporal Compositor -->
+      <div class="lg:col-span-4 space-y-5">
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. 60FPS Dual-Canvas &amp; Overlays</div>
+
+        <div class="node-card node-card-strong">
+          <div class="node-header">
+            <span>DUAL-CANVAS COMPOSITOR</span>
+            <span class="badge">compositor.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-3 font-mono">
+            <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
+              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas)</div>
+              <div class="text-[#99f6e4]">• Aspect-correct 1.0x–8.0x digital zoom &amp; touch pan</div>
+              <div class="text-[#99f6e4]">• Blends Temporal <strong class="text-[#ccfbf1]">GHOST</strong> (50% past frame) or <strong class="text-[#ccfbf1]">DELTA</strong> (difference Change-Radar)</div>
+            </div>
+
+            <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
+              <div class="text-sm font-bold text-[#2dd4bf]">B. Digital Zoom Window (#pipCanvas)</div>
+              <div class="text-[#99f6e4]">• Samples source around decoupled ROI Crosshair <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
+              <div class="text-[#99f6e4]">• Scales crop by <code class="text-[#ccfbf1]">(cropW * (pw/cw)) / pipZoom</code> for true screen magnification</div>
+            </div>
+
+            <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
+              <strong class="text-[#ccfbf1]">imageFilters.js</strong> → GPU CSS <code class="text-[#5eead4]">canvas.style.filter</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-card">
+          <div class="node-header">
+            <span>ZOOM WINDOW &amp; ROI TARGET</span>
+            <span class="badge">zoomWindow.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
+            <div>• Draggable <strong class="text-[#ccfbf1]">#zoomTargetCrosshair</strong> aims the Zoom Window</div>
+            <div>• Single Show/Hide ROI button inside Zoom Window header</div>
+            <div>• Bottom-Left &amp; Bottom-Right Corner Resize handles</div>
+            <div>• Automatic viewport boundary clamping on window resize</div>
+          </div>
+        </div>
+
+        <div class="node-card">
+          <div class="node-header">
+            <span>SUPERIMPOSED GUIDES</span>
+            <span class="badge">overlayManager.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
+            <div>• Vector presets: Crosshair, Alignment Grid, Concentric Rings</div>
+            <div>• Custom local PNG / SVG / WebP image upload</div>
+            <div>• Dynamic <code class="text-[#2dd4bf]">var(--radar-accent)</code> color adaptation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COLUMN 3: 20s RAM Ring Buffer, Replay & Archive -->
+      <div class="lg:col-span-4 space-y-5">
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. 20s RAM Buffer &amp; Video Archive</div>
+
+        <div class="node-card node-card-strong">
+          <div class="node-header">
+            <span>20s RAM FRAME RING BUFFER</span>
+            <span class="badge">memoryRingBuffer.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
+            <div class="text-[#2dd4bf] font-bold">Circular Array in RAM (15 FPS × 20s = 300 Frames)</div>
+            <div>• Captures 854×480 JPEG ArrayBuffer + GPU <code class="text-[#ccfbf1]">ImageBitmap</code></div>
+            <div>• Uses only ~5 MB RAM; zero disk wear while running</div>
+            <div>• Frames older than 20.0s are evicted &amp; <code class="text-[#ccfbf1]">bitmap.close()</code>d</div>
+            <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57] text-[#5eead4] mt-2">
+              <div>1. Feeds <strong class="text-[#ccfbf1]">getDelayedFrameBitmap(Δt)</strong> to Compositor</div>
+              <div>2. Feeds <strong class="text-[#ccfbf1]">snapshotMemoryBuffer()</strong> to Instant Replay</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="node-card node-card-strong">
+          <div class="node-header">
+            <span>INSTANT REPLAY + AUTO-SAVE</span>
+            <span class="badge">instantReplay.js</span>
+          </div>
+          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
+            <div>• Triggered by single <strong class="text-[#2dd4bf]">REPLAY</strong> button on bottom bar</div>
+            <div>• 60fps <code class="text-[#ccfbf1]">requestAnimationFrame</code> clock drives <code class="text-[#ccfbf1]">#replayCanvas</code> and moving scrubber bar</div>
+            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> the 20s clip to IndexedDB</div>
+          </div>
+        </div>
+
+        <div class="node-card">
+          <div class="node-header">
+            <span>STORED VIDEO ARCHIVE</span>
+            <span class="badge">videoStore + videoBrowser</span>
+          </div>
+          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
+            <div>• <strong class="text-[#ccfbf1]">videoStore.js</strong>: Stores frame arrays in IndexedDB (<code class="text-[#5eead4]">EagleVisionVideoDB</code>)</div>
+            <div>• <strong class="text-[#ccfbf1]">videoBrowser.js</strong>: Screen 2 player (<code class="text-[#5eead4]">#galleryPlayerCanvas</code>) with scrubber, 0.5x slow-mo &amp; +1 frame step</div>
+            <div>• <strong class="text-[#2dd4bf]">EXPORT TO DISK</strong> encodes &amp; downloads a <code class="text-[#ccfbf1]">.webm</code> video file</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom UI & Theme Engine Bar -->
+    <div class="node-card p-4 font-mono text-xs flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <span class="text-[#2dd4bf] font-bold">UI &amp; HSL THEME ENGINE (sidebarControls.js / hudController.js):</span>
+        <span class="text-[#99f6e4] ml-2">6 Tactical Color Swatches + 2D Color Picker → <code class="text-[#ccfbf1]">applyThemeColor(hex)</code> updates all <code class="text-[#5eead4]">--radar-*</code> CSS tokens &amp; SVG reticles live.</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

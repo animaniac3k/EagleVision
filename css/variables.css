@@ -1,0 +1,51 @@
+:root {
+  /* Refined Radar Teal/Green Monochrome Palette */
+  --radar-bg-deep: #03090c;
+  --radar-bg: #040d10;
+  --radar-panel: rgba(7, 22, 27, 0.94);
+  --radar-header: #0b2229;
+  --radar-surface: #091a20;
+  --radar-surface-hover: #11323b;
+  --radar-border: #1b4d57;
+  --radar-border-strong: #2dd4bf;
+  --radar-text: #ccfbf1;
+  --radar-text-secondary: #99f6e4;
+  --radar-text-muted: #5eead4;
+  --radar-accent: #2dd4bf;
+  --radar-accent-contrast: #041316;
+  --radar-danger: #f43f5e;
+
+  /* Typography & Sizing for 12-inch Tablet Touch Screen */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --touch-target: 52px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --shadow-panel: 0 14px 32px rgba(0, 0, 0, 0.78), 0 0 1px rgba(45, 212, 191, 0.3);
+  --shadow-glow: 0 0 14px rgba(45, 212, 191, 0.35);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--radar-bg-deep);
+  color: var(--radar-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.hidden {
+  display: none !important;
+}

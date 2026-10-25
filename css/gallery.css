@@ -1,0 +1,133 @@
+/* Screen 2: Stored Video Browser & Viewer */
+#screenGallery {
+  background-color: var(--radar-bg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--radar-border);
+  padding-bottom: 14px;
+}
+
+.gallery-title {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--radar-text);
+}
+
+.gallery-workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 20px;
+  min-height: 0;
+}
+
+.clips-list-container {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  touch-action: pan-y;
+}
+
+.clip-card {
+  padding: 16px;
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.clip-card:hover,
+.clip-card.active {
+  border-color: var(--radar-border-strong);
+  background: var(--radar-surface-hover);
+}
+
+.clip-name {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--radar-text);
+}
+
+.clip-meta {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--radar-text-muted);
+  margin-top: 4px;
+}
+
+.player-panel {
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
+}
+
+.player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--radar-border);
+  padding-bottom: 10px;
+}
+
+.player-stage {
+  flex: 1;
+  margin: 14px 0;
+  background: var(--radar-bg-deep);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+#galleryPlayerCanvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.gallery-scrubber-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.player-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.player-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

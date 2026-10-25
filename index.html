@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b2229" />
+  <title>EagleVision — USB Camera & Overlay System</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/layout.css" />
+  <link rel="stylesheet" href="./css/viewport.css" />
+  <link rel="stylesheet" href="./css/controls.css" />
+  <link rel="stylesheet" href="./css/gallery.css" />
+</head>
+<body>
+  <div id="appRoot">
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 1: 100% FULL-SCREEN LIVE CAMERA WORKSPACE                    -->
+    <!-- =================================================================== -->
+    <main id="screenLive" class="screen-view">
+      <div id="viewportContainer">
+        <!-- Hidden Video Source Element -->
+        <video id="cameraVideoEl" playsinline muted style="display:none;"></video>
+
+        <!-- Primary Full-Screen Stream Canvas -->
+        <canvas id="mainCanvas"></canvas>
+
+        <!-- Superimposed Guide Overlay Layer -->
+        <div id="overlayLayer" style="opacity: 0.75;">
+          <svg id="svgOverlay" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <img id="customOverlayImg" class="hidden" alt="Custom Overlay" />
+        </div>
+
+        <!-- Draggable ROI Target Crosshair (Toggled from Zoom Window Header) -->
+        <div id="zoomTargetCrosshair" title="Drag to position Zoom Window target">
+          <svg viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="28" stroke="var(--radar-text-muted)" stroke-width="2" stroke-dasharray="5 4" fill="rgba(45, 212, 191, 0.08)" />
+            <line x1="6" y1="48" x2="35" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="61" y1="48" x2="90" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="48" y1="6" x2="48" y2="35" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="48" y1="61" x2="48" y2="90" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <circle cx="48" cy="48" r="2.5" fill="var(--radar-text)" />
+          </svg>
+        </div>
+
+        <!-- Movable Digital Zoom Window (PiP Magnifier) -->
+        <section id="pipZoomWindow">
+          <header id="pipHeader">
+            <span id="pipZoomBadge">3.0x</span>
+            <div class="pip-controls">
+              <!-- Single ROI Crosshair Show/Hide Toggle inside Zoom Window Header -->
+              <button id="btnPipToggleRoi" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide ROI Target Crosshair on Feed">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+                </svg>
+              </button>
+              <button id="pipZoomMinus" class="radar-btn radar-btn-sm" title="Decrease Window Zoom">−</button>
+              <button id="pipZoomPlus" class="radar-btn radar-btn-sm" title="Increase Window Zoom">+</button>
+            </div>
+          </header>
+          <div id="pipViewport">
+            <canvas id="pipCanvas" width="340" height="210"></canvas>
+            <div class="pip-center-reticle"></div>
+            <!-- Corner Resize Handles (Bottom-Left & Bottom-Right for easy finger access) -->
+            <div id="pipResizeSW" class="pip-resize-handle pip-resize-sw" title="Drag corner to resize Zoom Window"></div>
+            <div id="pipResizeSE" class="pip-resize-handle pip-resize-se" title="Drag corner to resize Zoom Window"></div>
+          </div>
+        </section>
+
+        <!-- Instant Replay Video Modal (Shown when scrubbing 20s RAM Buffer) -->
+        <div id="instantReplayModal" class="hidden">
+          <div class="replay-status-banner">
+            <span class="replay-pulse-dot"></span>
+            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED 20s CLIP</span>
+          </div>
+          <canvas id="replayCanvas" width="854" height="480"></canvas>
+        </div>
+      </div>
+
+      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, Zoom Window, Stream Telemetry) -->
+      <nav class="floating-strip strip-top-left">
+        <button id="btnToggleOptions" class="radar-btn radar-btn-active" title="Show / Hide Settings Window">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+
+        <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Show / Hide Digital Zoom Window">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7"/><path stroke-linecap="round" d="M20 20l-4.35-4.35M11 8v6M8 11h6"/>
+          </svg>
+        </button>
+
+        <button id="btnToggleHud" class="radar-btn" title="Show / Hide Stream Info HUD">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
+          </svg>
+        </button>
+      </nav>
+
+      <!-- TOP-RIGHT FLOATING ICON STRIP (20s RAM Buffer Toggle + Saved Recordings Screen) -->
+      <nav class="floating-strip strip-top-right">
+        <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable 20-Second In-Memory Video Buffer">
+          <span id="bufferDot" class="status-dot"></span>
+          <span id="bufferText">20s RAM</span>
+        </button>
+
+        <button id="btnSwitchScreen" class="radar-btn" title="Open Stored Video Browser">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
+          </svg>
+          <span id="clipCountBadge">0</span>
+        </button>
+      </nav>
+
+      <!-- MOVABLE & COLLAPSIBLE SETTINGS WINDOW (Streamlined: Camera, Overlay Guide, Image Adjust) -->
+      <aside id="optionsPanel">
+        <header id="optionsDragHandle" class="panel-header">
+          <div class="panel-title">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/>
+            </svg>
+            <span>SETTINGS</span>
+          </div>
+          <button id="btnCloseOptionsInner" class="radar-btn radar-btn-sm" title="Hide Settings">✕</button>
+        </header>
+
+        <div class="panel-body">
+          <!-- 1. USB Camera Source -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <label for="cameraSelect" class="settings-label">Camera Source</label>
+              <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" title="Rescan USB Cameras">↻</button>
+            </div>
+            <select id="cameraSelect" class="radar-select"></select>
+          </div>
+
+          <!-- 2. Superimpose Overlay Guide -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Overlay Guide</span>
+              <button id="btnToggleOverlay" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+            </div>
+
+            <div class="overlay-grid">
+              <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">CROSSHAIR</button>
+              <button data-ov="grid" class="ov-btn radar-btn">GRID</button>
+              <button data-ov="rings" class="ov-btn radar-btn">RINGS</button>
+              <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
+            </div>
+            <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Opacity</span>
+                <span id="valOvOpacity" class="slider-val">75%</span>
+              </div>
+              <input id="sliderOvOpacity" type="range" min="10" max="100" value="75" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Guide Scale</span>
+                <span id="valOvScale" class="slider-val">100%</span>
+              </div>
+              <input id="sliderOvScale" type="range" min="25" max="200" value="100" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 3. Image Manipulation -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Image Adjust</span>
+              <button id="btnResetFilters" class="radar-btn radar-btn-sm">RESET</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Brightness</span>
+                <span id="valBrightness" class="slider-val">100%</span>
+              </div>
+              <input id="sliderBrightness" type="range" min="40" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Contrast</span>
+                <span id="valContrast" class="slider-val">100%</span>
+              </div>
+              <input id="sliderContrast" type="range" min="40" max="220" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Saturation</span>
+                <span id="valSaturation" class="slider-val">100%</span>
+              </div>
+              <input id="sliderSaturation" type="range" min="0" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="overlay-grid">
+              <button id="btnFilterInvert" class="radar-btn radar-btn-sm">INVERT</button>
+              <button id="btnFilterGrayscale" class="radar-btn radar-btn-sm">MONO</button>
+            </div>
+          </div>
+
+          <!-- 4. Temporal Change / Chrono-Ghost Overlay -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Temporal Compare</span>
+              <span id="valTemporalDelay" class="slider-val">2.0s AGO</span>
+            </div>
+            <div class="temporal-grid">
+              <button data-temp="off" class="temp-btn radar-btn radar-btn-sm radar-btn-active">OFF</button>
+              <button data-temp="ghost" class="temp-btn radar-btn radar-btn-sm" title="Superimpose translucent ghost from N seconds ago">GHOST</button>
+              <button data-temp="delta" class="temp-btn radar-btn radar-btn-sm" title="Highlight only what moved or changed over the last N seconds">DELTA</button>
+            </div>
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Time Lookback</span>
+              </div>
+              <input id="sliderTemporalDelay" type="range" min="0.5" max="15" step="0.5" value="2.0" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 5. Interface Theme Color Swatch -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Interface Color</span>
+              <input id="colorPickerCustom" type="color" value="#2dd4bf" class="theme-color-input" title="Pick Custom Interface Color" />
+            </div>
+            <div class="swatch-row">
+              <button class="theme-swatch active" data-color="#2dd4bf" style="background:#2dd4bf;" title="Radar Teal"></button>
+              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Phosphor Green"></button>
+              <button class="theme-swatch" data-color="#38bdf8" style="background:#38bdf8;" title="Sonar Cyan-Blue"></button>
+              <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
+              <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
+              <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- STREAM TELEMETRY HUD OVERLAY -->
+      <aside id="hudOverlay" class="hidden">
+        <div class="hud-header">
+          <span>STREAM TELEMETRY</span>
+          <span id="hudFps">60 FPS</span>
+        </div>
+        <div class="hud-row"><span class="hud-key">SOURCE:</span><span id="hudSource" class="hud-val">USB CAM</span></div>
+        <div class="hud-row"><span class="hud-key">RES:</span><span id="hudResolution" class="hud-val">1920×1080</span></div>
+        <div class="hud-row"><span class="hud-key">MAIN ZOOM:</span><span id="hudMainZoom" class="hud-val">1.0x</span></div>
+        <div class="hud-row"><span class="hud-key">WIN ZOOM:</span><span id="hudPipZoom" class="hud-val">3.0x</span></div>
+        <div class="hud-row"><span class="hud-key">RAM BUFFER:</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
+      </aside>
+
+      <!-- BOTTOM CONTROL STRIP (Main Zoom Stepper + Replay Scrubber + Replay/Save Buttons) -->
+      <footer class="strip-bottom">
+        <!-- Left: Whole-Image Zoom Stepper -->
+        <div class="control-pod">
+          <button id="mainZoomMinus" class="radar-btn" title="Zoom Out Whole Image">−</button>
+          <span id="mainZoomBadge" class="zoom-readout">1.0x</span>
+          <button id="mainZoomPlus" class="radar-btn" title="Zoom In Whole Image">+</button>
+          <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan & Zoom">1:1</button>
+        </div>
+
+        <!-- Center: Instant Replay Scrubber Bar -->
+        <div id="replayBar" class="hidden">
+          <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
+          <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
+          <span id="replayTimeText" class="slider-val" style="min-width:98px; text-align:right;">0.0s / 20.0s</span>
+          <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
+        </div>
+
+        <!-- Right: Instant Replay (Automatically saves the 20s clip to Archive) -->
+        <div class="control-pod">
+          <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Last 20 Seconds">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
+            </svg>
+            <span id="replayBtnLabel">REPLAY</span>
+          </button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 2: STORED VIDEO BROWSER / VIEWER                             -->
+    <!-- =================================================================== -->
+    <section id="screenGallery" class="screen-view hidden">
+      <header class="gallery-header">
+        <h2 class="gallery-title">Saved Recordings</h2>
+        <button id="btnBackToLive" class="radar-btn radar-btn-active">
+          <span>← LIVE FEED</span>
+        </button>
+      </header>
+
+      <div class="gallery-workspace">
+        <div id="clipsList" class="clips-list-container"></div>
+
+        <div class="player-panel">
+          <div class="player-header">
+            <span id="activeClipTitle" class="clip-name">NO CLIP SELECTED</span>
+            <span id="activeClipMeta" class="clip-meta">—</span>
+          </div>
+
+          <div class="player-stage">
+            <canvas id="galleryPlayerCanvas" width="854" height="480"></canvas>
+          </div>
+
+          <div class="gallery-scrubber-row">
+            <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
+            <span id="galleryTimeReadout" class="slider-val" style="min-width:105px; text-align:right;">0.0s / 0.0s</span>
+          </div>
+
+          <div class="player-controls">
+            <div class="player-btn-group">
+              <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm">PLAY / PAUSE</button>
+              <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm">0.5x</button>
+              <button id="btnGalleryStep" class="radar-btn radar-btn-sm">STEP +1</button>
+            </div>
+            <div class="player-btn-group">
+              <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active">EXPORT TO DISK</button>
+              <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger">DELETE</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
