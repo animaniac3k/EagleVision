@@ -1,82 +1,122 @@
 /**
- * 20-Second Rolling In-Memory Frame Ring Buffer
+ * Native-Resolution Configurable In-Memory Frame Ring Buffer
  *
- * Captures compressed JPEG frames + GPU ImageBitmaps at 15 FPS into a circular
- * RAM array (capped at 20.0 seconds = 300 frames, ~5 MB total in RAM).
- *
- * Why a Frame Ring Buffer instead of raw MediaRecorder chunks:
- * 1. Instant Replay & Saved Video Viewer play back via a 60fps Canvas clock with
- *    100% deterministic playback, instant frame-accurate scrubbing, and zero
- *    Chromium WebM "Duration: Infinity" codec stalls.
- * 2. Powers real-time Temporal Compare (Chrono-Ghost & Change-Radar Delta) by
- *    providing O(1) lookup of the exact video frame from N seconds ago.
+ * Captures frames at the camera stream's native resolution (e.g. 1920×1080)
+ * and stores only compressed JPEG ArrayBuffers in RAM.
+ * Supports user-adjustable duration (seconds) and frame rate (FPS) with live
+ * RAM usage and available memory budget reporting.
  */
 import { appState, updateState } from '../state.js';
 
-const BUFFER_FPS = 15;
-const MAX_BUFFER_SECONDS = 20;
-const MAX_FRAMES = BUFFER_FPS * MAX_BUFFER_SECONDS; // 300 frames
-const CAPTURE_W = 854;
-const CAPTURE_H = 480;
-
-let frameRing = []; // Array of { timestampMs, jpegBuffer, bitmap }
+let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height }
 let totalBytes = 0;
 let captureInterval = null;
 let captureCanvas = null;
 let captureCtx = null;
 let encodingInProgress = false;
+let currentVideoEl = null;
+
+/**
+ * Estimates the maximum safe RAM budget (in MB) for in-memory video buffering
+ * on the current device/browser.
+ */
+export function getAvailableMemoryBudgetMB() {
+  if (performance && performance.memory && performance.memory.jsHeapSizeLimit) {
+    const freeHeapBytes = Math.max(
+      128 * 1024 * 1024,
+      performance.memory.jsHeapSizeLimit - (performance.memory.usedJSHeapSize || 0)
+    );
+    // Use up to 40% of remaining JS heap (capped between 128 MB and 768 MB)
+    return Math.round(Math.min(768, Math.max(128, (freeHeapBytes * 0.4) / (1024 * 1024))));
+  }
+  const deviceGB = navigator.deviceMemory || 4;
+  return Math.round(Math.min(768, Math.max(150, deviceGB * 90)));
+}
+
+/**
+ * Estimates how many MB of RAM the configured (bufferMaxSeconds × bufferTargetFps)
+ * will consume at the current stream resolution.
+ */
+export function getEstimatedBufferMB() {
+  const totalTargetFrames = appState.bufferMaxSeconds * appState.bufferTargetFps;
+  if (frameRing.length > 0) {
+    const avgBytes = totalBytes / frameRing.length;
+    return Number(((avgBytes * totalTargetFrames) / (1024 * 1024)).toFixed(1));
+  }
+  // Fallback estimate based on pixel count (~0.055 bytes per pixel for JPEG q=0.84)
+  const pixels = (appState.streamWidth || 1920) * (appState.streamHeight || 1080);
+  const estFrameBytes = pixels * 0.055;
+  return Number(((estFrameBytes * totalTargetFrames) / (1024 * 1024)).toFixed(1));
+}
 
 export function startMemoryBuffer(videoEl) {
-  stopMemoryBuffer();
-  if (!appState.bufferEnabled) return;
+  if (videoEl) {
+    currentVideoEl = videoEl;
+  }
+  if (captureInterval) {
+    clearInterval(captureInterval);
+    captureInterval = null;
+  }
+  if (!appState.bufferEnabled || !currentVideoEl) return;
 
   if (!captureCanvas) {
     captureCanvas = document.createElement('canvas');
-    captureCanvas.width = CAPTURE_W;
-    captureCanvas.height = CAPTURE_H;
     captureCtx = captureCanvas.getContext('2d');
   }
 
+  const targetFps = Math.max(5, Math.min(30, appState.bufferTargetFps || 15));
+  const intervalMs = Math.round(1000 / targetFps);
+
   captureInterval = setInterval(() => {
     if (!appState.bufferEnabled || appState.replayActive || encodingInProgress) return;
-    if (!videoEl || videoEl.readyState < 2) return;
+    if (!currentVideoEl || currentVideoEl.readyState < 2) return;
+
+    const nativeW = currentVideoEl.videoWidth || appState.streamWidth || 1920;
+    const nativeH = currentVideoEl.videoHeight || appState.streamHeight || 1080;
+
+    if (captureCanvas.width !== nativeW || captureCanvas.height !== nativeH) {
+      captureCanvas.width = nativeW;
+      captureCanvas.height = nativeH;
+    }
 
     encodingInProgress = true;
     const capturedAt = performance.now();
 
     try {
-      captureCtx.drawImage(videoEl, 0, 0, CAPTURE_W, CAPTURE_H);
+      captureCtx.drawImage(currentVideoEl, 0, 0, nativeW, nativeH);
       captureCanvas.toBlob(
         async (blob) => {
           try {
             if (!blob || !appState.bufferEnabled) return;
-            const [jpegBuffer, bitmap] = await Promise.all([
-              blob.arrayBuffer(),
-              createImageBitmap(blob)
-            ]);
+            const jpegBuffer = await blob.arrayBuffer();
 
             frameRing.push({
               timestampMs: capturedAt,
               jpegBuffer,
-              bitmap
+              width: nativeW,
+              height: nativeH
             });
             totalBytes += jpegBuffer.byteLength;
 
-            // Evict frames older than 20 seconds (or exceeding MAX_FRAMES)
-            const cutoff = capturedAt - MAX_BUFFER_SECONDS * 1000;
-            while (frameRing.length > MAX_FRAMES || (frameRing.length > 2 && frameRing[0].timestampMs < cutoff)) {
+            const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
+            const maxFrames = maxSec * targetFps;
+            const cutoff = capturedAt - maxSec * 1000;
+            const maxBudgetBytes = getAvailableMemoryBudgetMB() * 1024 * 1024;
+
+            while (
+              frameRing.length > maxFrames ||
+              (frameRing.length > 2 && frameRing[0].timestampMs < cutoff) ||
+              (frameRing.length > 2 && totalBytes > maxBudgetBytes)
+            ) {
               const old = frameRing.shift();
               totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
-              if (old.bitmap && old.bitmap.close) {
-                old.bitmap.close();
-              }
             }
 
             const spanSec =
               frameRing.length > 1
-                ? Math.min(MAX_BUFFER_SECONDS, (frameRing[frameRing.length - 1].timestampMs - frameRing[0].timestampMs) / 1000)
+                ? Math.min(maxSec, (frameRing[frameRing.length - 1].timestampMs - frameRing[0].timestampMs) / 1000)
                 : frameRing.length > 0
-                  ? 0.1
+                  ? Number((1 / targetFps).toFixed(1))
                   : 0;
 
             updateState({
@@ -88,12 +128,22 @@ export function startMemoryBuffer(videoEl) {
           }
         },
         'image/jpeg',
-        0.82
+        0.84
       );
     } catch {
       encodingInProgress = false;
     }
-  }, Math.round(1000 / BUFFER_FPS));
+  }, intervalMs);
+}
+
+/**
+ * Updates the capture timer when the user changes FPS or Duration in Settings
+ * without discarding already-buffered frames in RAM.
+ */
+export function updateMemoryBufferConfig() {
+  if (appState.bufferEnabled && currentVideoEl) {
+    startMemoryBuffer(currentVideoEl);
+  }
 }
 
 export function stopMemoryBuffer() {
@@ -101,58 +151,29 @@ export function stopMemoryBuffer() {
     clearInterval(captureInterval);
     captureInterval = null;
   }
-  frameRing.forEach((f) => {
-    if (f.bitmap && f.bitmap.close) {
-      f.bitmap.close();
-    }
-  });
   frameRing = [];
   totalBytes = 0;
   encodingInProgress = false;
   updateState({ bufferedSeconds: 0, bufferBytes: 0 });
 }
 
-/**
- * Returns the ImageBitmap from `delaySec` seconds ago for Temporal Compare
- * (Chrono-Ghost & Change-Radar Delta modes).
- */
-export function getDelayedFrameBitmap(delaySec) {
-  if (!frameRing.length) return null;
-  const now = frameRing[frameRing.length - 1].timestampMs;
-  const targetTime = now - delaySec * 1000;
-
-  // Binary search or reverse scan for closest frame
-  for (let i = frameRing.length - 1; i >= 0; i--) {
-    if (frameRing[i].timestampMs <= targetTime) {
-      return frameRing[i].bitmap;
-    }
-  }
-  return frameRing[0].bitmap;
-}
-
-/**
- * Takes an instant snapshot of the current 20-second RAM frame ring buffer.
- */
 export async function snapshotMemoryBuffer() {
   if (!frameRing.length) return null;
 
   const firstTs = frameRing[0].timestampMs;
   const lastTs = frameRing[frameRing.length - 1].timestampMs;
-  const durationSec = Math.max(0.5, Math.min(MAX_BUFFER_SECONDS, (lastTs - firstTs) / 1000));
+  const maxSec = appState.bufferMaxSeconds || 20;
+  const durationSec = Math.max(0.5, Math.min(maxSec, (lastTs - firstTs) / 1000));
+  const lastFrame = frameRing[frameRing.length - 1];
 
-  // Clone JPEG ArrayBuffers and decode independent ImageBitmaps for the replay player
   const jpegFrames = frameRing.map((f) => f.jpegBuffer.slice(0));
-  const bitmaps = await Promise.all(
-    jpegFrames.map((buf) => createImageBitmap(new Blob([buf], { type: 'image/jpeg' })))
-  );
 
   return {
     jpegFrames,
-    bitmaps,
-    fps: BUFFER_FPS,
+    fps: appState.bufferTargetFps || 15,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: totalBytes,
-    width: CAPTURE_W,
-    height: CAPTURE_H
+    width: lastFrame.width || appState.streamWidth || 1920,
+    height: lastFrame.height || appState.streamHeight || 1080
   };
 }

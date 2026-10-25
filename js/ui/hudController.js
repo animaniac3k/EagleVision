@@ -24,7 +24,7 @@ export function initHudController() {
 
     if (state.bufferEnabled) {
       const mb = (state.bufferBytes / (1024 * 1024)).toFixed(1);
-      hudBufferText.textContent = `${state.bufferedSeconds.toFixed(1)}s (${mb} MB)`;
+      hudBufferText.textContent = `${state.bufferedSeconds.toFixed(1)}s / ${state.bufferMaxSeconds}s (${mb} MB)`;
     } else {
       hudBufferText.textContent = 'DISABLED';
     }

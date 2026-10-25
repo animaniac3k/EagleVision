@@ -1,35 +1,65 @@
-/* Screen 2: Stored Video Browser & Viewer */
+/* Screen 2: Fullscreen Stored Video Player with Floating GUI Overlay */
 #screenGallery {
-  background-color: var(--radar-bg);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--radar-bg-deep);
+  overflow: hidden;
 }
 
-.gallery-header {
+.gallery-fullscreen-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--radar-bg-deep);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(20, 83, 92, 0.14) 0%, rgba(3, 9, 12, 0.98) 80%),
+    linear-gradient(rgba(45, 212, 191, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--radar-border);
-  padding-bottom: 14px;
+  justify-content: center;
+  z-index: 1;
 }
 
-.gallery-title {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--radar-text);
+#galleryPlayerCanvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
-.gallery-workspace {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 5fr 7fr;
-  gap: 20px;
-  min-height: 0;
+/* Floating Active Clip Telemetry Pill (Top-Right) */
+.gallery-info-pill {
+  background: var(--radar-panel);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* Collapsible Floating Left Drawer for Saved Clips */
+.gallery-floating-drawer {
+  position: absolute;
+  left: 14px;
+  top: 78px;
+  width: 350px;
+  max-height: calc(100vh - 170px);
+  background: var(--radar-panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+  overflow: hidden;
 }
 
 .clips-list-container {
@@ -37,18 +67,19 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding-right: 4px;
+  padding: 14px;
   touch-action: pan-y;
 }
 
 .clip-card {
-  padding: 16px;
-  background: var(--radar-panel);
+  padding: 14px;
+  background: rgba(9, 26, 32, 0.9);
   border: 1px solid var(--radar-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
@@ -68,62 +99,31 @@
 
 .clip-meta {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--radar-text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-.player-panel {
+/* Bottom Floating Transport Bar Over Fullscreen Video */
+.gallery-transport-bar {
+  width: 100%;
   background: var(--radar-panel);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-md);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: 0;
-}
-
-.player-header {
+  box-shadow: var(--shadow-panel);
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--radar-border);
-  padding-bottom: 10px;
+  gap: 16px;
 }
 
-.player-stage {
+.gallery-scrubber-wrap {
   flex: 1;
-  margin: 14px 0;
-  background: var(--radar-bg-deep);
-  border: 1px solid var(--radar-border);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-}
-
-#galleryPlayerCanvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.gallery-scrubber-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-bottom: 12px;
-}
-
-.player-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
 }
 
 .player-btn-group {

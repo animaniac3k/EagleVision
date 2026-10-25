@@ -38,8 +38,8 @@ export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, w
     fps: fps || 15,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: sizeBytes || jpegFrames.reduce((acc, b) => acc + b.byteLength, 0),
-    width: width || 854,
-    height: height || 480,
+    width: width || 1920,
+    height: height || 1080,
     jpegFrames
   };
 
@@ -81,8 +81,8 @@ export async function deleteVideoClip(id) {
 export async function exportClipToDisk(clip) {
   const filename = clip.name.toLowerCase();
   const canvas = document.createElement('canvas');
-  canvas.width = clip.width || 854;
-  canvas.height = clip.height || 480;
+  canvas.width = clip.width || 1920;
+  canvas.height = clip.height || 1080;
   const ctx = canvas.getContext('2d');
 
   const bitmaps = await Promise.all(

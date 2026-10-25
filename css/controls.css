@@ -148,7 +148,7 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
 }
 
-/* 2x2 Grid for Overlay Buttons */
+/* 2-Column Grid for Overlay Buttons */
 .overlay-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -160,10 +160,52 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   font-size: 14px;
 }
 
-.temporal-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+/* RAM Memory Budget Meter in Settings */
+.memory-meter-box {
+  background: #051216;
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--radar-text-secondary);
+}
+
+.memory-bar-track {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--radar-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.memory-bar-est {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(45, 212, 191, 0.28);
+  border-right: 2px solid var(--radar-text-muted);
+  transition: width 0.2s ease;
+}
+
+.memory-bar-used {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--radar-accent);
+  transition: width 0.2s ease;
 }
 
 /* Replay Scrubber Bar */

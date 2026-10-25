@@ -1,16 +1,19 @@
 /**
- * Floating Icon Strips, Movable/Collapsible Settings Window, Overlays, Filters & Color Theme
+ * Floating Icon Strips, Movable/Collapsible Settings Window, Memory Buffer Config,
+ * Micro-Change Heatmap, Overlays, Filters & HSL Color Theme
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { enumerateCameras, startCameraStream } from '../camera/streamManager.js';
 import { makeElementDraggable } from '../renderer/zoomWindow.js';
-import { startMemoryBuffer, stopMemoryBuffer } from '../recorder/memoryRingBuffer.js';
+import {
+  startMemoryBuffer,
+  stopMemoryBuffer,
+  updateMemoryBufferConfig,
+  getAvailableMemoryBudgetMB,
+  getEstimatedBufferMB
+} from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
 
-/**
- * Converts a #RRGGBB hex color into HSL and updates all --radar-* CSS custom properties
- * so the entire UI (surfaces, borders, text, active glow, and SVG overlays) shifts cohesively.
- */
 export function applyThemeColor(hex) {
   const clean = (hex || '#2dd4bf').replace('#', '');
   const r = parseInt(clean.substring(0, 2), 16) / 255;
@@ -43,7 +46,7 @@ export function applyThemeColor(hex) {
   root.setProperty('--radar-header', `hsl(${h}, ${surfSat}%, 11%)`);
   root.setProperty('--radar-surface', `hsl(${h}, ${surfSat}%, 9%)`);
   root.setProperty('--radar-surface-hover', `hsl(${h}, ${surfSat}%, 15%)`);
-  root.setProperty('--radar-border', `hsl(${h}, ${ Math.min(60, sat)}%, 24%)`);
+  root.setProperty('--radar-border', `hsl(${h}, ${Math.min(60, sat)}%, 24%)`);
   root.setProperty('--radar-border-strong', hex);
   root.setProperty('--radar-text', `hsl(${h}, ${Math.min(85, sat)}%, 92%)`);
   root.setProperty('--radar-text-secondary', `hsl(${h}, ${Math.min(80, sat)}%, 80%)`);
@@ -59,6 +62,7 @@ export async function initSidebarAndTopControls(videoEl) {
   const btnToggleOptions = document.getElementById('btnToggleOptions');
   const btnCloseOptionsInner = document.getElementById('btnCloseOptionsInner');
   const btnTogglePip = document.getElementById('btnTogglePip');
+  const btnToggleHeatmap = document.getElementById('btnToggleHeatmap');
   const btnToggleHud = document.getElementById('btnToggleHud');
   const btnToggleBuffer = document.getElementById('btnToggleBuffer');
   const bufferDot = document.getElementById('bufferDot');
@@ -67,10 +71,7 @@ export async function initSidebarAndTopControls(videoEl) {
   const cameraSelect = document.getElementById('cameraSelect');
   const btnRefreshCameras = document.getElementById('btnRefreshCameras');
 
-  // Apply initial or saved theme color
   applyThemeColor(appState.themeColor || '#2dd4bf');
-
-  // Make Settings Panel Draggable by its header bar
   makeElementDraggable(optionsPanel, optionsDragHandle);
 
   // 1. Show/Hide Settings Window
@@ -87,12 +88,17 @@ export async function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 3. Show/Hide Stream Telemetry HUD
+  // 3. Toggle Localized Micro-Change Heatmap from Main Interface
+  btnToggleHeatmap.addEventListener('click', () => {
+    updateState({ heatmapEnabled: !appState.heatmapEnabled });
+  });
+
+  // 4. Show/Hide Stream Telemetry HUD
   btnToggleHud.addEventListener('click', () => {
     updateState({ hudOpen: !appState.hudOpen });
   });
 
-  // 4. Enable/Disable 20-Second Rolling In-Memory Buffer
+  // 5. Enable/Disable Rolling In-Memory Buffer
   btnToggleBuffer.addEventListener('click', () => {
     const next = !appState.bufferEnabled;
     updateState({ bufferEnabled: next });
@@ -104,7 +110,39 @@ export async function initSidebarAndTopControls(videoEl) {
     }
   });
 
-  // 5. Camera Enumeration & Selection
+  // 6. Adjustable Buffer Duration & Frame Rate + Live Memory Availability Meter
+  const sliderBufferDuration = document.getElementById('sliderBufferDuration');
+  const valBufferDuration = document.getElementById('valBufferDuration');
+  const sliderBufferFps = document.getElementById('sliderBufferFps');
+  const valBufferFps = document.getElementById('valBufferFps');
+  const valBufferResolution = document.getElementById('valBufferResolution');
+  const memUsedLabel = document.getElementById('memUsedLabel');
+  const memBudgetLabel = document.getElementById('memBudgetLabel');
+  const memBarEstFill = document.getElementById('memBarEstFill');
+  const memBarUsedFill = document.getElementById('memBarUsedFill');
+
+  sliderBufferDuration.value = String(appState.bufferMaxSeconds || 20);
+  valBufferDuration.textContent = `${appState.bufferMaxSeconds || 20}s`;
+  sliderBufferFps.value = String(appState.bufferTargetFps || 15);
+  valBufferFps.textContent = `${appState.bufferTargetFps || 15} FPS`;
+
+  sliderBufferDuration.addEventListener('input', (e) => {
+    const sec = Number(e.target.value) || 20;
+    valBufferDuration.textContent = `${sec}s`;
+    updateState({ bufferMaxSeconds: sec });
+    saveSettings(appState);
+    updateMemoryBufferConfig();
+  });
+
+  sliderBufferFps.addEventListener('input', (e) => {
+    const fps = Number(e.target.value) || 15;
+    valBufferFps.textContent = `${fps} FPS`;
+    updateState({ bufferTargetFps: fps });
+    saveSettings(appState);
+    updateMemoryBufferConfig();
+  });
+
+  // 7. Camera Enumeration & Selection
   async function populateCameraDropdown() {
     const devices = await enumerateCameras();
     cameraSelect.innerHTML = devices
@@ -130,7 +168,7 @@ export async function initSidebarAndTopControls(videoEl) {
     navigator.mediaDevices.addEventListener('devicechange', populateCameraDropdown);
   }
 
-  // 6. Main Whole-Image Zoom Controls (Bottom Bar)
+  // 8. Main Whole-Image Zoom Controls (Bottom Bar)
   const mainZoomMinus = document.getElementById('mainZoomMinus');
   const mainZoomPlus = document.getElementById('mainZoomPlus');
   const mainZoomReset = document.getElementById('mainZoomReset');
@@ -154,7 +192,7 @@ export async function initSidebarAndTopControls(videoEl) {
     updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
   });
 
-  // 7. Overlay Guide Controls
+  // 9. Overlay Guide Controls (Simplified: Open-Center Crosshair + Load Image Only)
   const btnToggleOverlay = document.getElementById('btnToggleOverlay');
   const ovButtons = document.querySelectorAll('.ov-btn');
   const fileCustomOverlay = document.getElementById('fileCustomOverlay');
@@ -175,7 +213,7 @@ export async function initSidebarAndTopControls(videoEl) {
         fileCustomOverlay.click();
         return;
       }
-      updateState({ overlayType: type, overlayEnabled: true });
+      updateState({ overlayType: 'crosshair', overlayEnabled: true });
       saveSettings(appState);
     });
   });
@@ -208,7 +246,20 @@ export async function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 8. Image Manipulation Sliders & Toggles
+  // 10. Heatmap Sensitivity Slider in Settings
+  const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');
+  const valHeatmapSens = document.getElementById('valHeatmapSens');
+  sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
+  valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
+
+  sliderHeatmapSens.addEventListener('input', (e) => {
+    const sens = Number(e.target.value) || 60;
+    valHeatmapSens.textContent = `${sens}%`;
+    updateState({ heatmapSensitivity: sens });
+    saveSettings(appState);
+  });
+
+  // 11. Image Manipulation Sliders & Toggles
   const sliderBrightness = document.getElementById('sliderBrightness');
   const valBrightness = document.getElementById('valBrightness');
   const sliderContrast = document.getElementById('sliderContrast');
@@ -261,28 +312,7 @@ export async function initSidebarAndTopControls(videoEl) {
     });
   });
 
-  // 9. Temporal Compare (Chrono-Ghost & Change-Radar Delta)
-  const tempButtons = document.querySelectorAll('.temp-btn');
-  const sliderTemporalDelay = document.getElementById('sliderTemporalDelay');
-  const valTemporalDelay = document.getElementById('valTemporalDelay');
-
-  tempButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.temp;
-      updateState({ temporalMode: mode });
-      tempButtons.forEach((b) => b.classList.toggle('radar-btn-active', b.dataset.temp === mode));
-    });
-  });
-
-  if (sliderTemporalDelay) {
-    sliderTemporalDelay.addEventListener('input', (e) => {
-      const sec = parseFloat(e.target.value) || 2.0;
-      valTemporalDelay.textContent = `${sec.toFixed(1)}s AGO`;
-      updateState({ temporalDelaySec: sec });
-    });
-  }
-
-  // 10. Interface Color Swatches & Photoshop-Style Custom Picker
+  // 12. Interface Color Swatches & 2D Color Picker
   const swatches = document.querySelectorAll('.theme-swatch');
   const colorPickerCustom = document.getElementById('colorPickerCustom');
 
@@ -306,7 +336,6 @@ export async function initSidebarAndTopControls(videoEl) {
     selectThemeColor(e.target.value);
   });
 
-  // Sync initial swatch selection
   if (appState.themeColor) {
     colorPickerCustom.value = appState.themeColor;
     swatches.forEach((s) => {
@@ -319,13 +348,27 @@ export async function initSidebarAndTopControls(videoEl) {
     optionsPanel.classList.toggle('hidden', !state.optionsOpen);
     btnToggleOptions.classList.toggle('radar-btn-active', state.optionsOpen);
     btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
+    btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
     btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
     bufferDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
     bufferText.textContent = state.bufferEnabled
-      ? `${Math.max(1, Math.round(state.bufferedSeconds))}s RAM`
+      ? `${Math.round(state.bufferedSeconds)}s / ${state.bufferMaxSeconds}s`
       : 'RAM OFF';
+
+    // Update Memory Availability Meter in Settings
+    valBufferResolution.textContent = `${state.streamWidth}×${state.streamHeight}`;
+    const usedMB = (state.bufferBytes / (1024 * 1024)).toFixed(1);
+    const estMB = getEstimatedBufferMB();
+    const maxBudgetMB = getAvailableMemoryBudgetMB();
+    memUsedLabel.textContent = `USED: ${usedMB} MB`;
+    memBudgetLabel.textContent = `EST: ~${estMB} MB / ${maxBudgetMB} MB FREE`;
+
+    const estPct = Math.min(100, Math.round((estMB / maxBudgetMB) * 100));
+    const usedPct = Math.min(100, Math.round((parseFloat(usedMB) / maxBudgetMB) * 100));
+    memBarEstFill.style.width = `${estPct}%`;
+    memBarUsedFill.style.width = `${usedPct}%`;
 
     mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
     mainZoomReset.classList.toggle('hidden', state.mainZoom <= 1.01);

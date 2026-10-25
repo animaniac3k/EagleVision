@@ -81,12 +81,11 @@ function buildStaticBoardCanvas(w, h) {
   const bg = document.createElement('canvas');
   bg.width = w;
   bg.height = h;
-  const ctx = bg.getContext('2d', { alpha: false });
+  const ctx = bg.getContext('2d');
 
   ctx.fillStyle = '#051317';
   ctx.fillRect(0, 0, w, h);
 
-  // Fine technical grid (batched into a single path)
   ctx.strokeStyle = 'rgba(45, 212, 191, 0.08)';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -100,14 +99,12 @@ function buildStaticBoardCanvas(w, h) {
   }
   ctx.stroke();
 
-  // Simulated PCB substrate
   ctx.fillStyle = '#071d24';
   ctx.strokeStyle = '#2dd4bf';
   ctx.lineWidth = 4;
   ctx.fillRect(240, 130, 1440, 820);
   ctx.strokeRect(240, 130, 1440, 820);
 
-  // Traces
   ctx.strokeStyle = 'rgba(45, 212, 191, 0.45)';
   ctx.lineWidth = 6;
   ctx.beginPath();
@@ -116,7 +113,6 @@ function buildStaticBoardCanvas(w, h) {
   ctx.moveTo(420, 820); ctx.lineTo(880, 820); ctx.lineTo(980, 710); ctx.lineTo(1560, 710);
   ctx.stroke();
 
-  // Fiducial markers
   const fiducials = [[340, 250], [340, 480], [420, 820], [1540, 580], [1560, 710]];
   for (const [fx, fy] of fiducials) {
     ctx.fillStyle = '#2dd4bf';
@@ -126,7 +122,6 @@ function buildStaticBoardCanvas(w, h) {
     ctx.beginPath(); ctx.arc(fx, fy, 26, 0, Math.PI * 2); ctx.stroke();
   }
 
-  // Secondary BGA Chip
   ctx.fillStyle = '#041014';
   ctx.strokeStyle = '#5eead4';
   ctx.lineWidth = 3;
@@ -140,7 +135,6 @@ function buildStaticBoardCanvas(w, h) {
   ctx.font = '24px monospace';
   ctx.fillText('64GB-BGA', 535, 655);
 
-  // Center High-Density Processor IC
   ctx.fillStyle = '#030b0e';
   ctx.strokeStyle = '#99f6e4';
   ctx.lineWidth = 4;
@@ -176,14 +170,13 @@ function startSimulatedStream(videoEl) {
     staticBgCanvas = buildStaticBoardCanvas(w, h);
   }
 
-  const ctx = simCanvas.getContext('2d', { alpha: false });
+  const ctx = simCanvas.getContext('2d');
   ctx.textAlign = 'center';
   ctx.font = '25px monospace';
   let tick = 0;
 
   const drawSimFrame = () => {
     tick += 1;
-    // Fast single bitmap copy of pre-rendered static PCB
     ctx.drawImage(staticBgCanvas, 0, 0);
 
     // Dynamic timecode
@@ -191,10 +184,18 @@ function startSimulatedStream(videoEl) {
     const timecode = (tick / 30).toFixed(2);
     ctx.fillText(`PITCH 0.40MM  |  T+${timecode}s`, 960, 595);
 
-    // Animated Radar Scan Bar
-    const scanY = 130 + ((tick * 6) % 820);
-    ctx.fillStyle = 'rgba(45, 212, 191, 0.45)';
-    ctx.fillRect(240, scanY, 1440, 3);
+    // Localized micro-activity on the board (ideal for testing the Micro-Change Heatmap)
+    const oscX = 1360 + Math.sin(tick * 0.25) * 18;
+    const oscY = 340 + Math.cos(tick * 0.25) * 18;
+    ctx.fillStyle = '#ccfbf1';
+    ctx.beginPath();
+    ctx.arc(oscX, oscY, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pulsing thermal hotspot pad on IC pin 3
+    const pulse = Math.floor(128 + 127 * Math.sin(tick * 0.3));
+    ctx.fillStyle = `rgb(${pulse}, ${pulse}, ${pulse})`;
+    ctx.fillRect(882, 350, 16, 30);
   };
 
   drawSimFrame();

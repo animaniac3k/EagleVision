@@ -1,7 +1,7 @@
 /**
- * Persists user overlay & filter preferences in localStorage
+ * Persists user overlay, recording buffer, heatmap & theme preferences in localStorage
  */
-const STORAGE_KEY = 'eaglevision_settings_v1';
+const STORAGE_KEY = 'eaglevision_settings_v2';
 
 export function loadSavedSettings() {
   try {
@@ -18,10 +18,13 @@ export function saveSettings(state) {
       pipEnabled: state.pipEnabled,
       pipZoom: state.pipZoom,
       overlayEnabled: state.overlayEnabled,
-      overlayType: state.overlayType === 'custom' ? 'crosshair' : state.overlayType,
+      overlayType: state.overlayType === 'custom' ? 'crosshair' : 'crosshair',
       overlayOpacity: state.overlayOpacity,
       overlayScale: state.overlayScale,
+      heatmapSensitivity: state.heatmapSensitivity,
       bufferEnabled: state.bufferEnabled,
+      bufferMaxSeconds: state.bufferMaxSeconds,
+      bufferTargetFps: state.bufferTargetFps,
       themeColor: state.themeColor || '#2dd4bf'
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));

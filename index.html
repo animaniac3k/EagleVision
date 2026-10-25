@@ -45,7 +45,7 @@
           </svg>
         </div>
 
-        <!-- Movable Digital Zoom Window (PiP Magnifier) -->
+        <!-- Movable & Corner-Resizable Digital Zoom Window (PiP Magnifier) -->
         <section id="pipZoomWindow">
           <header id="pipHeader">
             <span id="pipZoomBadge">3.0x</span>
@@ -63,23 +63,22 @@
           <div id="pipViewport">
             <canvas id="pipCanvas" width="340" height="210"></canvas>
             <div class="pip-center-reticle"></div>
-            <!-- Corner Resize Handles (Bottom-Left & Bottom-Right for easy finger access) -->
             <div id="pipResizeSW" class="pip-resize-handle pip-resize-sw" title="Drag corner to resize Zoom Window"></div>
             <div id="pipResizeSE" class="pip-resize-handle pip-resize-se" title="Drag corner to resize Zoom Window"></div>
           </div>
         </section>
 
-        <!-- Instant Replay Video Modal (Shown when scrubbing 20s RAM Buffer) -->
+        <!-- Instant Replay Video Modal (Full-screen native-resolution playback) -->
         <div id="instantReplayModal" class="hidden">
           <div class="replay-status-banner">
             <span class="replay-pulse-dot"></span>
-            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED 20s CLIP</span>
+            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED CLIP</span>
           </div>
-          <canvas id="replayCanvas" width="854" height="480"></canvas>
+          <canvas id="replayCanvas" width="1920" height="1080"></canvas>
         </div>
       </div>
 
-      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, Zoom Window, Stream Telemetry) -->
+      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, Zoom Window, Micro-Change Heatmap, Telemetry HUD) -->
       <nav class="floating-strip strip-top-left">
         <button id="btnToggleOptions" class="radar-btn radar-btn-active" title="Show / Hide Settings Window">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -93,6 +92,13 @@
           </svg>
         </button>
 
+        <!-- Micro-Change Heatmap Toggle on Main Interface -->
+        <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Localized Micro-Change Heatmap (Ignores Camera Shake)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+
         <button id="btnToggleHud" class="radar-btn" title="Show / Hide Stream Info HUD">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
@@ -100,14 +106,14 @@
         </button>
       </nav>
 
-      <!-- TOP-RIGHT FLOATING ICON STRIP (20s RAM Buffer Toggle + Saved Recordings Screen) -->
+      <!-- TOP-RIGHT FLOATING ICON STRIP (RAM Buffer Toggle + Saved Recordings Screen) -->
       <nav class="floating-strip strip-top-right">
-        <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable 20-Second In-Memory Video Buffer">
+        <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable In-Memory Video Buffer">
           <span id="bufferDot" class="status-dot"></span>
           <span id="bufferText">20s RAM</span>
         </button>
 
-        <button id="btnSwitchScreen" class="radar-btn" title="Open Stored Video Browser">
+        <button id="btnSwitchScreen" class="radar-btn" title="Open Fullscreen Stored Video Browser">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
           </svg>
@@ -115,7 +121,7 @@
         </button>
       </nav>
 
-      <!-- MOVABLE & COLLAPSIBLE SETTINGS WINDOW (Streamlined: Camera, Overlay Guide, Image Adjust) -->
+      <!-- MOVABLE & COLLAPSIBLE SETTINGS WINDOW -->
       <aside id="optionsPanel">
         <header id="optionsDragHandle" class="panel-header">
           <div class="panel-title">
@@ -137,7 +143,43 @@
             <select id="cameraSelect" class="radar-select"></select>
           </div>
 
-          <!-- 2. Superimpose Overlay Guide -->
+          <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Memory Recording</span>
+              <span id="valBufferResolution" class="slider-val" style="font-size:13px;">1920×1080</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Buffer Duration</span>
+                <span id="valBufferDuration" class="slider-val">20s</span>
+              </div>
+              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Frame Rate</span>
+                <span id="valBufferFps" class="slider-val">15 FPS</span>
+              </div>
+              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
+            </div>
+
+            <!-- Live Memory Availability & Requirement Meter -->
+            <div class="memory-meter-box">
+              <div class="memory-meter-labels">
+                <span id="memUsedLabel">USED: 0.0 MB</span>
+                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
+              </div>
+              <div class="memory-bar-track">
+                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
+                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Superimpose Overlay Guide (Simplified: Open-Center Crosshair + Load Image Only) -->
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Overlay Guide</span>
@@ -146,8 +188,6 @@
 
             <div class="overlay-grid">
               <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">CROSSHAIR</button>
-              <button data-ov="grid" class="ov-btn radar-btn">GRID</button>
-              <button data-ov="rings" class="ov-btn radar-btn">RINGS</button>
               <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
             </div>
             <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
@@ -169,7 +209,18 @@
             </div>
           </div>
 
-          <!-- 3. Image Manipulation -->
+          <!-- 4. Micro-Change Heatmap Sensitivity (Toggle is on Main Interface) -->
+          <div class="settings-card">
+            <div class="slider-group">
+              <div class="slider-header">
+                <span class="settings-label">Heatmap Sensitivity</span>
+                <span id="valHeatmapSens" class="slider-val">60%</span>
+              </div>
+              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 5. Image Manipulation -->
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Image Adjust</span>
@@ -206,26 +257,7 @@
             </div>
           </div>
 
-          <!-- 4. Temporal Change / Chrono-Ghost Overlay -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Temporal Compare</span>
-              <span id="valTemporalDelay" class="slider-val">2.0s AGO</span>
-            </div>
-            <div class="temporal-grid">
-              <button data-temp="off" class="temp-btn radar-btn radar-btn-sm radar-btn-active">OFF</button>
-              <button data-temp="ghost" class="temp-btn radar-btn radar-btn-sm" title="Superimpose translucent ghost from N seconds ago">GHOST</button>
-              <button data-temp="delta" class="temp-btn radar-btn radar-btn-sm" title="Highlight only what moved or changed over the last N seconds">DELTA</button>
-            </div>
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Time Lookback</span>
-              </div>
-              <input id="sliderTemporalDelay" type="range" min="0.5" max="15" step="0.5" value="2.0" class="radar-slider" />
-            </div>
-          </div>
-
-          <!-- 5. Interface Theme Color Swatch -->
+          <!-- 6. Interface Theme Color Swatch -->
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Interface Color</span>
@@ -256,7 +288,7 @@
         <div class="hud-row"><span class="hud-key">RAM BUFFER:</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
       </aside>
 
-      <!-- BOTTOM CONTROL STRIP (Main Zoom Stepper + Replay Scrubber + Replay/Save Buttons) -->
+      <!-- BOTTOM CONTROL STRIP -->
       <footer class="strip-bottom">
         <!-- Left: Whole-Image Zoom Stepper -->
         <div class="control-pod">
@@ -274,9 +306,9 @@
           <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
         </div>
 
-        <!-- Right: Instant Replay (Automatically saves the 20s clip to Archive) -->
+        <!-- Right: Instant Replay (Automatically saves the clip to Archive) -->
         <div class="control-pod">
-          <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Last 20 Seconds">
+          <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Memory Buffer">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
             </svg>
@@ -287,47 +319,65 @@
     </main>
 
     <!-- =================================================================== -->
-    <!-- SCREEN 2: STORED VIDEO BROWSER / VIEWER                             -->
+    <!-- SCREEN 2: FULLSCREEN STORED VIDEO PLAYER (GUI FLOATING ON TOP)      -->
     <!-- =================================================================== -->
     <section id="screenGallery" class="screen-view hidden">
-      <header class="gallery-header">
-        <h2 class="gallery-title">Saved Recordings</h2>
-        <button id="btnBackToLive" class="radar-btn radar-btn-active">
+      <!-- 100% Fullscreen Playback Canvas -->
+      <div class="gallery-fullscreen-stage">
+        <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
+      </div>
+
+      <!-- Top-Left Floating Navigation & Clips Drawer Toggle -->
+      <nav class="floating-strip strip-top-left">
+        <button id="btnBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
           <span>← LIVE FEED</span>
         </button>
-      </header>
 
-      <div class="gallery-workspace">
-        <div id="clipsList" class="clips-list-container"></div>
+        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-active" title="Show / Hide Saved Clips List">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+          <span>CLIPS</span>
+        </button>
+      </nav>
 
-        <div class="player-panel">
-          <div class="player-header">
-            <span id="activeClipTitle" class="clip-name">NO CLIP SELECTED</span>
-            <span id="activeClipMeta" class="clip-meta">—</span>
-          </div>
-
-          <div class="player-stage">
-            <canvas id="galleryPlayerCanvas" width="854" height="480"></canvas>
-          </div>
-
-          <div class="gallery-scrubber-row">
-            <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
-            <span id="galleryTimeReadout" class="slider-val" style="min-width:105px; text-align:right;">0.0s / 0.0s</span>
-          </div>
-
-          <div class="player-controls">
-            <div class="player-btn-group">
-              <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm">PLAY / PAUSE</button>
-              <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm">0.5x</button>
-              <button id="btnGalleryStep" class="radar-btn radar-btn-sm">STEP +1</button>
-            </div>
-            <div class="player-btn-group">
-              <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active">EXPORT TO DISK</button>
-              <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger">DELETE</button>
-            </div>
-          </div>
+      <!-- Top-Right Floating Active Clip Telemetry Pill -->
+      <div class="floating-strip strip-top-right">
+        <div class="gallery-info-pill">
+          <span id="activeClipTitle" class="clip-name">NO CLIP SELECTED</span>
+          <span id="activeClipMeta" class="clip-meta">—</span>
         </div>
       </div>
+
+      <!-- Collapsible Floating Left Drawer for Saved Clips List -->
+      <aside id="galleryDrawer" class="gallery-floating-drawer">
+        <header class="panel-header" style="cursor:default;">
+          <span class="panel-title">SAVED RECORDINGS</span>
+          <button id="btnCloseGalleryDrawer" class="radar-btn radar-btn-sm" title="Hide Clips List so video is unobstructed">✕</button>
+        </header>
+        <div id="clipsList" class="clips-list-container"></div>
+      </aside>
+
+      <!-- Bottom Floating Full-Width Transport & Export Bar over the Video -->
+      <footer class="strip-bottom">
+        <div class="gallery-transport-bar">
+          <div class="player-btn-group">
+            <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-active">PAUSE ⏸</button>
+            <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
+            <button id="btnGalleryStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
+          </div>
+
+          <div class="gallery-scrubber-wrap">
+            <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
+            <span id="galleryTimeReadout" class="slider-val" style="min-width:110px; text-align:right;">0.0s / 0.0s</span>
+          </div>
+
+          <div class="player-btn-group">
+            <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video at Native Resolution (.webm)">EXPORT</button>
+            <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Recording">DELETE</button>
+          </div>
+        </div>
+      </footer>
     </section>
 
   </div>

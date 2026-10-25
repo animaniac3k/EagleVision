@@ -1,18 +1,24 @@
 /**
- * Screen 2: Stored Video Browser & Frame-Accurate Canvas Player Controller
+ * Screen 2: Fullscreen Stored Video Player with Floating GUI Overlay
+ *
+ * Renders saved clips at 100% fullscreen in their native recorded resolution
+ * with a collapsible left clip drawer and floating bottom transport bar.
  */
-import { updateState } from '../state.js';
+import { appState, updateState } from '../state.js';
 import { listVideoClips, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
 
 let cachedClips = [];
 let selectedClipId = null;
-let decodedBitmaps = [];
+let frameUrls = [];
 let clipDuration = 0;
 let playheadSec = 0;
 let playbackSpeed = 1.0;
 let isPlaying = false;
 let lastTickMs = 0;
 let rafId = null;
+let lastDrawnIdx = -1;
+
+const galleryImg = new Image();
 
 function stopPlayerLoop() {
   if (rafId) {
@@ -21,11 +27,10 @@ function stopPlayerLoop() {
   }
 }
 
-function releaseDecodedBitmaps() {
-  decodedBitmaps.forEach((bmp) => {
-    if (bmp && bmp.close) bmp.close();
-  });
-  decodedBitmaps = [];
+function releaseFrameUrls() {
+  frameUrls.forEach((u) => URL.revokeObjectURL(u));
+  frameUrls = [];
+  lastDrawnIdx = -1;
 }
 
 function renderGalleryFrame() {
@@ -35,19 +40,19 @@ function renderGalleryFrame() {
   const btnPlayPause = document.getElementById('btnGalleryPlayPause');
   if (!canvasEl) return;
 
-  const ctx = canvasEl.getContext('2d');
-  if (!decodedBitmaps.length) {
+  if (!frameUrls.length) {
+    const ctx = canvasEl.getContext('2d');
     ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
     timeReadout.textContent = '0.0s / 0.0s';
     return;
   }
 
   const progress = clipDuration > 0 ? Math.max(0, Math.min(1, playheadSec / clipDuration)) : 0;
-  const idx = Math.min(decodedBitmaps.length - 1, Math.floor(progress * decodedBitmaps.length));
-  const bmp = decodedBitmaps[idx];
-  if (bmp) {
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    ctx.drawImage(bmp, 0, 0, canvasEl.width, canvasEl.height);
+  const idx = Math.min(frameUrls.length - 1, Math.floor(progress * frameUrls.length));
+
+  if (idx !== lastDrawnIdx && frameUrls[idx]) {
+    lastDrawnIdx = idx;
+    galleryImg.src = frameUrls[idx];
   }
 
   scrubber.value = String(playheadSec.toFixed(2));
@@ -62,7 +67,7 @@ function galleryTickLoop(nowMs) {
     return;
   }
 
-  if (isPlaying && decodedBitmaps.length > 0) {
+  if (isPlaying && frameUrls.length > 0) {
     const dtSec = Math.max(0, (nowMs - lastTickMs) / 1000) * playbackSpeed;
     playheadSec += dtSec;
     if (playheadSec >= clipDuration) {
@@ -85,13 +90,13 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
 
   if (!cachedClips.length) {
     stopPlayerLoop();
-    releaseDecodedBitmaps();
+    releaseFrameUrls();
     selectedClipId = null;
     listEl.innerHTML = `
       <div class="clip-card" style="cursor:default;">
         <div>
           <div class="clip-name">NO SAVED RECORDINGS</div>
-          <div class="clip-meta">Tap REPLAY on the live feed to view & auto-save the last 20s.</div>
+          <div class="clip-meta">Tap REPLAY on the live feed to view & auto-save clips.</div>
         </div>
       </div>
     `;
@@ -104,7 +109,7 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
   let currentClip = cachedClips.find((c) => c.id === selectedClipId);
   if (!currentClip || autoSelectFirst) {
     currentClip = cachedClips[0];
-    await selectClip(currentClip, true);
+    selectClip(currentClip, true);
   }
 
   renderClipList();
@@ -120,28 +125,28 @@ function renderClipList() {
         <div class="clip-card ${isSelected ? 'active' : ''}" data-clip-id="${clip.id}">
           <div>
             <div class="clip-name">${clip.name}</div>
-            <div class="clip-meta">${clip.durationSec}s • ${mb} MB • ${clip.jpegFrames.length} FRAMES</div>
+            <div class="clip-meta">${clip.width}×${clip.height} • ${clip.durationSec}s (${clip.fps || 15} FPS) • ${mb} MB</div>
           </div>
-          <span class="radar-btn radar-btn-sm ${isSelected ? 'radar-btn-active' : ''}">${isSelected ? 'PLAYING' : 'LOAD'}</span>
+          <span class="radar-btn radar-btn-sm ${isSelected ? 'radar-btn-active' : ''}">${isSelected ? 'ACTIVE' : 'LOAD'}</span>
         </div>
       `;
     })
     .join('');
 
   listEl.querySelectorAll('.clip-card[data-clip-id]').forEach((card) => {
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', () => {
       const found = cachedClips.find((c) => c.id === card.dataset.clipId);
       if (found) {
-        await selectClip(found, true);
+        selectClip(found, true);
         renderClipList();
       }
     });
   });
 }
 
-async function selectClip(clip, autoPlay = true) {
+function selectClip(clip, autoPlay = true) {
   stopPlayerLoop();
-  releaseDecodedBitmaps();
+  releaseFrameUrls();
 
   selectedClipId = clip.id;
   const titleEl = document.getElementById('activeClipTitle');
@@ -149,11 +154,11 @@ async function selectClip(clip, autoPlay = true) {
   const canvasEl = document.getElementById('galleryPlayerCanvas');
   const scrubber = document.getElementById('galleryScrubber');
 
-  canvasEl.width = clip.width || 854;
-  canvasEl.height = clip.height || 480;
+  canvasEl.width = clip.width || 1920;
+  canvasEl.height = clip.height || 1080;
 
-  decodedBitmaps = await Promise.all(
-    clip.jpegFrames.map((buf) => createImageBitmap(new Blob([buf], { type: 'image/jpeg' })))
+  frameUrls = clip.jpegFrames.map((buf) =>
+    URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }))
   );
 
   clipDuration = Math.max(0.5, clip.durationSec);
@@ -166,7 +171,7 @@ async function selectClip(clip, autoPlay = true) {
 
   const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
   titleEl.textContent = clip.name;
-  metaEl.textContent = `${clip.width}×${clip.height} • ${clip.durationSec}s • ${mb} MB`;
+  metaEl.textContent = `${clip.width}×${clip.height} @ ${clip.fps || 15} FPS • ${clip.durationSec}s • ${mb} MB`;
 
   renderGalleryFrame();
   rafId = requestAnimationFrame(galleryTickLoop);
@@ -178,12 +183,33 @@ export async function initVideoBrowser() {
   const btnSwitchScreen = document.getElementById('btnSwitchScreen');
   const btnBackToLive = document.getElementById('btnBackToLive');
 
+  const galleryDrawer = document.getElementById('galleryDrawer');
+  const btnToggleGalleryDrawer = document.getElementById('btnToggleGalleryDrawer');
+  const btnCloseGalleryDrawer = document.getElementById('btnCloseGalleryDrawer');
+
+  const canvasEl = document.getElementById('galleryPlayerCanvas');
+  const ctx = canvasEl.getContext('2d');
   const scrubber = document.getElementById('galleryScrubber');
   const btnPlayPause = document.getElementById('btnGalleryPlayPause');
   const btnSlowMo = document.getElementById('btnGallerySlowMo');
   const btnStep = document.getElementById('btnGalleryStep');
   const btnDownload = document.getElementById('btnGalleryDownload');
   const btnDelete = document.getElementById('btnGalleryDelete');
+
+  galleryImg.onload = () => {
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    ctx.drawImage(galleryImg, 0, 0, canvasEl.width, canvasEl.height);
+  };
+
+  function setDrawerOpen(open) {
+    const next = typeof open === 'boolean' ? open : !appState.galleryDrawerOpen;
+    updateState({ galleryDrawerOpen: next });
+    galleryDrawer.classList.toggle('hidden', !next);
+    btnToggleGalleryDrawer.classList.toggle('radar-btn-active', next);
+  }
+
+  btnToggleGalleryDrawer.addEventListener('click', () => setDrawerOpen());
+  btnCloseGalleryDrawer.addEventListener('click', () => setDrawerOpen(false));
 
   btnSwitchScreen.addEventListener('click', async () => {
     screenLive.classList.add('hidden');
@@ -201,7 +227,7 @@ export async function initVideoBrowser() {
   });
 
   btnPlayPause.addEventListener('click', () => {
-    if (!decodedBitmaps.length) return;
+    if (!frameUrls.length) return;
     isPlaying = !isPlaying;
     lastTickMs = performance.now();
     renderGalleryFrame();
@@ -213,9 +239,9 @@ export async function initVideoBrowser() {
   });
 
   btnStep.addEventListener('click', () => {
-    if (!decodedBitmaps.length) return;
+    if (!frameUrls.length) return;
     isPlaying = false;
-    const stepSec = clipDuration / Math.max(1, decodedBitmaps.length);
+    const stepSec = clipDuration / Math.max(1, frameUrls.length);
     playheadSec = (playheadSec + stepSec) % clipDuration;
     renderGalleryFrame();
   });

@@ -1,16 +1,21 @@
 /**
- * 60fps Dual-Canvas Compositor (Full-Screen Main Feed + Magnified PiP Zoom Window)
+ * 60fps Dual-Canvas Compositor + Localized Micro-Change Heatmap Engine
  *
- * Includes Temporal Compare modes:
- * - 'ghost': Superimposes the video frame from N seconds ago at 50% opacity.
- * - 'delta': Change-Radar mode using Canvas 'difference' blending against the frame
- *            from N seconds ago so stationary regions cancel to black and only
- *            changes/movement light up.
+ * Heatmap Engine:
+ * - Analyzes frame-to-frame luminance deltas on a fast 160×90 grid.
+ * - Rejects global camera movement: if >18% of the frame changes at once
+ *   (e.g., camera shake or panning), the heatmap suppresses the global spike
+ *   and re-anchors its reference background immediately.
+ * - Highlights small, localized changes in high-contrast thermal/radar colors.
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
-import { getDelayedFrameBitmap } from '../recorder/memoryRingBuffer.js';
+
+const HEAT_W = 160;
+const HEAT_H = 90;
+const HEAT_CELLS = HEAT_W * HEAT_H;
+const GLOBAL_MOTION_REJECTION_RATIO = 0.18; // If >18% of image changes at once, treat as camera movement
 
 export function initCompositor(videoEl) {
   const mainCanvas = document.getElementById('mainCanvas');
@@ -18,7 +23,99 @@ export function initCompositor(videoEl) {
   const mainCtx = mainCanvas.getContext('2d');
   const pipCtx = pipCanvas.getContext('2d');
 
-  // Resize canvases only when layout changes
+  // Offscreen buffers for Localized Micro-Change Heatmap
+  const sampleCanvas = document.createElement('canvas');
+  sampleCanvas.width = HEAT_W;
+  sampleCanvas.height = HEAT_H;
+  const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+  const heatOverlayCanvas = document.createElement('canvas');
+  heatOverlayCanvas.width = HEAT_W;
+  heatOverlayCanvas.height = HEAT_H;
+  const heatOverlayCtx = heatOverlayCanvas.getContext('2d');
+  const heatImgData = heatOverlayCtx.createImageData(HEAT_W, HEAT_H);
+
+  const refLuma = new Float32Array(HEAT_CELLS);
+  const heatAccum = new Float32Array(HEAT_CELLS);
+  let refInitialized = false;
+
+  function updateHeatmap(videoSource) {
+    sampleCtx.drawImage(videoSource, 0, 0, HEAT_W, HEAT_H);
+    const src = sampleCtx.getImageData(0, 0, HEAT_W, HEAT_H).data;
+    const out = heatImgData.data;
+
+    // Map sensitivity (10..95) to pixel delta threshold (75..8)
+    const sens = Math.max(10, Math.min(95, appState.heatmapSensitivity));
+    const threshold = 82 - sens * 0.76;
+
+    if (!refInitialized) {
+      for (let i = 0; i < HEAT_CELLS; i++) {
+        const p = i * 4;
+        refLuma[i] = 0.299 * src[p] + 0.587 * src[p + 1] + 0.114 * src[p + 2];
+        heatAccum[i] = 0;
+      }
+      refInitialized = true;
+      return;
+    }
+
+    // Pass 1: Measure how many cells changed above threshold to detect global camera motion
+    let changedCells = 0;
+    const currentLuma = new Float32Array(HEAT_CELLS);
+    for (let i = 0; i < HEAT_CELLS; i++) {
+      const p = i * 4;
+      const luma = 0.299 * src[p] + 0.587 * src[p + 1] + 0.114 * src[p + 2];
+      currentLuma[i] = luma;
+      if (Math.abs(luma - refLuma[i]) > threshold) {
+        changedCells++;
+      }
+    }
+
+    const changedFraction = changedCells / HEAT_CELLS;
+
+    // Global Motion Gate: if the whole camera moved (>18% of scene changed simultaneously),
+    // re-anchor the background reference and do NOT light up the heatmap!
+    if (changedFraction > GLOBAL_MOTION_REJECTION_RATIO) {
+      for (let i = 0; i < HEAT_CELLS; i++) {
+        refLuma[i] = currentLuma[i];
+        heatAccum[i] *= 0.4; // Rapidly clear stale markings when camera moves
+      }
+    } else {
+      // Localized change: accumulate heat on small changes and slowly adapt reference
+      for (let i = 0; i < HEAT_CELLS; i++) {
+        const delta = Math.abs(currentLuma[i] - refLuma[i]);
+        if (delta > threshold) {
+          heatAccum[i] = Math.min(255, heatAccum[i] + (delta - threshold) * 3.6);
+        } else {
+          heatAccum[i] *= 0.88;
+        }
+        refLuma[i] += (currentLuma[i] - refLuma[i]) * 0.15;
+      }
+    }
+
+    // Render high-contrast thermal/radar markings into heatOverlayCanvas
+    for (let i = 0; i < HEAT_CELLS; i++) {
+      const h = heatAccum[i];
+      const p = i * 4;
+      if (h < 20) {
+        out[p + 3] = 0; // Transparent where no change occurred
+      } else if (h < 100) {
+        // High-contrast electric yellow-green for subtle micro-changes
+        out[p] = 255;
+        out[p + 1] = 230;
+        out[p + 2] = 0;
+        out[p + 3] = Math.min(220, Math.round(h * 2.1));
+      } else {
+        // High-contrast hot crimson/orange-white core for strong localized changes
+        out[p] = 255;
+        out[p + 1] = Math.max(0, 255 - Math.round((h - 100) * 1.6));
+        out[p + 2] = h > 210 ? 255 : 40;
+        out[p + 3] = 235;
+      }
+    }
+
+    heatOverlayCtx.putImageData(heatImgData, 0, 0);
+  }
+
   function syncCanvasSize() {
     const rect = mainCanvas.parentElement.getBoundingClientRect();
     const w = Math.max(320, Math.round(rect.width));
@@ -41,7 +138,6 @@ export function initCompositor(videoEl) {
   window.addEventListener('resize', syncCanvasSize);
   syncCanvasSize();
 
-  // Apply GPU-composited CSS filters only when state changes
   let lastFilterCss = '';
   subscribeState((state) => {
     const filterCss = buildCanvasFilterString(state);
@@ -49,6 +145,9 @@ export function initCompositor(videoEl) {
       lastFilterCss = filterCss;
       mainCanvas.style.filter = filterCss;
       pipCanvas.style.filter = filterCss;
+    }
+    if (!state.heatmapEnabled) {
+      refInitialized = false;
     }
   });
 
@@ -84,39 +183,10 @@ export function initCompositor(videoEl) {
   mainCanvas.addEventListener('pointerup', stopPan);
   mainCanvas.addEventListener('pointercancel', stopPan);
 
-  // Helper to composite Temporal Ghost or Delta layer from the 20s RAM ring buffer
-  function drawTemporalLayer(ctx, pastBmp, normSx, normSy, normW, normH, destW, destH) {
-    if (!pastBmp || appState.temporalMode === 'off') return;
-    const bw = pastBmp.width;
-    const bh = pastBmp.height;
-
-    ctx.save();
-    if (appState.temporalMode === 'ghost') {
-      ctx.globalAlpha = 0.48;
-      ctx.globalCompositeOperation = 'source-over';
-    } else if (appState.temporalMode === 'delta') {
-      ctx.globalAlpha = 1.0;
-      ctx.globalCompositeOperation = 'difference';
-    }
-
-    ctx.drawImage(
-      pastBmp,
-      normSx * bw,
-      normSy * bh,
-      normW * bw,
-      normH * bh,
-      0,
-      0,
-      destW,
-      destH
-    );
-    ctx.restore();
-  }
-
   function renderLoop() {
     if (appState.currentScreen === 'live' && !appState.replayActive && videoEl.readyState >= 2) {
-      const vw = videoEl.videoWidth || appState.streamWidth || 1280;
-      const vh = videoEl.videoHeight || appState.streamHeight || 720;
+      const vw = videoEl.videoWidth || appState.streamWidth || 1920;
+      const vh = videoEl.videoHeight || appState.streamHeight || 1080;
       const cw = mainCanvas.width;
       const ch = mainCanvas.height;
 
@@ -138,18 +208,27 @@ export function initCompositor(videoEl) {
       const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
       const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
 
-      const pastBmp =
-        appState.temporalMode !== 'off'
-          ? getDelayedFrameBitmap(appState.temporalDelaySec)
-          : null;
-
-      // 1. Hardware-accelerated blit to Main Canvas
-      mainCtx.drawImage(videoEl, sx, sy, cropW, cropH, 0, 0, cw, ch);
-      if (pastBmp) {
-        drawTemporalLayer(mainCtx, pastBmp, sx / vw, sy / vh, cropW / vw, cropH / vh, cw, ch);
+      if (appState.heatmapEnabled) {
+        updateHeatmap(videoEl);
       }
 
-      // 2. Hardware-accelerated blit to Magnified PiP Zoom Window
+      // 1. Render Main Canvas
+      mainCtx.drawImage(videoEl, sx, sy, cropW, cropH, 0, 0, cw, ch);
+      if (appState.heatmapEnabled) {
+        mainCtx.drawImage(
+          heatOverlayCanvas,
+          (sx / vw) * HEAT_W,
+          (sy / vh) * HEAT_H,
+          (cropW / vw) * HEAT_W,
+          (cropH / vh) * HEAT_H,
+          0,
+          0,
+          cw,
+          ch
+        );
+      }
+
+      // 2. Render Magnified PiP Zoom Window
       if (appState.pipEnabled) {
         const pw = pipCanvas.width || 340;
         const ph = pipCanvas.height || 210;
@@ -164,8 +243,18 @@ export function initCompositor(videoEl) {
         const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
 
         pipCtx.drawImage(videoEl, psx, psy, pipCropW, pipCropH, 0, 0, pw, ph);
-        if (pastBmp) {
-          drawTemporalLayer(pipCtx, pastBmp, psx / vw, psy / vh, pipCropW / vw, pipCropH / vh, pw, ph);
+        if (appState.heatmapEnabled) {
+          pipCtx.drawImage(
+            heatOverlayCanvas,
+            (psx / vw) * HEAT_W,
+            (psy / vh) * HEAT_H,
+            (pipCropW / vw) * HEAT_W,
+            (pipCropH / vh) * HEAT_H,
+            0,
+            0,
+            pw,
+            ph
+          );
         }
       }
 

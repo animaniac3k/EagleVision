@@ -28,8 +28,9 @@ export const appState = {
   optionsOpen: true,
   hudOpen: false,
   currentScreen: 'live',
+  galleryDrawerOpen: true,
 
-  // Superimposed Overlay Guide
+  // Superimposed Overlay Guide (Only 'crosshair' or 'custom')
   overlayEnabled: true,
   overlayType: 'crosshair',
   overlayOpacity: 75,
@@ -43,12 +44,14 @@ export const appState = {
   invert: false,
   grayscale: false,
 
-  // Temporal Compare (Chrono-Ghost & Change-Radar)
-  temporalMode: 'off', // 'off' | 'ghost' | 'delta'
-  temporalDelaySec: 2.0,
+  // Localized Micro-Change Heatmap (ignores global camera shake)
+  heatmapEnabled: false,
+  heatmapSensitivity: 60, // 10 (low) to 95 (high)
 
-  // 20-Second Rolling In-Memory Buffer
+  // Configurable In-Memory Rolling Recording Buffer
   bufferEnabled: true,
+  bufferMaxSeconds: 20, // Adjustable: 5s to 60s
+  bufferTargetFps: 15,  // Adjustable: 5 FPS to 30 FPS
   bufferedSeconds: 0,
   bufferBytes: 0,
   replayActive: false,

@@ -1,37 +1,36 @@
 /**
- * Superimpose Guide Overlays (Preset Vector Reticles + Custom Image Upload)
- * Uses CSS variables (--radar-accent, --radar-text) so overlays adapt to the chosen Interface Color.
+ * Superimpose Guide Overlays
+ * Simplified to:
+ * 1. Open-Center Crosshair (gap in the middle so the point of interest is unobstructed)
+ * 2. Custom User-Loaded Image (PNG/SVG/WebP)
  */
 import { appState, subscribeState } from '../state.js';
 
-const PRESET_SVGS = {
-  crosshair: `
-    <line x1="400" y1="0" x2="400" y2="500" stroke="var(--radar-accent)" stroke-width="1.5" stroke-dasharray="10 6" />
-    <line x1="0" y1="250" x2="800" y2="250" stroke="var(--radar-accent)" stroke-width="1.5" stroke-dasharray="10 6" />
-    <circle cx="400" cy="250" r="55" stroke="var(--radar-accent)" stroke-width="1.5" fill="none" />
-    <circle cx="400" cy="250" r="4" fill="var(--radar-text)" />
-  `,
-  grid: `
-    <line x1="266.6" y1="0" x2="266.6" y2="500" stroke="var(--radar-accent)" stroke-width="1.3" />
-    <line x1="533.3" y1="0" x2="533.3" y2="500" stroke="var(--radar-accent)" stroke-width="1.3" />
-    <line x1="0" y1="166.6" x2="800" y2="166.6" stroke="var(--radar-accent)" stroke-width="1.3" />
-    <line x1="0" y1="333.3" x2="800" y2="333.3" stroke="var(--radar-accent)" stroke-width="1.3" />
-    <rect x="120" y="75" width="560" height="350" stroke="var(--radar-text-muted)" stroke-width="1.2" stroke-dasharray="8 6" fill="none" />
-  `,
-  rings: `
-    <circle cx="400" cy="250" r="35" stroke="var(--radar-accent)" stroke-width="1.5" fill="none" />
-    <circle cx="400" cy="250" r="85" stroke="var(--radar-accent)" stroke-width="1.5" fill="none" />
-    <circle cx="400" cy="250" r="145" stroke="var(--radar-accent)" stroke-width="1.5" fill="none" />
-    <circle cx="400" cy="250" r="205" stroke="var(--radar-accent)" stroke-width="1.2" stroke-dasharray="8 6" fill="none" />
-    <line x1="360" y1="250" x2="440" y2="250" stroke="var(--radar-text-muted)" stroke-width="1.5" />
-    <line x1="400" y1="210" x2="400" y2="290" stroke="var(--radar-text-muted)" stroke-width="1.5" />
-  `
-};
+const OPEN_CENTER_CROSSHAIR_SVG = `
+  <!-- Horizontal arms with a 64px open gap in the center (368..432) -->
+  <line x1="60" y1="250" x2="368" y2="250" stroke="var(--radar-accent)" stroke-width="1.8" />
+  <line x1="432" y1="250" x2="740" y2="250" stroke="var(--radar-accent)" stroke-width="1.8" />
+
+  <!-- Vertical arms with a 64px open gap in the center (218..282) -->
+  <line x1="400" y1="25" x2="400" y2="218" stroke="var(--radar-accent)" stroke-width="1.8" />
+  <line x1="400" y1="282" x2="400" y2="475" stroke="var(--radar-accent)" stroke-width="1.8" />
+
+  <!-- Inner gap bracket ticks marking the open inspection window -->
+  <line x1="368" y1="242" x2="368" y2="258" stroke="var(--radar-accent)" stroke-width="1.8" />
+  <line x1="432" y1="242" x2="432" y2="258" stroke="var(--radar-accent)" stroke-width="1.8" />
+  <line x1="392" y1="218" x2="408" y2="218" stroke="var(--radar-accent)" stroke-width="1.8" />
+  <line x1="392" y1="282" x2="408" y2="282" stroke="var(--radar-accent)" stroke-width="1.8" />
+
+  <!-- Outer reference circle well outside the center gap -->
+  <circle cx="400" cy="250" r="76" stroke="var(--radar-accent)" stroke-width="1.4" stroke-dasharray="8 6" fill="none" />
+`;
 
 export function initOverlayManager() {
   const overlayLayer = document.getElementById('overlayLayer');
   const svgOverlay = document.getElementById('svgOverlay');
   const customImg = document.getElementById('customOverlayImg');
+
+  svgOverlay.innerHTML = OPEN_CENTER_CROSSHAIR_SVG;
 
   function renderOverlay(state) {
     overlayLayer.classList.toggle('hidden', !state.overlayEnabled);
@@ -49,11 +48,6 @@ export function initOverlayManager() {
     } else {
       customImg.classList.add('hidden');
       svgOverlay.classList.remove('hidden');
-      const markup = PRESET_SVGS[state.overlayType] || PRESET_SVGS.crosshair;
-      if (svgOverlay.dataset.activeType !== state.overlayType) {
-        svgOverlay.innerHTML = markup;
-        svgOverlay.dataset.activeType = state.overlayType;
-      }
     }
   }
 
