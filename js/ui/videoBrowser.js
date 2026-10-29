@@ -17,8 +17,31 @@ let isPlaying = false;
 let lastTickMs = 0;
 let rafId = null;
 let lastDrawnIdx = -1;
+let galleryZoom = 1.0;
+let galleryPanX = 0;
+let galleryPanY = 0;
 
 const galleryImg = new Image();
+
+function drawCurrentGalleryImage() {
+  const canvasEl = document.getElementById('galleryPlayerCanvas');
+  if (!canvasEl || !galleryImg.complete || !galleryImg.naturalWidth) return;
+  const ctx = canvasEl.getContext('2d');
+  const iw = galleryImg.naturalWidth;
+  const ih = galleryImg.naturalHeight;
+  const cw = canvasEl.width;
+  const ch = canvasEl.height;
+
+  const cropW = iw / galleryZoom;
+  const cropH = ih / galleryZoom;
+  const centerX = iw * (0.5 + galleryPanX);
+  const centerY = ih * (0.5 + galleryPanY);
+  const sx = Math.max(0, Math.min(iw - cropW, centerX - cropW / 2));
+  const sy = Math.max(0, Math.min(ih - cropH, centerY - cropH / 2));
+
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(galleryImg, sx, sy, cropW, cropH, 0, 0, cw, ch);
+}
 
 function stopPlayerLoop() {
   if (rafId) {
@@ -196,9 +219,73 @@ export async function initVideoBrowser() {
   const btnDownload = document.getElementById('btnGalleryDownload');
   const btnDelete = document.getElementById('btnGalleryDelete');
 
+  const btnZoomMinus = document.getElementById('galleryZoomMinus');
+  const btnZoomPlus = document.getElementById('galleryZoomPlus');
+  const btnZoomReset = document.getElementById('galleryZoomReset');
+  const zoomBadge = document.getElementById('galleryZoomBadge');
+
+  function syncGalleryZoomUI() {
+    if (zoomBadge) zoomBadge.textContent = `${galleryZoom.toFixed(1)}x`;
+    if (btnZoomReset) btnZoomReset.classList.toggle('hidden', galleryZoom <= 1.01);
+    canvasEl.style.cursor = galleryZoom > 1.01 ? 'grab' : 'default';
+    drawCurrentGalleryImage();
+  }
+
+  btnZoomMinus?.addEventListener('click', () => {
+    galleryZoom = Math.max(1.0, Math.round((galleryZoom - 0.5) * 10) / 10);
+    if (galleryZoom <= 1.01) {
+      galleryPanX = 0;
+      galleryPanY = 0;
+    }
+    syncGalleryZoomUI();
+  });
+
+  btnZoomPlus?.addEventListener('click', () => {
+    galleryZoom = Math.min(8.0, Math.round((galleryZoom + 0.5) * 10) / 10);
+    syncGalleryZoomUI();
+  });
+
+  btnZoomReset?.addEventListener('click', () => {
+    galleryZoom = 1.0;
+    galleryPanX = 0;
+    galleryPanY = 0;
+    syncGalleryZoomUI();
+  });
+
+  // Touch / Pointer Panning on Recorded Video when zoomed in (>1.0x)
+  let panning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let startOffX = 0;
+  let startOffY = 0;
+
+  canvasEl.addEventListener('pointerdown', (e) => {
+    if (galleryZoom <= 1.01) return;
+    panning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    startOffX = galleryPanX;
+    startOffY = galleryPanY;
+    canvasEl.setPointerCapture(e.pointerId);
+  });
+
+  canvasEl.addEventListener('pointermove', (e) => {
+    if (!panning) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const dx = (e.clientX - panStartX) / Math.max(1, rect.width);
+    const dy = (e.clientY - panStartY) / Math.max(1, rect.height);
+    const maxPan = Math.max(0, (1 - 1 / galleryZoom) / 2);
+    galleryPanX = Math.max(-maxPan, Math.min(maxPan, startOffX - dx / galleryZoom));
+    galleryPanY = Math.max(-maxPan, Math.min(maxPan, startOffY - dy / galleryZoom));
+    drawCurrentGalleryImage();
+  });
+
+  const stopPan = () => { panning = false; };
+  canvasEl.addEventListener('pointerup', stopPan);
+  canvasEl.addEventListener('pointercancel', stopPan);
+
   galleryImg.onload = () => {
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    ctx.drawImage(galleryImg, 0, 0, canvasEl.width, canvasEl.height);
+    drawCurrentGalleryImage();
   };
 
   function setDrawerOpen(open) {

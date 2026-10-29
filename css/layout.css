@@ -58,6 +58,29 @@
   pointer-events: auto;
 }
 
+/* Declutter Mode: Hide all interface elements except the single top-left restore button */
+.btn-restore-ui {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 60;
+  opacity: 0.65;
+  box-shadow: var(--shadow-panel);
+}
+
+.btn-restore-ui:hover {
+  opacity: 1;
+}
+
+#screenLive.ui-decluttered .floating-strip,
+#screenLive.ui-decluttered .strip-bottom,
+#screenLive.ui-decluttered #optionsPanel,
+#screenLive.ui-decluttered #hudOverlay,
+#screenLive.ui-decluttered #pipZoomWindow,
+#screenLive.ui-decluttered #zoomTargetCrosshair {
+  display: none !important;
+}
+
 /* Movable & Collapsible Settings Window */
 #optionsPanel {
   position: absolute;

@@ -39,8 +39,62 @@ export function initCompositor(videoEl) {
   const heatAccum = new Float32Array(HEAT_CELLS);
   let refInitialized = false;
   let lastHeatTimeMs = performance.now();
+  let lastSpeechTimeMs = 0;
+  const SPEECH_COOLDOWN_MS = 3600;
 
-  function updateHeatmap(videoSource) {
+  function announceHeatmapDetection(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
+    if (!appState.heatmapSpeechEnabled || !('speechSynthesis' in window)) return;
+    const now = performance.now();
+    if (now - lastSpeechTimeMs < SPEECH_COOLDOWN_MS) return;
+
+    // Convert detection normalized source coords (0..1) into current viewport coords (0..1)
+    const detViewX = (detSourceNormX * vw - sx) / cropW;
+    const detViewY = (detSourceNormY * vh - sy) / cropH;
+
+    // Ignore if detection is outside the currently visible main viewport
+    if (detViewX < 0 || detViewX > 1 || detViewY < 0 || detViewY > 1) return;
+
+    // Reference origin: where the zoomed-in ROI target is pointing (appState.roiX, appState.roiY)
+    const aspect = ch > 0 ? cw / ch : 1.6;
+    const dx = (detViewX - appState.roiX) * aspect;
+    const dy = detViewY - appState.roiY;
+    const dist = Math.hypot(dx, dy);
+
+    // 1 tick = 8% of viewport height (approx 1 ROI reticle radius)
+    const ticks = Math.round(dist / 0.08);
+    let phrase = '';
+    let hudSummary = '';
+
+    if (ticks <= 0) {
+      phrase = 'Detection, on target';
+      hudSummary = '🔊 ON TARGET';
+    } else {
+      // Clock angle: 0 deg = 12 o'clock (up, -dy), 90 deg = 3 o'clock (+dx)
+      const angleDeg = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+      const clockHour = Math.round(angleDeg / 30) || 12;
+      const tickWord = ticks === 1 ? 'tick' : 'ticks';
+      phrase = `Detection, ${clockHour} o'clock, ${ticks} ${tickWord}`;
+      hudSummary = `🔊 ${clockHour} O'CLOCK • ${ticks} ${tickWord.toUpperCase()}`;
+    }
+
+    lastSpeechTimeMs = now;
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(phrase);
+      utter.rate = 1.15;
+      utter.pitch = 1.0;
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // Ignore speech synthesis errors on restricted platforms
+    }
+
+    const ringActionText = document.getElementById('ringActionText');
+    if (ringActionText) {
+      ringActionText.textContent = hudSummary;
+    }
+  }
+
+  function updateHeatmap(videoSource, sx, sy, cropW, cropH, vw, vh, cw, ch) {
     const nowMs = performance.now();
     const dtSec = Math.max(0.005, Math.min(0.25, (nowMs - lastHeatTimeMs) / 1000));
     lastHeatTimeMs = nowMs;
@@ -54,7 +108,7 @@ export function initCompositor(videoEl) {
     const threshold = 82 - sens * 0.76;
 
     // Compute per-frame decay factor so peak heat (255) decays to visibility threshold (20)
-    // over the exact user-selected heatmapDuration (0.5s .. 10.0s)
+    // over the exact user-selected heatmapDuration (0.5s .. 60.0s)
     const durationSec = Math.max(0.2, Number(appState.heatmapDuration) || 2.0);
     const decayFactor = Math.exp((-2.545 * dtSec) / durationSec);
 
@@ -91,14 +145,37 @@ export function initCompositor(videoEl) {
       }
     } else {
       // Localized change: accumulate heat on small changes and decay over heatmapDuration seconds
+      let spikeWeightSum = 0;
+      let spikeSumX = 0;
+      let spikeSumY = 0;
+      let spikeCount = 0;
+      let maxSpikeHeat = 0;
+
       for (let i = 0; i < HEAT_CELLS; i++) {
         const delta = Math.abs(currentLuma[i] - refLuma[i]);
         if (delta > threshold) {
-          heatAccum[i] = Math.min(255, heatAccum[i] + (delta - threshold) * 3.8);
+          const added = (delta - threshold) * 3.8;
+          heatAccum[i] = Math.min(255, heatAccum[i] + added);
+          if (heatAccum[i] > 115) {
+            const cellX = i % HEAT_W;
+            const cellY = (i / HEAT_W) | 0;
+            spikeWeightSum += added;
+            spikeSumX += cellX * added;
+            spikeSumY += cellY * added;
+            spikeCount++;
+            if (heatAccum[i] > maxSpikeHeat) maxSpikeHeat = heatAccum[i];
+          }
         } else {
           heatAccum[i] *= decayFactor;
         }
         refLuma[i] += (currentLuma[i] - refLuma[i]) * 0.15;
+      }
+
+      // If a distinct localized movement spike occurred, announce its clock direction & ticks
+      if (spikeCount >= 2 && maxSpikeHeat >= 135 && spikeWeightSum > 0) {
+        const centroidNormX = (spikeSumX / spikeWeightSum + 0.5) / HEAT_W;
+        const centroidNormY = (spikeSumY / spikeWeightSum + 0.5) / HEAT_H;
+        announceHeatmapDetection(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
       }
     }
 
@@ -219,7 +296,7 @@ export function initCompositor(videoEl) {
       const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
 
       if (appState.heatmapEnabled) {
-        updateHeatmap(videoEl);
+        updateHeatmap(videoEl, sx, sy, cropW, cropH, vw, vh, cw, ch);
       }
 
       // 1. Render Main Canvas

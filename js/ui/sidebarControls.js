@@ -57,6 +57,9 @@ export function applyThemeColor(hex) {
 }
 
 export async function initSidebarAndTopControls(videoEl) {
+  const screenLive = document.getElementById('screenLive');
+  const btnDeclutterUi = document.getElementById('btnDeclutterUi');
+  const btnRestoreUi = document.getElementById('btnRestoreUi');
   const optionsPanel = document.getElementById('optionsPanel');
   const optionsDragHandle = document.getElementById('optionsDragHandle');
   const btnToggleOptions = document.getElementById('btnToggleOptions');
@@ -74,6 +77,14 @@ export async function initSidebarAndTopControls(videoEl) {
 
   applyThemeColor(appState.themeColor || '#2dd4bf');
   makeElementDraggable(optionsPanel, optionsDragHandle);
+
+  // 0. Declutter Mode (Hides whole interface except single top-left restore button)
+  btnDeclutterUi?.addEventListener('click', () => {
+    updateState({ uiDecluttered: true });
+  });
+  btnRestoreUi?.addEventListener('click', () => {
+    updateState({ uiDecluttered: false });
+  });
 
   // 1. Show/Hide Settings Window
   const toggleOptions = (force) => {
@@ -255,11 +266,12 @@ export async function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 10. Heatmap Sensitivity & Display Duration Sliders in Settings
+  // 10. Heatmap Sensitivity, Display Duration (up to 60s) & Voice Callout Toggle
   const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');
   const valHeatmapSens = document.getElementById('valHeatmapSens');
   const sliderHeatmapDuration = document.getElementById('sliderHeatmapDuration');
   const valHeatmapDuration = document.getElementById('valHeatmapDuration');
+  const btnToggleHeatmapSpeech = document.getElementById('btnToggleHeatmapSpeech');
 
   sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
   valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
@@ -273,6 +285,26 @@ export async function initSidebarAndTopControls(videoEl) {
       valHeatmapDuration.textContent = `${dur.toFixed(1)}s`;
       updateState({ heatmapDuration: dur });
       saveSettings(appState);
+    });
+  }
+
+  if (btnToggleHeatmapSpeech) {
+    btnToggleHeatmapSpeech.addEventListener('click', () => {
+      const next = !appState.heatmapSpeechEnabled;
+      updateState({ heatmapSpeechEnabled: next });
+      saveSettings(appState);
+      if (next && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance('Voice callouts active');
+          u.rate = 1.15;
+          window.speechSynthesis.speak(u);
+        } catch {
+          // Ignore speech synthesis errors
+        }
+      } else if (!next && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
     });
   }
 
@@ -387,6 +419,13 @@ export async function initSidebarAndTopControls(videoEl) {
 
   // Reactive UI Sync
   subscribeState((state) => {
+    if (screenLive) {
+      screenLive.classList.toggle('ui-decluttered', Boolean(state.uiDecluttered));
+    }
+    if (btnRestoreUi) {
+      btnRestoreUi.classList.toggle('hidden', !state.uiDecluttered);
+    }
+
     optionsPanel.classList.toggle('hidden', !state.optionsOpen);
     btnToggleOptions.classList.toggle('radar-btn-active', state.optionsOpen);
     btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
@@ -394,6 +433,10 @@ export async function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+    if (btnToggleHeatmapSpeech) {
+      btnToggleHeatmapSpeech.textContent = state.heatmapSpeechEnabled ? 'VOICE: ON' : 'VOICE: OFF';
+      btnToggleHeatmapSpeech.classList.toggle('radar-btn-active', Boolean(state.heatmapSpeechEnabled));
+    }
     btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);

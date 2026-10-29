@@ -134,6 +134,36 @@
   color: var(--radar-text);
 }
 
+.duration-custom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.radar-num-input {
+  width: 64px;
+  height: 28px;
+  background: #051216;
+  color: var(--radar-text);
+  border: 1px solid var(--radar-border);
+  border-radius: 3px;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+}
+
+.radar-num-input:focus {
+  border-color: var(--radar-border-strong);
+}
+
+.radar-num-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 input[type="range"].radar-slider {
   -webkit-appearance: none;
   appearance: none;

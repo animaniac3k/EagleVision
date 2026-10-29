@@ -78,8 +78,24 @@
         </div>
       </div>
 
-      <!-- TOP-LEFT FLOATING ICON STRIP (Settings, PiP Window, Overlay Guide, Heatmap, HUD, Whole-Image Zoom) -->
+      <!-- SINGLE TOP-LEFT BUTTON SHOWN ONLY IN DECLUTTER MODE TO RESTORE UI -->
+      <button id="btnRestoreUi" class="radar-btn btn-restore-ui hidden" title="Restore Interface Controls">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+
+      <!-- TOP-LEFT FLOATING ICON STRIP (Declutter, Settings, PiP Window, Overlay Guide, Heatmap, HUD, Whole-Image Zoom) -->
       <nav class="floating-strip strip-top-left">
+        <!-- Declutter / Hide Entire Interface Button -->
+        <button id="btnDeclutterUi" class="radar-btn" title="Declutter Screen (Hide All Interface Controls)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>
+          </svg>
+        </button>
+
         <button id="btnToggleOptions" class="radar-btn radar-btn-active" title="Show / Hide Settings Window">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
@@ -225,10 +241,11 @@
             </div>
           </div>
 
-          <!-- 4. Micro-Change Heatmap Sensitivity & Display Duration -->
+          <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration (up to 60s) & Voice Callout -->
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Heatmap Config</span>
+              <button id="btnToggleHeatmapSpeech" class="radar-btn radar-btn-sm" title="Announce Heatmap Detections via Speech (Clock Direction & Ticks from ROI Target)">VOICE: OFF</button>
             </div>
 
             <div class="slider-group">
@@ -242,9 +259,13 @@
             <div class="slider-group">
               <div class="slider-header">
                 <span>Display Duration</span>
-                <span id="valHeatmapDuration" class="slider-val">2.0s</span>
+                <div class="duration-custom-controls">
+                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Enter Custom Heatmap Duration in Seconds" />
+                  <span id="valHeatmapDuration" class="slider-val" style="min-width:22px;">s</span>
+                  <button id="btnHeatmapInfinite" class="radar-btn radar-btn-sm" style="height:28px; min-width:34px; padding:0 6px; font-size:14px;" title="Toggle Infinite Heatmap Persistence (∞)">∞</button>
+                </div>
               </div>
-              <input id="sliderHeatmapDuration" type="range" min="0.5" max="10" step="0.5" value="2.0" class="radar-slider" />
+              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" title="Drag right to 125 for Infinite (∞) or enter any custom seconds above" />
             </div>
           </div>
 
@@ -381,7 +402,7 @@
         <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
       </div>
 
-      <!-- Top-Left Floating Navigation & Clips Drawer Toggle -->
+      <!-- Top-Left Floating Navigation, Clips Drawer Toggle & Video Playback Zoom Tool -->
       <nav class="floating-strip strip-top-left">
         <button id="btnBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
           <span>← LIVE FEED</span>
@@ -393,6 +414,14 @@
           </svg>
           <span>CLIPS</span>
         </button>
+
+        <!-- Video Playback Zoom Tool (Zoom & Pan Saved Recordings) -->
+        <div class="control-pod control-pod-top">
+          <button id="galleryZoomMinus" class="radar-btn" title="Zoom Out Recorded Video">−</button>
+          <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
+          <button id="galleryZoomPlus" class="radar-btn" title="Zoom In Recorded Video">+</button>
+          <button id="galleryZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Video Pan & Zoom">1:1</button>
+        </div>
       </nav>
 
       <!-- Top-Right Floating Active Clip Telemetry Pill -->

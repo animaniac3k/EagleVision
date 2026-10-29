@@ -23,6 +23,7 @@ export function saveSettings(state) {
       overlayScale: state.overlayScale,
       heatmapSensitivity: state.heatmapSensitivity,
       heatmapDuration: state.heatmapDuration || 2.0,
+      heatmapSpeechEnabled: Boolean(state.heatmapSpeechEnabled),
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
