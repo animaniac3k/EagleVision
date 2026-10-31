@@ -1,12 +1,16 @@
 {
   "name": "SPOTR — Recon • Detect • Alert",
   "short_name": "SPOTR",
-  "description": "Tactical Camera Stream Viewer, Scope Reticle Overlay, Digital Zoom Loupe & RAM Buffer Recorder.",
+  "id": "spotr-tactical-pwa",
+  "description": "Tactical Precision Camera Stream Viewer, Scope Reticle Customizer, Digital Zoom Loupe, Gamepad/Touchpad Virtual Mouse & In-Memory Video Buffer.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "landscape",
   "background_color": "#18181B",
   "theme_color": "#202024",
+  "categories": ["utilities", "productivity", "multimedia"],
   "icons": [
     {
       "src": "./assets/icons/icon.svg",

@@ -618,7 +618,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 540px;
+  max-width: 600px;
   animation: splashZoomIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -661,6 +661,6 @@
     width: 0px;
   }
   to {
-    width: 261px;
+    width: 290px;
   }
 }

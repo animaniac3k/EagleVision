@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SPOTR — Tactical Visual User Manual (Beta 1)</title>
+  <style>
+    @page {
+      size: letter landscape;
+      margin: 10mm 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0d0e12;
+      color: #e2e8f0;
+      line-height: 1.4;
+      font-size: 11pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      width: 100%;
+      height: 100%;
+      min-height: 180mm;
+      padding: 6mm 4mm;
+      page-break-after: always;
+      break-after: page;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .page:last-child {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    /* Header & Footer */
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #27272a;
+      padding-bottom: 4mm;
+      margin-bottom: 5mm;
+    }
+
+    .brand-title {
+      font-size: 16pt;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-title .badge-tm {
+      font-size: 10pt;
+      color: #ffd166;
+    }
+
+    .brand-tagline {
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #2dd4bf;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .doc-meta {
+      text-align: right;
+      font-size: 8.5pt;
+      color: #94a3b8;
+      font-family: ui-monospace, monospace;
+    }
+
+    .doc-footer {
+      margin-top: auto;
+      border-top: 1px solid #27272a;
+      padding-top: 3mm;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8pt;
+      color: #64748b;
+      font-family: ui-monospace, monospace;
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5mm;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4mm;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4mm;
+    }
+
+    /* Card Panels */
+    .card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 4mm 5mm;
+    }
+
+    .card-teal { border-top: 3px solid #2dd4bf; }
+    .card-gold { border-top: 3px solid #ffd166; }
+    .card-blue { border-top: 3px solid #38bdf8; }
+    .card-purple { border-top: 3px solid #a855f7; }
+    .card-rose { border-top: 3px solid #f43f5e; }
+
+    .card-title {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 2.5mm;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-title .icon {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    p, li {
+      font-size: 9pt;
+      color: #cbd5e1;
+      margin-bottom: 2mm;
+    }
+
+    ul {
+      padding-left: 4.5mm;
+    }
+
+    li {
+      margin-bottom: 1.5mm;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 7.5pt;
+      font-weight: 700;
+      font-family: ui-monospace, monospace;
+      text-transform: uppercase;
+    }
+
+    .pill-teal { background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.4); }
+    .pill-gold { background: rgba(255, 209, 102, 0.15); color: #ffd166; border: 1px solid rgba(255, 209, 102, 0.4); }
+    .pill-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .pill-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+      margin-top: 2mm;
+    }
+
+    th {
+      background: #202024;
+      color: #94a3b8;
+      font-weight: 600;
+      text-align: left;
+      padding: 2mm 3mm;
+      border: 1px solid #27272a;
+      font-family: ui-monospace, monospace;
+      font-size: 7.5pt;
+      text-transform: uppercase;
+    }
+
+    td {
+      padding: 2mm 3mm;
+      border: 1px solid #27272a;
+      color: #cbd5e1;
+    }
+
+    tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .key {
+      display: inline-block;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: ui-monospace, monospace;
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: #f8fafc;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+
+    /* Cover Page Styling */
+    .cover {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 15mm 10mm;
+    }
+
+    .cover-box {
+      border: 2px solid #2dd4bf;
+      border-radius: 12px;
+      background: #121318;
+      padding: 12mm 16mm;
+      max-width: 220mm;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.8);
+      position: relative;
+    }
+
+    .cover-box::before {
+      content: "";
+      position: absolute;
+      top: -2px; left: 15%; right: 15%;
+      height: 2px;
+      background: #ffd166;
+    }
+
+    .cover-title {
+      font-size: 38pt;
+      font-weight: 900;
+      letter-spacing: 5px;
+      color: #ffffff;
+      margin-bottom: 2mm;
+    }
+
+    .cover-title span {
+      color: #ffd166;
+      font-size: 20pt;
+      vertical-align: super;
+    }
+
+    .cover-tagline {
+      font-size: 14pt;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #2dd4bf;
+      margin-bottom: 6mm;
+    }
+
+    .cover-subtitle {
+      font-size: 12pt;
+      color: #94a3b8;
+      margin-bottom: 8mm;
+      line-height: 1.5;
+    }
+
+    .cover-specs {
+      display: flex;
+      justify-content: center;
+      gap: 6mm;
+      margin-top: 6mm;
+      padding-top: 6mm;
+      border-top: 1px solid #27272a;
+    }
+
+    .spec-item {
+      text-align: center;
+    }
+
+    .spec-val {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #f8fafc;
+      font-family: ui-monospace, monospace;
+    }
+
+    .spec-lbl {
+      font-size: 7.5pt;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Diagrams & SVGs */
+    .diagram-container {
+      background: #121318;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 3mm;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 1: TITLE & COVER                                                 -->
+  <!-- ===================================================================== -->
+  <div class="page cover">
+    <div class="cover-box">
+      <div class="cover-title">SPOTR<span>™</span></div>
+      <div class="cover-tagline">RECON • DETECT • ALERT</div>
+      <div class="cover-subtitle">
+        Tactical Precision Camera Stream Viewer, Scope Reticle Customizer,<br>
+        Micro-Change Thermal Heatmap, In-Memory Video Buffer &amp; WebHID Controller Virtual Mouse.
+      </div>
+
+      <div style="margin: 4mm 0;">
+        <span class="pill pill-gold" style="font-size: 9pt; padding: 3px 10px;">BETA 1 RELEASE SPECIFICATION</span>
+        <span class="pill pill-teal" style="font-size: 9pt; padding: 3px 10px; margin-left: 3mm;">OFFLINE PWA READY</span>
+      </div>
+
+      <div class="cover-specs">
+        <div class="spec-item">
+          <div class="spec-val">1080p @ 60 FPS</div>
+          <div class="spec-lbl">Low Latency UVC Stream</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-val">WebHID BT Mouse</div>
+          <div class="spec-lbl">DualShock 4 Touchpad &amp; L2/R2</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-val">RAM Ring Buffer</div>
+          <div class="spec-lbl">5s–60s Instant Replay</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-val">Voice Directional</div>
+          <div class="spec-lbl">Real-Time Target Announcements</div>
+        </div>
+        <div class="spec-item">
+          <div class="spec-val">100% Client-Side</div>
+          <div class="spec-lbl">Zero Cloud Dependencies</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 8mm; font-size: 8pt; color: #64748b; font-family: ui-monospace, monospace;">
+        DOCUMENTATION IDENTIFIER: SPOTR-DOC-BETA1-REV31 • OCT 2026
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 2: HARDWARE SETUP & CONTROLLER MAPPING                           -->
+  <!-- ===================================================================== -->
+  <div class="page">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
+        <div class="brand-tagline">1. HARDWARE CONNECTIVITY &amp; CONTROLLER VIRTUAL MOUSE</div>
+      </div>
+      <div class="doc-meta">
+        SECTION 1 OF 6<br>
+        PAGE 2
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: Hardware Input -->
+      <div class="card card-teal">
+        <div class="card-title">
+          <span class="pill pill-teal">HARDWARE</span> UVC Optical Scopes &amp; Camera Input
+        </div>
+        <p>SPOTR interfaces directly with standard USB Video Class (UVC) digital scopes, optical adapters, and webcams via the native HTML5 MediaDevices API.</p>
+        <ul>
+          <li><strong>Direct Plug &amp; Play:</strong> Hot-plugging a scope triggers automatic stream renegotiation without page refreshes.</li>
+          <li><strong>Performance Profiles:</strong> 1080p60 (recommended for scopes), 720p60 (low battery), or custom native capture.</li>
+          <li><strong>Synthetic Test Signal:</strong> If no camera is connected, SPOTR launches a synthetic test pattern card with calibrated hash lines to verify compositor and reticle settings.</li>
+        </ul>
+
+        <div style="margin-top: 3mm; padding: 2.5mm; background: #121318; border-radius: 4px; border-left: 3px solid #2dd4bf;">
+          <div style="font-size: 8pt; font-weight: 700; color: #2dd4bf; text-transform: uppercase;">Lens &amp; Aspect Ratio Engine</div>
+          <p style="font-size: 8pt; margin: 1mm 0 0 0; color: #94a3b8;">
+            Canvas composition dynamically calculates letterbox/pillarbox geometry to preserve 1:1 true optical aspect ratios regardless of tablet display proportions.
+          </p>
+        </div>
+      </div>
+
+      <!-- Right: WebHID Bluetooth & Touchpad Virtual Mouse -->
+      <div class="card card-blue">
+        <div class="card-title">
+          <span class="pill pill-blue">INPUT BUS</span> DualShock 4 Wireless Controller &amp; Virtual Mouse
+        </div>
+        <p>SPOTR features direct integration with Sony DualShock 4 controllers over Bluetooth utilizing the high-speed <strong>WebHID API</strong> (Report ID 0x11).</p>
+        <ul>
+          <li><strong>Touchpad Virtual Mouse:</strong> Clicking the center touchpad toggles the high-contrast blue Virtual Mouse cursor. Gliding a finger smoothly moves the pointer across all toolbars and sliders.</li>
+          <li><strong>Tactical Triggers (L2 / R2):</strong>
+            <ul>
+              <li><span class="key">L2 Trigger</span>: Left Mouse Click &amp; Drag (selects buttons, scrubs timelines, drags resizable PiP loupe).</li>
+              <li><span class="key">R2 Trigger</span>: Right Mouse Context Click.</li>
+            </ul>
+          </li>
+          <li><strong>Precision Joysticks:</strong> Left Stick controls primary scope reticle aim with a calibrated 50% precision rate curve. Right Stick steers the digital PiP zoom window.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- DualShock 4 Mapping Table -->
+    <div class="card card-gold" style="margin-top: 4mm;">
+      <div class="card-title">
+        <span class="pill pill-gold">CONTROL MATRIX</span> DualShock 4 &amp; Bluetooth Ring Command Reference
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 20%;">Control Input</th>
+            <th style="width: 25%;">Primary Viewport Action</th>
+            <th style="width: 25%;">Instant Replay / Gallery Mode</th>
+            <th style="width: 30%;">Reticle Customizer Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="key">Touchpad Click</span></td>
+            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
+            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
+            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
+          </tr>
+          <tr>
+            <td><span class="key">Touchpad Glide</span></td>
+            <td>Precision Mouse Pointer Translation</td>
+            <td>Precision Mouse Pointer Translation</td>
+            <td>Precision Mouse Pointer Translation</td>
+          </tr>
+          <tr>
+            <td><span class="key">L2 Trigger</span></td>
+            <td>Left Mouse Click / Drag Floating Windows</td>
+            <td>Left Mouse Click / Drag Timeline Scrubber</td>
+            <td>Left Mouse Click / Drag Slider Knobs</td>
+          </tr>
+          <tr>
+            <td><span class="key">R2 Trigger</span></td>
+            <td>Right Mouse Click</td>
+            <td>Right Mouse Click</td>
+            <td>Right Mouse Click</td>
+          </tr>
+          <tr>
+            <td><span class="key">Left Joystick</span></td>
+            <td>Primary Reticle Aim (Precision 50% Speed)</td>
+            <td>—</td>
+            <td>Sculpt Crosshair Thickness &amp; Line Size</td>
+          </tr>
+          <tr>
+            <td><span class="key">Right Joystick</span></td>
+            <td>Digital Zoom Loupe (PiP) Target Pan</td>
+            <td>—</td>
+            <td>Sculpt Reticle Ring Diameter &amp; Center Gap</td>
+          </tr>
+          <tr>
+            <td><span class="key">Circle (B)</span></td>
+            <td>Trigger Instant Replay (Auto-Saves Clip)</td>
+            <td>Close Replay &amp; Return to Live Stream</td>
+            <td>Exit Customizer Screen</td>
+          </tr>
+          <tr>
+            <td><span class="key">Cross (A)</span></td>
+            <td>Cycle HUD Visibility</td>
+            <td>Play / Pause Video Playback</td>
+            <td>Toggle Concentric Rings</td>
+          </tr>
+          <tr>
+            <td><span class="key">D-Pad ◄ / ►</span></td>
+            <td>Fine Reticle Step (Windage)</td>
+            <td>Step Backward / Forward (1 Frame)</td>
+            <td>Adjust Open Center Gap (Fine)</td>
+          </tr>
+          <tr>
+            <td><span class="key">L3 / R3 Stick Clicks</span></td>
+            <td>L3: Tactical Color Theme | R3: Declutter UI</td>
+            <td>—</td>
+            <td>L3: Switch Color Swatch</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-footer">
+      <div>SPOTR BETA 1 USER MANUAL • SEC 1: HARDWARE &amp; CONTROLLER</div>
+      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 3: MAIN INTERFACE, DECLUTTER & 4 SCREEN MODES                    -->
+  <!-- ===================================================================== -->
+  <div class="page">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
+        <div class="brand-tagline">2. TACTICAL SCREEN MODES &amp; DECLUTTER SYSTEM</div>
+      </div>
+      <div class="doc-meta">
+        SECTION 2 OF 6<br>
+        PAGE 3
+      </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom: 4mm;">
+      <div class="card card-teal">
+        <div class="card-title"><span class="pill pill-teal">VIEW 1</span> Live Feed</div>
+        <p style="font-size: 8pt;">60 FPS live video, micro-change thermal heatmap, floating draggable PiP loupe, customizable crosshairs, and voice announcements.</p>
+      </div>
+      <div class="card card-blue">
+        <div class="card-title"><span class="pill pill-blue">VIEW 2</span> Instant Replay</div>
+        <p style="font-size: 8pt;">Immediate native-resolution playback of the in-memory RAM buffer. Scrub frame-by-frame or play at 0.25x / 0.5x slow-motion.</p>
+      </div>
+      <div class="card card-gold">
+        <div class="card-title"><span class="pill pill-gold">VIEW 3</span> Video Archive</div>
+        <p style="font-size: 8pt;">Permanent local storage library in IndexedDB. Organize shot clips, review high-speed impacts, and export directly as standalone .webm.</p>
+      </div>
+      <div class="card card-purple">
+        <div class="card-title"><span class="pill pill-purple">VIEW 4</span> Reticle Studio</div>
+        <p style="font-size: 8pt;">Dedicated parametric design canvas. Sculpt crosshair thickness, center gaps, mil-dot markings, and compute scope turret click corrections.</p>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- UI Chrome & Floating Pods -->
+      <div class="card card-teal">
+        <div class="card-title">
+          <span class="pill pill-teal">CONTROLS</span> Floating Toolbars &amp; Declutter Mode
+        </div>
+        <ul>
+          <li><strong>Top-Left Control Strip:</strong>
+            <ul>
+              <li><strong>Settings Gear:</strong> Opens the central configuration modal (RAM meter, camera selection, controller mappings).</li>
+              <li><strong>Target POI Icon:</strong> Toggles the resizable PiP Digital Zoom Loupe.</li>
+              <li><strong>Crosshair Reticle Icon:</strong> Turns scope reticle overlay ON / OFF.</li>
+              <li><strong>Thermal Heatmap Flame:</strong> Toggles 60 FPS micro-motion detection.</li>
+              <li><strong>Voice Announcement Speaker:</strong> Quick-toggle for speech engine with active waves (cyan) vs muted slash (red).</li>
+            </ul>
+          </li>
+          <li><strong>Top-Left Zoom Pod:</strong> Whole-viewport digital zoom controls (<span class="key">−</span>, <span class="key">1.0x</span>, <span class="key">+</span>, <span class="key">1:1</span>) with smooth touch and joystick panning.</li>
+          <li><strong>1-Tap Declutter Mode:</strong> Tapping anywhere on open screen space (or pressing <span class="key">R3</span>) hides all toolbars and buttons, leaving an uninhibited, 100% full-screen sight picture.</li>
+        </ul>
+      </div>
+
+      <!-- PiP Digital Zoom Loupe -->
+      <div class="card card-blue">
+        <div class="card-title">
+          <span class="pill pill-blue">OPTICS</span> Digital Zoom Loupe (#pipCanvas)
+        </div>
+        <p>The Picture-in-Picture (PiP) Loupe provides real-time digital magnification of any specific point of interest (POI) on the target without changing the primary field of view.</p>
+        <ul>
+          <li><strong>Independent Pan &amp; Zoom:</strong> Adjust loupe magnification from 2.0x to 16.0x independently of main viewport zoom.</li>
+          <li><strong>Sub-Pixel Target Crosshair:</strong> A high-contrast target marker indicates the exact optical coordinate currently magnified in the loupe.</li>
+          <li><strong>Draggable &amp; Resizable:</strong> Drag the loupe anywhere on the screen by its titlebar. Drag the bottom-right or bottom-left corner handles to resize.</li>
+          <li><strong>Hardware Steering:</strong> Push the Right Joystick on your gamepad to smoothly track the loupe target across the target face.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- UI Color Swatches & Opacity -->
+    <div class="card card-gold" style="margin-top: 4mm;">
+      <div class="card-title">
+        <span class="pill pill-gold">APPEARANCE</span> Tactical Night Themes &amp; Global Interface Opacity
+      </div>
+      <div class="grid-2">
+        <div>
+          <p style="font-size: 8.5pt;">Customize UI chrome and reticle colors to match ambient lighting and target contrast:
+          <strong>Emerald Teal</strong> (#2dd4bf), <strong>Amber Gold</strong> (#ffd166), <strong>Ruby Red</strong> (#f43f5e), <strong>Night Blue</strong> (#38bdf8), <strong>Amethyst</strong> (#a855f7), or full 2D HSL color selection.</p>
+        </div>
+        <div>
+          <p style="font-size: 8.5pt;"><strong>Interface Opacity Slider (15% to 100%):</strong> Fades background chrome, borders, and buttons into near-invisibility (<span style="font-family: monospace;">--ui-opacity</span>), allowing spotting downrange without night-blindness or screen glare.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div>SPOTR BETA 1 USER MANUAL • SEC 2: SCREEN MODES &amp; DECLUTTER</div>
+      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 4: THERMAL HEATMAP & DIRECTIONAL SPEECH ENGINE                   -->
+  <!-- ===================================================================== -->
+  <div class="page">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
+        <div class="brand-tagline">3. THERMAL MICRO-CHANGE HEATMAP &amp; DIRECTIONAL VOICE</div>
+      </div>
+      <div class="doc-meta">
+        SECTION 3 OF 6<br>
+        PAGE 4
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Heatmap Engine -->
+      <div class="card card-rose">
+        <div class="card-title">
+          <span class="pill pill-teal" style="background: rgba(244, 63, 94, 0.15); color: #fb7185; border-color: rgba(244, 63, 94, 0.4);">DETECTION</span> Thermal Micro-Change Heatmap Engine
+        </div>
+        <p>SPOTR features an advanced, low-latency micro-movement detection algorithm that highlights subtle changes (bullet impacts, target movement, wind drift) as a colored thermal glow overlay.</p>
+        <ul>
+          <li><strong>Downsampled Luma Analysis:</strong> Downsamples the 1080p stream to a high-speed 160×90 luminance matrix at 60 FPS, calculating delta variance against an exponential moving average background.</li>
+          <li><strong>Global Shift Rejection (&gt;18%):</strong> Automatically discards whole-frame camera movements (wind buffeting, scope recoil, tripod bumps) to prevent false alerts.</li>
+          <li><strong>Adjustable Sensitivity (10% to 95%):</strong> Fine-tune detection thresholds in Settings to spot minute paper tears at 1000 yards without triggering on heat mirage.</li>
+          <li><strong>Decay Duration (0.5s to 10s):</strong> Controls how long the visual impact heat bloom persists before fading.</li>
+        </ul>
+      </div>
+
+      <!-- Directional Speech Synthesis -->
+      <div class="card card-gold">
+        <div class="card-title">
+          <span class="pill pill-gold">SPEECH</span> Directional Voice Announcer (<span style="font-family: monospace;">speechEngine.js</span>)
+        </div>
+        <p>When target movement or bullet impact is detected, SPOTR computes the geometric centroid vector relative to your scope crosshair and speaks the direction out loud using the browser's Web Speech API.</p>
+        <ul>
+          <li><strong>Directional Speech Cues:</strong> Announces target quadrant (e.g. <em>"Target High Right"</em>, <em>"Movement Low Left"</em>) or exact clock coordinates (e.g. <em>"Impact 2 o'clock"</em>).</li>
+          <li><strong>Customizable Keyword Dictionary:</strong> In Settings, operators can replace standard directional words with custom military or tactical keywords (e.g., replace "High" with "North" or "Elevation").</li>
+          <li><strong>Intelligent Throttling:</strong> An internal speech queue and rate-limiter prevents audio cascades and ensures only fresh detections are spoken.</li>
+          <li><strong>Immediate Voice Mute:</strong> Click the speaker icon in the top-left toolbar or press the Mute hotkey to instantly silence audio without disabling visual heatmap rendering.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Speech Dictionary Configuration Table -->
+    <div class="card card-blue" style="margin-top: 4mm;">
+      <div class="card-title">
+        <span class="pill pill-blue">VOCABULARY</span> Directional Speech Dictionary &amp; Configuration Options
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 20%;">Relative Angle</th>
+            <th style="width: 25%;">Default Announcement</th>
+            <th style="width: 25%;">Custom Keyword Option</th>
+            <th style="width: 30%;">Operational Use Case</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>337.5° – 22.5° (0°)</td>
+            <td><strong>"Target High"</strong></td>
+            <td>"North" / "Top" / "Elevation Up"</td>
+            <td>Impact high of point of aim; adjust turret down.</td>
+          </tr>
+          <tr>
+            <td>22.5° – 67.5° (45°)</td>
+            <td><strong>"Target High Right"</strong></td>
+            <td>"Two O'Clock" / "North-East"</td>
+            <td>Impact high right; windage left + elevation down.</td>
+          </tr>
+          <tr>
+            <td>67.5° – 112.5° (90°)</td>
+            <td><strong>"Target Right"</strong></td>
+            <td>"East" / "Three O'Clock" / "Windage Right"</td>
+            <td>Crosswind deflection; adjust windage turret left.</td>
+          </tr>
+          <tr>
+            <td>112.5° – 157.5° (135°)</td>
+            <td><strong>"Target Low Right"</strong></td>
+            <td>"Four O'Clock" / "South-East"</td>
+            <td>Impact low right; hold over and into wind.</td>
+          </tr>
+          <tr>
+            <td>157.5° – 202.5° (180°)</td>
+            <td><strong>"Target Low"</strong></td>
+            <td>"South" / "Bottom" / "Elevation Down"</td>
+            <td>Impact low; adjust elevation turret up.</td>
+          </tr>
+          <tr>
+            <td>Reticle Center (&lt;5% radius)</td>
+            <td><strong>"Direct Hit" / "Bullseye"</strong></td>
+            <td>"Center" / "Hit"</td>
+            <td>Point of impact matches zero point of aim.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doc-footer">
+      <div>SPOTR BETA 1 USER MANUAL • SEC 3: HEATMAP &amp; VOICE ANNOUNCER</div>
+      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 5: RAM RING BUFFER, INSTANT REPLAY & VIDEO EXPORT                -->
+  <!-- ===================================================================== -->
+  <div class="page">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
+        <div class="brand-tagline">4. IN-MEMORY RAM BUFFER, INSTANT REPLAY &amp; VIDEO EXPORT</div>
+      </div>
+      <div class="doc-meta">
+        SECTION 4 OF 6<br>
+        PAGE 5
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- RAM Ring Buffer -->
+      <div class="card card-teal">
+        <div class="card-title">
+          <span class="pill pill-teal">IN-MEMORY</span> Native-Resolution Circular RAM Ring Buffer
+        </div>
+        <p>Traditional video recording causes tablet thermal throttling and flash storage wear. SPOTR solves this by maintaining a <strong>100% RAM-only rolling queue</strong> (<span style="font-family: monospace;">memoryRingBuffer.js</span>) with zero disk writes during surveillance.</p>
+        <ul>
+          <li><strong>Configurable Duration:</strong> Store from <strong>5 to 60 seconds</strong> of rolling historical video.</li>
+          <li><strong>Configurable Buffer FPS:</strong> Set buffer capture between <strong>5 and 30 FPS</strong> to optimize RAM footprint on low-memory devices (e.g., Chromebook Duet 3 with 4GB RAM).</li>
+          <li><strong>Live RAM Budget Meter:</strong> Real-time telemetric bar in Settings displays Current Used MB, Estimated Allocation, and Free Device RAM.</li>
+          <li><strong>Automatic Memory Guardrails:</strong> Proactively purges older frames if device memory pressure exceeds threshold, guaranteeing rock-solid stability without browser crashes.</li>
+        </ul>
+      </div>
+
+      <!-- Instant Replay Viewport -->
+      <div class="card card-blue">
+        <div class="card-title">
+          <span class="pill pill-blue">PLAYBACK</span> Instant Replay Viewport &amp; Scrubbing
+        </div>
+        <p>Capture critical shot strings instantly with a single button press or ring tap.</p>
+        <ul>
+          <li><strong>Instant Snapshot:</strong> Press <span class="key">Circle</span> on controller, double-tap the center ring button, or click <strong>REPLAY</strong> to freeze and inspect the circular buffer.</li>
+          <li><strong>Automatic Silent Persistence:</strong> Upon trigger, the snapshot is automatically cloned to permanent local IndexedDB storage in the background without stuttering playback.</li>
+          <li><strong>Precision Timeline Scrubber:</strong> Drag the timeline slider to locate the exact microsecond of bullet impact or target change.</li>
+          <li><strong>Slow-Motion &amp; Frame Step:</strong> Play at <strong>0.25x</strong>, <strong>0.5x</strong>, or step frame-by-frame forward (<span class="key">STEP +1</span>) and backward (<span class="key">STEP -1</span>) for forensic ballistic review.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Video Archive & WebM Export -->
+    <div class="card card-gold" style="margin-top: 4mm;">
+      <div class="card-title">
+        <span class="pill pill-gold">STORAGE</span> Video Archive Library &amp; High-Speed WebM Exporter
+      </div>
+      <div class="grid-3">
+        <div>
+          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">1. IndexedDB Local Storage</h4>
+          <p style="font-size: 8pt; color: #cbd5e1;">Clips are stored securely in browser sandboxed storage. Clips remain accessible across browser restarts and offline field sessions without cloud connectivity.</p>
+        </div>
+        <div>
+          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">2. Fullscreen Analysis Player</h4>
+          <p style="font-size: 8pt; color: #cbd5e1;">Review saved clips in the full-screen Gallery Player. Features a collapsible side drawer with clip timestamps, frame counts, and duration badges.</p>
+        </div>
+        <div>
+          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">3. One-Click WebM Export</h4>
+          <p style="font-size: 8pt; color: #cbd5e1;">The native export engine encodes recorded frames into a standard <span style="font-family: monospace;">.webm</span> video file, saving it directly to local disk for reporting, archiving, or sharing.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div>SPOTR BETA 1 USER MANUAL • SEC 4: RAM BUFFER &amp; INSTANT REPLAY</div>
+      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- PAGE 6: RETICLE STUDIO, CLICK CALCULATION & PWA SETUP                 -->
+  <!-- ===================================================================== -->
+  <div class="page">
+    <div class="doc-header">
+      <div>
+        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
+        <div class="brand-tagline">5. RETICLE CUSTOMIZER, CLICK CALIBRATION &amp; PWA INSTALL</div>
+      </div>
+      <div class="doc-meta">
+        SECTION 5 OF 6<br>
+        PAGE 6
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Reticle Studio & Stick Sculpting -->
+      <div class="card card-purple">
+        <div class="card-title">
+          <span class="pill pill-purple">RETICLE</span> Parametric Reticle Studio &amp; Stick Sculpting
+        </div>
+        <p>Craft the ideal sighting overlay for any optics magnification or target geometry in View 4 (#screenReticle):</p>
+        <ul>
+          <li><strong>Parametric Geometry:</strong> Adjust Outer Ring Diameter, Inner Ring, Center Open Gap, Crosshair Line Thickness, and Hash Mark Spacing.</li>
+          <li><strong>Direct Controller Stick Sculpting:</strong> While in Reticle Customizer mode, you can sculpt the crosshair geometry live using the gamepad joysticks:
+            <ul>
+              <li><strong>Left Stick Up/Down:</strong> Increase / decrease crosshair line thickness.</li>
+              <li><strong>Left Stick Left/Right:</strong> Expand / contract reticle diameter.</li>
+              <li><strong>Right Stick Up/Down:</strong> Expand / shrink the open-center sight gap.</li>
+            </ul>
+          </li>
+          <li><strong>Concentric Circles &amp; Mil-Dots:</strong> Toggle dual concentric ranging rings and calibrated mil-dot hash lines with <span class="key">Cross (A)</span>.</li>
+          <li><strong>Custom Image Overlays:</strong> Load external PNG/SVG reticle artwork via the custom reticle loader.</li>
+        </ul>
+      </div>
+
+      <!-- Scope Turret Click Calibration Engine -->
+      <div class="card card-gold">
+        <div class="card-title">
+          <span class="pill pill-gold">CALIBRATION</span> MOA &amp; MRAD Turret Click Calculator
+        </div>
+        <p>Eliminate sighting guesswork by calculating exact optical turret click offsets directly from observed bullet impacts:</p>
+        <ul>
+          <li><strong>Target Distance Input:</strong> Enter engagement distance in Yards or Meters.</li>
+          <li><strong>Turret Value Selection:</strong> Select your scope turret click standard (1/4 MOA, 1/8 MOA, 1/2 MOA, 0.1 MRAD, or 0.05 MRAD).</li>
+          <li><strong>Point of Impact (POI) vs Point of Aim (POA):</strong> Measure target offset in millimeters or inches on the digital display.</li>
+          <li><strong>Instant Turret Solution:</strong> SPOTR calculates exact turret clicks (e.g. <em>"Elevation: +6 Clicks UP | Windage: -4 Clicks LEFT"</em>) to achieve pinpoint zero.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- PWA Installation Guide -->
+    <div class="card card-teal" style="margin-top: 4mm;">
+      <div class="card-title">
+        <span class="pill pill-teal">DEPLOYMENT</span> Progressive Web App (PWA) Offline Installation Guide
+      </div>
+      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App with zero external runtime dependencies. Precached by Service Worker <span style="font-family: monospace;">spotr-v31</span>:</p>
+
+      <div class="grid-4" style="margin-top: 2mm;">
+        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
+          <div style="font-size: 8pt; font-weight: 700; color: #2dd4bf;">ChromeOS / Chromebook</div>
+          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">In Chrome, click the <strong>Install</strong> icon in the omnibox. Launches in standalone window mode with Window Controls Overlay.</p>
+        </div>
+        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
+          <div style="font-size: 8pt; font-weight: 700; color: #38bdf8;">Windows / PC</div>
+          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">Open in Chrome/Edge, click <strong>Settings &gt; Apps &gt; Install SPOTR</strong>. Creates a desktop shortcut and starts like a native executable.</p>
+        </div>
+        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
+          <div style="font-size: 8pt; font-weight: 700; color: #ffd166;">Android Tablets &amp; Phones</div>
+          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">Tap browser menu (<span style="font-family: monospace;">⋮</span>) &gt; <strong>Add to Home Screen</strong>. Operates in full-screen immersive landscape mode.</p>
+        </div>
+        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
+          <div style="font-size: 8pt; font-weight: 700; color: #c084fc;">Apple macOS &amp; iPadOS</div>
+          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">In Safari, tap <strong>Share &gt; Add to Home Screen</strong>. Pre-caches all assets for completely offline field operation.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div>SPOTR BETA 1 USER MANUAL • SEC 5: RETICLE STUDIO &amp; PWA DEPLOYMENT</div>
+      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    </div>
+  </div>
+
+</body>
+</html>
