@@ -559,13 +559,18 @@
               <div class="gp-badge" data-gp="options">OPTIONS</div>
               <div class="gp-badge" data-gp="l3">L3</div>
               <div class="gp-badge" data-gp="r3">R3</div>
+              <div class="gp-badge" data-gp="ps">PS</div>
+              <div class="gp-badge" data-gp="touchpad" style="grid-column: span 3;">TOUCHPAD (VIRTUAL MOUSE)</div>
             </div>
 
             <div class="gamepad-mapping-table" style="font-size:12px; font-family:var(--font-mono); color:var(--radar-text-secondary); margin-top:8px; line-height:1.6;">
               <div style="color:#2dd4bf; margin-bottom:6px; font-size:11px;">🎮 <b>Direct Chrome Bluetooth:</b> Click <b>PAIR PS4 BT</b> to select your <i>Wireless Controller</i> in Chrome's permission prompt for driverless Bluetooth input.</div>
+              <div>• <b>Touchpad:</b> Virtual Mouse Trackpad + Click (Slide & Drag Sliders/UI)</div>
+              <div>• <b>Options:</b> Open / Close Settings (Options) Screen</div>
+              <div>• <b>Share:</b> 20s Instant Replay (Auto-Save)</div>
               <div>• <b>L-Stick:</b> Aim ROI Crosshair (Speed proportional)</div>
               <div>• <b>R-Stick:</b> Pan Stream when Main Zoom &gt; 1.0x</div>
-              <div>• <b>L3 / R3:</b> Recenter ROI / Reset 1:1 Zoom</div>
+              <div>• <b>L3 / R3 (Press Sticks In):</b> GUI Color Scheme (◀ Prev / ▶ Next)</div>
               <div>• <b>D-Pad:</b> Zoom Window (▲/▼), Main Zoom/Step (◀/▶)</div>
               <div>• <b>L1 / R1:</b> Main Stream Zoom Out / In</div>
               <div>• <b>L2 / R2:</b> Step Frame -1 / +1 (Replay & Clips)</div>
@@ -573,8 +578,7 @@
               <div>• <b>○ Circle:</b> Return to Live Screen</div>
               <div>• <b>□ Square:</b> Reticle Guide On/Off</div>
               <div>• <b>△ Triangle:</b> Heatmap On/Off</div>
-              <div>• <b>Options:</b> 20s Instant Replay (Auto-Save)</div>
-              <div>• <b>Share:</b> Open / Close Settings Screen</div>
+              <div>• <b>PS Button:</b> Declutter HUD On/Off</div>
             </div>
           </div>
 
@@ -770,6 +774,12 @@
       </div>
     </section>
 
+  </div>
+
+  <!-- PS4 Touchpad Virtual Mouse Pointer -->
+  <div id="spotrVirtualMouse" class="spotr-virtual-mouse hidden" aria-hidden="true">
+    <div class="vm-ring"></div>
+    <div class="vm-dot"></div>
   </div>
 
   <script type="module" src="./js/main.js"></script>

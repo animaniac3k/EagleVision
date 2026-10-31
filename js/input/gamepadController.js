@@ -3,26 +3,63 @@
  *
  * Integrates:
  * 1. Native Chrome WebHID API (Direct Bluetooth HID report stream for Sony DualShock 4)
- *    - Bypasses Windows Bluetooth DirectInput XInput limitations
- *    - Zero external software or driver installation needed
- *    - Persistent authorization across reloads via navigator.hid.getDevices()
+ *    - Sends Bluetooth initialization output report (0x11 with CRC32) to unlock full 78-byte telemetry & capacitive touchpad
+ *    - Sets lightbar to SPOTR cyan (#22d3ee)
+ *    - Decodes capacitive touchpad multi-touch coordinates for Virtual Mouse
+ *    - Non-linear power curve for sticks (50-70% reduction at low end for micro-tick positioning)
+ *    - L3 / R3 stick-click cycles GUI color schemes (◀ Prev / ▶ Next)
+ *    - Options button opens/closes Settings; Share button triggers 20s Instant Replay
  * 2. HTML5 Gamepad API fallback (for USB-connected controllers, Xbox, and XInput emulators)
  */
 import { appState, updateState } from '../state.js';
 import { isSplashScreenActive, dismissSplashScreen } from '../ui/splashScreen.js';
+import { applyThemeColor } from '../ui/sidebarControls.js';
+import { saveSettings } from '../storage/settingsStore.js';
 
 let activeHIDDevice = null;
 let webHIDConnected = false;
 let webHIDLastReportTime = 0;
+let lastReportId = 0;
+let lastReportLen = 0;
+let hasSentInit = false;
+let lastInitAttemptTime = 0;
+let latestTouchInfo = { active: false, x: 0, y: 0 };
+
 let prevButtonStates = {};
 let latestAxes = { lx: 0, ly: 0, rx: 0, ry: 0 };
 let currentActionState = {};
 let rafId = null;
 let consecutiveNullFrames = 0;
 
+// Virtual Mouse State Variables
+let vmCursorX = typeof window !== 'undefined' ? window.innerWidth / 2 : 500;
+let vmCursorY = typeof window !== 'undefined' ? window.innerHeight / 2 : 400;
+let vmLastTouchX = 0;
+let vmLastTouchY = 0;
+let vmLastTrackingId = -1;
+let vmWasTouching = false;
+let vmTouchStartTime = 0;
+let vmTouchStartCursorX = 0;
+let vmTouchStartCursorY = 0;
+let vmHideTimeout = null;
+let vmIsDragging = false;
+let vmDragTargetEl = null;
+let vmLastPhysicalClick = false;
+
+// Stick Tuning: Power curve provides 50-70% reduction at low end for fine-tick adjustments
 const DEADZONE = 0.16;
-const ROI_SPEED = 0.015;
-const PAN_SPEED = 0.018;
+const ROI_SPEED = 0.012;
+const PAN_SPEED = 0.014;
+
+// Tactical GUI Color Schemes (Cycled via L3 / R3)
+const GUI_THEMES = [
+  { id: 'teal', name: 'Radar Teal', color: '#2dd4bf' },
+  { id: 'green', name: 'Phosphor Green', color: '#22c55e' },
+  { id: 'cyan', name: 'Sonar Cyan', color: '#38bdf8' },
+  { id: 'amber', name: 'Avionics Amber', color: '#f59e0b' },
+  { id: 'crimson', name: 'Night-Vision Crimson', color: '#f43f5e' },
+  { id: 'silver', name: 'Monochrome Silver', color: '#e5e5e5' }
+];
 
 const ROLES = [
   'cross', 'circle', 'square', 'triangle',
@@ -38,6 +75,24 @@ const SONY_DS4_FILTERS = [
   { vendorId: 0x054c }                     // Generic Sony Interactive Entertainment HID
 ];
 
+// Standard IEEE 802.3 CRC-32 Table for Bluetooth Output Reports
+const CRC32_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let k = 0; k < 8; k++) {
+    c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  CRC32_TABLE[i] = c >>> 0;
+}
+
+function computeCRC32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+  }
+  return (~crc) >>> 0;
+}
+
 function updateGamepadUI(connected, text) {
   const dot = document.getElementById('gamepadStatusDot');
   const status = document.getElementById('gamepadStatusText');
@@ -46,13 +101,9 @@ function updateGamepadUI(connected, text) {
 }
 
 export function initGamepadController() {
-  // 1. Immediately start polling & frame loop
   startFrameLoop();
-
-  // 2. Check for previously authorized WebHID devices (persistent across reloads)
   autoReconnectWebHID();
 
-  // 3. Listen to standard HTML5 Gamepad API connection events (for USB / Xbox)
   window.addEventListener('gamepadconnected', (e) => {
     const pad = e.gamepad;
     console.log(`[Gamepad API] Connected: "${pad.id}" (index: ${pad.index})`);
@@ -83,7 +134,7 @@ export function initGamepadController() {
     }
   });
 
-  // 4. Hook up "PAIR PS4 BT" WebHID button in Settings
+  // Hook up "PAIR PS4 BT" WebHID button in Settings
   const btnConnectHID = document.getElementById('btnConnectWebHID');
   if (btnConnectHID) {
     btnConnectHID.addEventListener('click', async (e) => {
@@ -92,14 +143,16 @@ export function initGamepadController() {
     });
   }
 
-  // 5. SCAN button in Settings
+  // SCAN button in Settings
   const btnScan = document.getElementById('btnDetectGamepad');
   if (btnScan) {
-    btnScan.addEventListener('click', (e) => {
+    btnScan.addEventListener('click', async (e) => {
       e.stopPropagation();
       window.focus();
 
       if (webHIDConnected && activeHIDDevice) {
+        // Re-send Bluetooth initialization report to ensure full telemetry stream is active
+        await sendDualShock4BluetoothInit(activeHIDDevice);
         const name = activeHIDDevice.productName || 'Sony PS4 Wireless Controller';
         updateState({
           gamepadConnected: true,
@@ -181,7 +234,49 @@ async function autoReconnectWebHID() {
 }
 
 /**
- * Opens WebHID device stream and registers report listener
+ * Sends Bluetooth Output Report 0x11 with valid CRC32 to unlock full 78-byte sensor & touchpad streaming
+ */
+async function sendDualShock4BluetoothInit(device) {
+  try {
+    // 79-byte Bluetooth output report frame
+    // report[0]: 0xA2 (Bluetooth HID Data Output header / CRC32 seed)
+    // report[1]: 0x11 (Output Report ID)
+    // report[2]: 0xC4 = 0x80 (HID) | 0x40 (CRC32 enable) | 0x04 (4ms polling rate)
+    // report[3]: 0x00 (Audio control)
+    // report[4]: 0x07 (common.valid_flag0: 0x01 motor | 0x02 lightbar | 0x04 blink)
+    // report[5]: 0x04 (common.valid_flag1: lightbar configure)
+    const report = new Uint8Array(79);
+    report[0] = 0xA2; // Bluetooth HID Data Output header
+    report[1] = 0x11; // Report ID 0x11
+    report[2] = 0xC4; // Hardware control: 0x80 (HID) | 0x40 (CRC32 enable) | 0x04 (4ms polling)
+    report[3] = 0x00; // Audio control
+    report[4] = 0x07; // Enable motor and lightbar
+    report[5] = 0x04; // Enable lightbar setup
+
+    // Lightbar color: SPOTR Cyan (#22d3ee)
+    report[9] = 34;   // Red
+    report[10] = 211; // Green
+    report[11] = 238; // Blue
+
+    // Calculate CRC32 over the first 75 bytes (report[0..74], including 0xA2 seed and 0x11 report ID)
+    const crcVal = computeCRC32(report.subarray(0, 75));
+    report[75] = crcVal & 0xFF;
+    report[76] = (crcVal >>> 8) & 0xFF;
+    report[77] = (crcVal >>> 16) & 0xFF;
+    report[78] = (crcVal >>> 24) & 0xFF;
+
+    // Send 77-byte payload excluding 0xA2 header and 0x11 report ID
+    await device.sendReport(0x11, report.subarray(2));
+    console.log('[WebHID] DualShock 4 Bluetooth 0x11 output report sent (telemetry & lightbar unlocked)!');
+    hasSentInit = true;
+  } catch (err) {
+    console.warn('[WebHID] Bluetooth init report notice:', err);
+    hasSentInit = false;
+  }
+}
+
+/**
+ * Opens WebHID device stream, unlocks full telemetry, and registers report listener
  */
 async function setupWebHIDDevice(device) {
   try {
@@ -191,6 +286,7 @@ async function setupWebHIDDevice(device) {
     activeHIDDevice = device;
     webHIDConnected = true;
     webHIDLastReportTime = performance.now();
+    hasSentInit = false;
 
     const name = device.productName || 'Sony PS4 Wireless Controller';
     console.log(`[WebHID] Active: ${name} (VID: 0x${device.vendorId.toString(16)}, PID: 0x${device.productId.toString(16)})`);
@@ -205,11 +301,16 @@ async function setupWebHIDDevice(device) {
     device.removeEventListener('inputreport', handleWebHIDInputReport);
     device.addEventListener('inputreport', handleWebHIDInputReport);
 
+    // Send output report to unlock extended report 0x11 mode
+    await sendDualShock4BluetoothInit(device);
+    device.receiveFeatureReport(0x02).catch(() => {});
+
     navigator.hid.addEventListener('disconnect', (event) => {
       if (event.device === activeHIDDevice) {
         console.log('[WebHID] Device disconnected');
         activeHIDDevice = null;
         webHIDConnected = false;
+        hasSentInit = false;
         updateState({
           gamepadConnected: false,
           gamepadName: '',
@@ -227,21 +328,26 @@ async function setupWebHIDDevice(device) {
 }
 
 /**
- * Decodes Sony DualShock 4 HID input reports directly over Bluetooth (Report 0x11 / 0x31) and USB (0x01)
+ * Decodes Sony DualShock 4 HID input reports directly over Bluetooth and USB
  */
 function handleWebHIDInputReport(event) {
   const { data, reportId } = event;
   webHIDLastReportTime = performance.now();
+  lastReportId = reportId;
+  lastReportLen = data.byteLength;
+
+  // If controller is still streaming basic truncated report, prompt mode switch
+  if (data.byteLength < 64 && activeHIDDevice && (performance.now() - lastInitAttemptTime > 1800)) {
+    lastInitAttemptTime = performance.now();
+    sendDualShock4BluetoothInit(activeHIDDevice);
+  }
 
   let offset = 0;
   if (reportId === 0x11 || reportId === 0x31) {
-    // Bluetooth extended report: byte 0 is header/flags, byte 1..4 are thumbstick axes
     offset = 1;
   } else if (reportId === 0x01) {
-    // Standard USB / BT report
     offset = 0;
   } else if (data.byteLength >= 10) {
-    // Fallback heuristic based on length
     offset = 1;
   }
 
@@ -293,6 +399,10 @@ function handleWebHIDInputReport(event) {
     touchpad = Boolean(b3 & 0x02);
   }
 
+  // 5. DualShock 4 Capacitive Touchpad Virtual Mouse Tracking
+  const touch = parseDualShock4Touch(data, reportId);
+  processTouchpadVirtualMouse(touch, touchpad);
+
   const actionState = {
     cross, circle, square, triangle,
     l1, r1, l2, r2,
@@ -301,15 +411,387 @@ function handleWebHIDInputReport(event) {
     'dpad-left': dpadLeft,
     'dpad-right': dpadRight,
     share, options, l3, r3,
-    ps, touchpad
+    ps,
+    touchpad: Boolean(touchpad || (touch && touch.active))
   };
 
   dispatchControllerInputs(actionState);
 }
 
 /**
+ * Decodes DualShock 4 Capacitive Touchpad multi-touch coordinates
+ *
+ * Ground truth from Chromium device/gamepad/dualshock4_controller.cc:
+ * In Bluetooth Report 0x11 (data.byteLength === 77):
+ * - byte 34: touches_count
+ * - byte 35: touch_data_timestamp (rolling packet counter)
+ * - byte 36: touch[0].id : 7, is_invalid : 1 (contact byte)
+ * - byte 37: touch[0].data[0] (X lower 8 bits)
+ * - byte 38: touch[0].data[1] (X upper 4 bits in low nibble, Y lower 4 bits in high nibble)
+ * - byte 39: touch[0].data[2] (Y upper 8 bits)
+ * - byte 40: touch[1].id : 7, is_invalid : 1
+ *
+ * In USB Report 0x01 (data.byteLength === 64):
+ * - byte 32: touches_count
+ * - byte 33: touch_data_timestamp
+ * - byte 34: touch[0].contact
+ * - byte 35: touch[0].data[0]
+ * - byte 36: touch[0].data[1]
+ * - byte 37: touch[0].data[2]
+ */
+function parseDualShock4Touch(data, reportId) {
+  if (data.byteLength < 38) {
+    return { active: false, x: 0, y: 0, trackingId: -1 };
+  }
+
+  // Candidate contact offsets:
+  // For Bluetooth 77B packets, index 36 is the primary contact byte.
+  // For USB 64B packets, index 34 is the primary contact byte.
+  // Note: We NEVER test index 35 first because byte 35 in BT reports is the rolling timestamp counter!
+  const candidateOffsets = (data.byteLength >= 70 || reportId === 0x11 || reportId === 0x31)
+    ? [36, 40, 34, 37]
+    : [34, 38, 36, 37];
+
+  for (let i = 0; i < candidateOffsets.length; i++) {
+    const c = candidateOffsets[i];
+    if (c + 3 >= data.byteLength) continue;
+
+    const contact = data.getUint8(c);
+    // Bit 7 is 0 when touching down (active), 1 when released / inactive
+    const isContactActive = (contact & 0x80) === 0;
+
+    if (isContactActive) {
+      const b0 = data.getUint8(c + 1); // X lower 8 bits
+      const b1 = data.getUint8(c + 2); // X upper 4 bits & Y lower 4 bits
+      const b2 = data.getUint8(c + 3); // Y upper 8 bits
+
+      const x = b0 | ((b1 & 0x0f) << 8);
+      const y = ((b1 & 0xf0) >> 4) | (b2 << 4);
+
+      // Verify realistic touch coordinates on DualShock 4 1920x942 surface
+      if (x >= 0 && x <= 1920 && y >= 0 && y <= 942) {
+        return { active: true, x, y, trackingId: contact & 0x7f };
+      }
+    }
+  }
+
+  return { active: false, x: 0, y: 0, trackingId: -1 };
+}
+
+/**
+ * Handles capacitive trackpad movement, tap-to-click, and physical click & drag
+ */
+function processTouchpadVirtualMouse(touch, physicalClick) {
+  latestTouchInfo = touch && touch.active
+    ? { active: true, x: touch.x, y: touch.y }
+    : { active: false, x: 0, y: 0 };
+
+  // 1. Physical Mechanical Touchpad Click (down/drag and up)
+  if (physicalClick && !vmLastPhysicalClick) {
+    vmLastPhysicalClick = true;
+    vmIsDragging = true;
+    wakeVirtualMouse();
+    startVirtualDrag(vmCursorX, vmCursorY);
+  } else if (!physicalClick && vmLastPhysicalClick) {
+    vmLastPhysicalClick = false;
+    vmIsDragging = false;
+    endVirtualDrag(vmCursorX, vmCursorY);
+  }
+
+  // 2. Capacitive Surface Glide & Tap-to-Click
+  if (touch && touch.active) {
+    if (isSplashScreenActive()) {
+      dismissSplashScreen('gamepad');
+      return;
+    }
+
+    wakeVirtualMouse();
+
+    if (!vmWasTouching) {
+      // Finger first touchdown on trackpad
+      vmWasTouching = true;
+      vmLastTouchX = touch.x;
+      vmLastTouchY = touch.y;
+      vmLastTrackingId = touch.trackingId;
+      vmTouchStartTime = performance.now();
+      vmTouchStartCursorX = vmCursorX;
+      vmTouchStartCursorY = vmCursorY;
+    } else {
+      // Finger dragging across trackpad
+      const rawDx = touch.x - vmLastTouchX;
+      const rawDy = touch.y - vmLastTouchY;
+      vmLastTouchX = touch.x;
+      vmLastTouchY = touch.y;
+
+      // Handle subtle tracking ID re-keys without aborting smooth motion
+      if (touch.trackingId !== vmLastTrackingId) {
+        vmLastTrackingId = touch.trackingId;
+        if (Math.hypot(rawDx, rawDy) > 280) {
+          // Large leap indicates finger repositioned elsewhere, skip jump
+          return;
+        }
+      }
+
+      // Smooth relative tracking with brisk acceleration on fast swipes
+      if (Math.abs(rawDx) >= 1 || Math.abs(rawDy) >= 1) {
+        const dist = Math.hypot(rawDx, rawDy);
+        if (dist < 400) {
+          const speedFactor = dist > 40 ? 1.45 : dist > 18 ? 1.25 : 1.0;
+          const dx = rawDx * 1.35 * speedFactor;
+          const dy = rawDy * 1.35 * speedFactor;
+
+          vmCursorX = Math.max(6, Math.min(window.innerWidth - 6, vmCursorX + dx));
+          vmCursorY = Math.max(6, Math.min(window.innerHeight - 6, vmCursorY + dy));
+          updateVirtualMouseElementPosition();
+
+          if (vmIsDragging && vmDragTargetEl) {
+            dispatchVirtualDragMove(vmDragTargetEl, vmCursorX, vmCursorY);
+          } else {
+            dispatchVirtualHover(vmCursorX, vmCursorY);
+          }
+        }
+      }
+    }
+  } else if (vmWasTouching) {
+    // Finger lifted from trackpad!
+    vmWasTouching = false;
+    const duration = performance.now() - vmTouchStartTime;
+    const travel = Math.hypot(vmCursorX - vmTouchStartCursorX, vmCursorY - vmTouchStartCursorY);
+
+    // Tap to Click: short contact (< 320ms) with minimal travel (< 18px)
+    if (duration < 320 && travel < 18 && !physicalClick) {
+      triggerVirtualClick(vmCursorX, vmCursorY);
+    }
+  }
+}
+
+function wakeVirtualMouse() {
+  const el = document.getElementById('spotrVirtualMouse');
+  if (el) {
+    el.classList.remove('hidden');
+    updateVirtualMouseElementPosition();
+  }
+  if (vmHideTimeout) clearTimeout(vmHideTimeout);
+  vmHideTimeout = setTimeout(() => {
+    if (!vmWasTouching && !vmIsDragging) {
+      const cur = document.getElementById('spotrVirtualMouse');
+      if (cur) cur.classList.add('hidden');
+    }
+  }, 3500);
+}
+
+function updateVirtualMouseElementPosition() {
+  const el = document.getElementById('spotrVirtualMouse');
+  if (el) {
+    el.style.transform = `translate3d(${vmCursorX}px, ${vmCursorY}px, 0)`;
+  }
+}
+
+function setVirtualMouseState(state) {
+  const el = document.getElementById('spotrVirtualMouse');
+  if (!el) return;
+  el.classList.remove('vm-clicked', 'vm-dragging');
+  if (state === 'clicked') el.classList.add('vm-clicked');
+  if (state === 'dragging') el.classList.add('vm-dragging');
+}
+
+function dispatchVirtualHover(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return;
+  el.dispatchEvent(new PointerEvent('pointermove', {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: y,
+    button: -1,
+    buttons: 0,
+    pointerId: 101,
+    isPrimary: true
+  }));
+}
+
+function startVirtualDrag(x, y) {
+  setVirtualMouseState('clicked');
+  const el = document.elementFromPoint(x, y);
+  vmDragTargetEl = el;
+
+  if (el) {
+    el.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 1,
+      pointerId: 101,
+      isPrimary: true
+    }));
+    el.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 1
+    }));
+  }
+}
+
+function dispatchVirtualDragMove(targetEl, x, y) {
+  setVirtualMouseState('dragging');
+  const target = targetEl || document.elementFromPoint(x, y);
+  if (target) {
+    target.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 1,
+      pointerId: 101,
+      isPrimary: true
+    }));
+
+    // If dragging an <input type="range"> (slider):
+    const slider = target.type === 'range' ? target : target.closest('input[type="range"]');
+    if (slider) {
+      updateRangeSliderFromX(slider, x);
+    }
+  }
+}
+
+function endVirtualDrag(x, y) {
+  setVirtualMouseState('normal');
+  const el = vmDragTargetEl || document.elementFromPoint(x, y);
+
+  if (el) {
+    el.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 0,
+      pointerId: 101,
+      isPrimary: true
+    }));
+    el.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 0
+    }));
+    el.dispatchEvent(new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0
+    }));
+
+    const interactive = el.closest('button, a, .radar-btn, .gp-badge, .ov-btn');
+    if (interactive && typeof interactive.click === 'function') {
+      interactive.click();
+    }
+  }
+  vmDragTargetEl = null;
+}
+
+function triggerVirtualClick(x, y) {
+  wakeVirtualMouse();
+  setVirtualMouseState('clicked');
+  setTimeout(() => setVirtualMouseState('normal'), 180);
+
+  const el = document.elementFromPoint(x, y);
+  if (!el) return;
+
+  const interactive = el.closest('button, input, select, a, [data-gp], [data-tab], .radar-btn, .ov-btn') || el;
+
+  interactive.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 1, pointerId: 101, isPrimary: true
+  }));
+  interactive.dispatchEvent(new PointerEvent('pointerup', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 0, pointerId: 101, isPrimary: true
+  }));
+  interactive.dispatchEvent(new MouseEvent('click', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0
+  }));
+
+  if (typeof interactive.focus === 'function') interactive.focus();
+  if (typeof interactive.click === 'function' && interactive !== el) {
+    interactive.click();
+  }
+
+  // If clicked on main video canvas in live screen, move the ROI target crosshair right there!
+  const canvasWrapper = el.closest('.canvas-wrapper') || (el.id === 'mainCanvas' ? el : null);
+  if (canvasWrapper && appState.currentScreen === 'live') {
+    const rect = canvasWrapper.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const roiX = Math.max(0.04, Math.min(0.96, (x - rect.left) / rect.width));
+      const roiY = Math.max(0.04, Math.min(0.96, (y - rect.top) / rect.height));
+      updateState({
+        roiX,
+        roiY,
+        pipEnabled: true,
+        roiTargetVisible: true,
+        lastGamepadAction: `TOUCHPAD CLICK: AIM ROI (${Math.round(roiX * 100)}%, ${Math.round(roiY * 100)}%)`
+      });
+    }
+  }
+}
+
+function updateRangeSliderFromX(slider, clientX) {
+  const rect = slider.getBoundingClientRect();
+  if (rect.width <= 0) return;
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const min = parseFloat(slider.min) || 0;
+  const max = parseFloat(slider.max) || 100;
+  const step = parseFloat(slider.step) || 1;
+  const rawVal = min + ratio * (max - min);
+  const steppedVal = Math.round((rawVal - min) / step) * step + min;
+  const finalVal = Math.max(min, Math.min(max, steppedVal));
+  if (slider.value != finalVal) {
+    slider.value = finalVal;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+/**
+ * Cycles GUI color theme backward (-1) or forward (+1)
+ */
+function cycleTheme(direction) {
+  const current = (appState.themeColor || '#2dd4bf').toLowerCase();
+  let idx = GUI_THEMES.findIndex((t) => t.color.toLowerCase() === current);
+  if (idx < 0) idx = 0;
+
+  const nextIdx = (idx + direction + GUI_THEMES.length) % GUI_THEMES.length;
+  const newTheme = GUI_THEMES[nextIdx];
+
+  applyThemeColor(newTheme.color);
+  updateState({
+    themeColor: newTheme.color,
+    lastGamepadAction: `THEME: ${newTheme.name.toUpperCase()}`
+  });
+  saveSettings(appState);
+
+  // Update UI swatches and custom picker in Settings
+  const swatches = document.querySelectorAll('.theme-swatch');
+  swatches.forEach((s) => {
+    s.classList.toggle('active', s.dataset.color.toLowerCase() === newTheme.color.toLowerCase());
+  });
+  const colorPicker = document.getElementById('colorPickerCustom');
+  if (colorPicker) colorPicker.value = newTheme.color;
+
+  const actionEl = document.getElementById('gamepadActionText');
+  if (actionEl) actionEl.textContent = `GUI COLOR: ${newTheme.name.toUpperCase()}`;
+}
+
+/**
  * Continuous Animation Frame Loop:
- * - Executes smooth analog stick updates
+ * - Executes smooth analog stick updates with non-linear precision curve
  * - Polls Gamepad API if WebHID is not streaming
  * - Updates Settings diagnostics and button monitors
  */
@@ -336,6 +818,45 @@ function startFrameLoop() {
   }
 
   rafId = requestAnimationFrame(loop);
+}
+
+/**
+ * Non-linear power response curve:
+ * Deflection^1.8 provides 50-70% reduction at low stick angles for micro fine-tick aiming,
+ * while retaining full velocity at 100% deflection.
+ */
+function applyStickCurve(v) {
+  if (v === 0) return 0;
+  return Math.sign(v) * Math.pow(Math.abs(v), 1.8);
+}
+
+/**
+ * Applies smooth thumbstick movement frame by frame
+ */
+function applyStickMotion(lx, ly, rx, ry) {
+  // Left Stick: Moves ROI Target Crosshair (roiX, roiY) in live mode
+  if (appState.currentScreen === 'live' && (lx !== 0 || ly !== 0)) {
+    const clx = applyStickCurve(lx);
+    const cly = applyStickCurve(ly);
+    let nx = Math.max(0.04, Math.min(0.96, appState.roiX + clx * ROI_SPEED));
+    let ny = Math.max(0.04, Math.min(0.96, appState.roiY + cly * ROI_SPEED));
+    updateState({
+      roiX: nx,
+      roiY: ny,
+      pipEnabled: true,
+      roiTargetVisible: true
+    });
+  }
+
+  // Right Stick: Pans Main View when zoomed in (>1.0x) in live mode
+  if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || ry !== 0)) {
+    const crx = applyStickCurve(rx);
+    const cry = applyStickCurve(ry);
+    const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
+    const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX + crx * PAN_SPEED));
+    const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + cry * PAN_SPEED));
+    updateState({ mainPanX: nx, mainPanY: ny });
+  }
 }
 
 /**
@@ -392,31 +913,6 @@ function pollGamepadAPI() {
 
   applyStickMotion(lx, ly, rx, ry);
   dispatchControllerInputs(actionState);
-}
-
-/**
- * Applies smooth thumbstick movement frame by frame
- */
-function applyStickMotion(lx, ly, rx, ry) {
-  // Left Stick: Moves ROI Target Crosshair (roiX, roiY) in live mode
-  if (appState.currentScreen === 'live' && (lx !== 0 || ly !== 0)) {
-    let nx = Math.max(0.04, Math.min(0.96, appState.roiX + lx * ROI_SPEED));
-    let ny = Math.max(0.04, Math.min(0.96, appState.roiY + ly * ROI_SPEED));
-    updateState({
-      roiX: nx,
-      roiY: ny,
-      pipEnabled: true,
-      roiTargetVisible: true
-    });
-  }
-
-  // Right Stick: Pans Main View when zoomed in (>1.0x) in live mode
-  if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || ry !== 0)) {
-    const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
-    const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX + rx * PAN_SPEED));
-    const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + ry * PAN_SPEED));
-    updateState({ mainPanX: nx, mainPanY: ny });
-  }
 }
 
 /**
@@ -561,36 +1057,34 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // Share - Open / Close Settings Screen
-  if (isJustPressed('share')) {
+  // Options - Open / Close Settings (Options) Screen
+  if (isJustPressed('options')) {
     if (screen === 'settings') {
       document.getElementById('btnSettingsBackToLive')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: SHARE (EXIT SETTINGS)' });
+      updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT SETTINGS)' });
+    } else if (screen === 'reticle') {
+      document.getElementById('btnReticleBackToLive')?.click();
+      updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT TO LIVE)' });
     } else {
       document.getElementById('btnToggleOptions')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: SHARE (OPEN SETTINGS)' });
+      updateState({ lastGamepadAction: 'BUTTON: OPTIONS (OPEN SETTINGS)' });
     }
   }
 
-  // Options - Trigger Instant Replay
-  if (isJustPressed('options')) {
+  // Share - Trigger 20s Instant Replay
+  if (isJustPressed('share')) {
     document.getElementById('btnReplay20s')?.click();
-    updateState({ lastGamepadAction: 'BUTTON: OPTIONS (INSTANT REPLAY)' });
+    updateState({ lastGamepadAction: 'BUTTON: SHARE (INSTANT REPLAY)' });
   }
 
-  // L3 (Left Stick Click) - Recenter ROI Target
+  // L3 (Left Stick Click) - Circle Backward through GUI Color Themes
   if (isJustPressed('l3')) {
-    updateState({
-      roiX: 0.5,
-      roiY: 0.5,
-      lastGamepadAction: 'BUTTON: L3 (RECENTER ROI)'
-    });
+    cycleTheme(-1);
   }
 
-  // R3 (Right Stick Click) - Reset Main Zoom 1:1
+  // R3 (Right Stick Click) - Circle Forward through GUI Color Themes
   if (isJustPressed('r3')) {
-    document.getElementById('mainZoomReset')?.click();
-    updateState({ lastGamepadAction: 'BUTTON: R3 (RESET ZOOM 1:1)' });
+    cycleTheme(1);
   }
 
   // D-Pad Up
@@ -665,8 +1159,10 @@ function updateSettingsDiagnostics(backend, count) {
 
   if (slotEl) {
     if (backend === 'webhid') {
-      slotEl.textContent = 'BACKEND: WEBHID BT CONNECTED ✓';
-      slotEl.style.color = '#22c55e';
+      const info = `0x${lastReportId.toString(16).toUpperCase()} (${lastReportLen}B)`;
+      const touchStr = latestTouchInfo.active ? `TOUCH [${latestTouchInfo.x}, ${latestTouchInfo.y}]` : `TOUCH IDLE`;
+      slotEl.textContent = `BACKEND: WEBHID BT [${info}] ✓ | ${touchStr}`;
+      slotEl.style.color = lastReportLen >= 64 ? '#22c55e' : '#f59e0b';
     } else if (count > 0) {
       slotEl.textContent = `BACKEND: GAMEPAD API (${count} CONNECTED ✓)`;
       slotEl.style.color = '#22c55e';
