@@ -450,18 +450,19 @@
 
 /* Voice Announcement Toggle Button in Top-Left Strip */
 #btnToggleVoiceAnnounce.radar-btn-active {
-  color: var(--radar-primary);
-  border-color: var(--radar-primary);
-  box-shadow: 0 0 10px rgba(45, 212, 191, 0.45);
+  color: var(--radar-accent-contrast) !important;
+  background-color: var(--radar-accent) !important;
+  border-color: var(--radar-primary) !important;
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.45);
 }
-#btnToggleVoiceAnnounce:not(.radar-btn-active) {
-  opacity: 0.65;
+#btnToggleVoiceAnnounce.radar-btn-muted {
+  color: #f43f5e !important;
+  border-color: rgba(244, 63, 94, 0.5) !important;
+  background-color: rgba(244, 63, 94, 0.12) !important;
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.35);
 }
-#btnToggleVoiceAnnounce:not(.radar-btn-active) #voiceWavesPath {
-  display: none;
-}
-#btnToggleVoiceAnnounce:not(.radar-btn-active) #voiceMuteSlash {
-  display: block !important;
+#btnToggleVoiceAnnounce:hover {
+  filter: brightness(1.15);
 }
 
 /* Movable & Collapsible Settings Window */

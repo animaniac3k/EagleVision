@@ -868,34 +868,36 @@ function applyStickMotion(lx, ly, rx, ry) {
   if (appState.currentScreen === 'reticle') {
     const now = performance.now();
 
-    // Left Stick X: Clicks Per Arm (Left = fewer clicks, Right = more clicks)
-    if (Math.abs(lx) > 0.18) {
-      const interval = Math.abs(lx) > 0.6 ? 80 : 160;
+    // 1. Left Stick Y: Select / Navigate Controls (Up / Down) through Drawer Menu
+    // Note: Up on stick produces negative ly, Down produces positive ly
+    if (Math.abs(ly) > 0.08) {
+      const interval = Math.abs(ly) > 0.50 ? 120 : 220;
+      if (now - reticleStickLastYTime > interval) {
+        reticleStickLastYTime = now;
+        const dir = ly > 0 ? 1 : -1;
+        const ctrl = window.reticleGamepadAPI?.cycleFocus(dir);
+        const label = ctrl ? ctrl.label.toUpperCase() : 'CONTROL';
+        window.reticleGamepadAPI?.showToast(`SELECTED: ${label}`, 'lstick');
+        updateState({ lastGamepadAction: `SELECT: ${label}` });
+      }
+    }
+
+    // 2. Left Stick X: Adjust Currently Selected Control (- / +)
+    // Note: Right on stick produces positive lx, Left produces negative lx
+    if (Math.abs(lx) > 0.08) {
+      const interval = Math.abs(lx) > 0.50 ? 90 : 200;
       if (now - reticleStickLastXTime > interval) {
         reticleStickLastXTime = now;
         const dir = lx > 0 ? 1 : -1;
-        const res = window.reticleGamepadAPI?.quickAdjustClicks(dir);
-        window.reticleGamepadAPI?.showToast(res, 'lstick');
-        updateState({ lastGamepadAction: `RETICLE: ${res}` });
+        const res = window.reticleGamepadAPI?.adjust(dir);
+        window.reticleGamepadAPI?.showToast(res || (dir > 0 ? 'INCREASE' : 'DECREASE'), 'lstick');
+        updateState({ lastGamepadAction: `RETICLE: ${res || 'ADJUST'}` });
       }
     }
 
-    // Left Stick Y: Click Spacing (Up = wider spacing, Down = tighter spacing)
-    // Note: Up on stick produces negative Y value, so invert (-ly)
-    if (Math.abs(ly) > 0.18) {
-      const interval = Math.abs(ly) > 0.6 ? 80 : 160;
-      if (now - reticleStickLastYTime > interval) {
-        reticleStickLastYTime = now;
-        const dir = -ly > 0 ? 2 : -2;
-        const res = window.reticleGamepadAPI?.quickAdjustSpacing(dir);
-        window.reticleGamepadAPI?.showToast(res, 'lstick');
-        updateState({ lastGamepadAction: `RETICLE: ${res}` });
-      }
-    }
-
-    // Right Stick X: Center Gap (Left = tighter gap, Right = larger POI gap)
-    if (Math.abs(rx) > 0.18) {
-      const interval = Math.abs(rx) > 0.6 ? 80 : 160;
+    // 3. Right Stick X: Direct Center Gap Adjustment (Left = tighter, Right = larger POI gap)
+    if (Math.abs(rx) > 0.08) {
+      const interval = Math.abs(rx) > 0.50 ? 75 : 150;
       if (now - reticleStickRightXTime > interval) {
         reticleStickRightXTime = now;
         const dir = rx > 0 ? 4 : -4;
@@ -905,9 +907,9 @@ function applyStickMotion(lx, ly, rx, ry) {
       }
     }
 
-    // Right Stick Y: Stroke Weight (Up = thicker lines, Down = thinner lines)
-    if (Math.abs(ry) > 0.18) {
-      const interval = Math.abs(ry) > 0.6 ? 80 : 160;
+    // 4. Right Stick Y: Direct Stroke Weight Adjustment (Up = thicker lines, Down = thinner lines)
+    if (Math.abs(ry) > 0.08) {
+      const interval = Math.abs(ry) > 0.50 ? 75 : 150;
       if (now - reticleStickRightYTime > interval) {
         reticleStickRightYTime = now;
         const dir = -ry > 0 ? 0.2 : -0.2;

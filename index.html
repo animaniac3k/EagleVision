@@ -230,11 +230,16 @@
         </button>
 
         <!-- Voice Announcements (Audio Callouts) On/Off Toggle -->
-        <button id="btnToggleVoiceAnnounce" class="radar-btn" title="Toggle Voice Announcements (Audio Callouts On / Off)">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <button id="btnToggleVoiceAnnounce" class="radar-btn radar-btn-muted" title="Voice Announcements: MUTED (Click to Enable)">
+          <!-- Voice Active Icon (Speaker with Radiating Sound Waves) -->
+          <svg id="iconVoiceOn" class="voice-icon hidden" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
-            <path id="voiceWavesPath" stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
-            <line id="voiceMuteSlash" x1="22" y1="2" x2="2" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="hidden" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+          </svg>
+          <!-- Voice Muted Icon (Speaker with Red Diagonal Slash) -->
+          <svg id="iconVoiceMuted" class="voice-icon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
+            <line x1="22" y1="2" x2="2" y2="22" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
         </button>
 
@@ -741,15 +746,14 @@
 
           <!-- Interactive Controller Legend Strip -->
           <div class="reticle-gamepad-legend">
-            <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK</kbd> CLICKS / SPACING</span>
+            <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK / D-PAD</kbd> SELECT & ADJUST</span>
             <span class="gp-leg-pill" data-leg="rstick"><kbd>R-STICK</kbd> GAP / WEIGHT</span>
             <span class="gp-leg-pill" data-leg="square"><kbd>▢</kbd> RINGS</span>
             <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
-            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> LABELS</span>
+            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> TOGGLE / AUDITION</span>
             <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
             <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> SPACING</span>
-            <span class="gp-leg-pill" data-leg="dpad"><kbd>D-PAD</kbd> MENU</span>
-            <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> EXIT</span>
+            <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> LIVE FEED</span>
           </div>
 
           <div class="reticle-stage-hint">TAP PREVIEW OR USE JOYSTICK / BUTTONS TO SCULPT CROSSHAIR</div>

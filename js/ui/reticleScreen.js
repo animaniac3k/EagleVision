@@ -230,13 +230,13 @@ export function initReticleScreen() {
   btnReticleBackToLive?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenLive?.classList.remove('hidden');
-    updateState({ currentScreen: 'live' });
+    updateState({ currentScreen: 'live', replayActive: false });
   });
 
   btnReticleToSettings?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
-    updateState({ currentScreen: 'settings' });
+    updateState({ currentScreen: 'settings', replayActive: false });
   });
 
   // Reset reticle defaults

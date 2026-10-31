@@ -104,9 +104,10 @@ export async function initSidebarAndTopControls(videoEl) {
   });
 
   const openReticleScreen = () => {
+    screenLive?.classList.add('hidden');
     screenSettings?.classList.add('hidden');
     screenReticle?.classList.remove('hidden');
-    updateState({ currentScreen: 'reticle' });
+    updateState({ currentScreen: 'reticle', replayActive: false });
   };
   btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
   btnOpenReticleScreenCard?.addEventListener('click', openReticleScreen);
@@ -344,10 +345,34 @@ export async function initSidebarAndTopControls(videoEl) {
     }
   });
 
-  function toggleVoiceSpeech() {
+  function syncVoiceToggleUI(isEnabled) {
+    const isVoiceOn = Boolean(isEnabled);
+    if (btnToggleVoiceAnnounce) {
+      btnToggleVoiceAnnounce.classList.toggle('radar-btn-active', isVoiceOn);
+      btnToggleVoiceAnnounce.classList.toggle('radar-btn-muted', !isVoiceOn);
+      btnToggleVoiceAnnounce.title = isVoiceOn
+        ? 'Voice Announcements: ON (Click to Mute)'
+        : 'Voice Announcements: MUTED (Click to Enable)';
+      const iconVoiceOn = document.getElementById('iconVoiceOn');
+      const iconVoiceMuted = document.getElementById('iconVoiceMuted');
+      if (iconVoiceOn) iconVoiceOn.classList.toggle('hidden', !isVoiceOn);
+      if (iconVoiceMuted) iconVoiceMuted.classList.toggle('hidden', isVoiceOn);
+    }
+    if (btnToggleHeatmapSpeech) {
+      btnToggleHeatmapSpeech.textContent = isVoiceOn ? 'VOICE: ON' : 'VOICE: OFF';
+      btnToggleHeatmapSpeech.classList.toggle('radar-btn-active', isVoiceOn);
+    }
+  }
+
+  function toggleVoiceSpeech(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const next = !appState.heatmapSpeechEnabled;
     updateState({ heatmapSpeechEnabled: next });
     saveSettings(appState);
+    syncVoiceToggleUI(next);
     if (next) {
       const alertWord = appState.voiceAlertKeyword || 'Detection';
       speakDetectionAnnouncement(`${alertWord}! Voice callouts active`);
@@ -365,6 +390,7 @@ export async function initSidebarAndTopControls(videoEl) {
   if (btnToggleVoiceAnnounce) {
     btnToggleVoiceAnnounce.addEventListener('click', toggleVoiceSpeech);
   }
+  syncVoiceToggleUI(Boolean(appState.heatmapSpeechEnabled));
 
   // Voice Customization (Pitch & Speed)
   if (sliderVoicePitch && valVoicePitch) {
@@ -589,13 +615,7 @@ export async function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
-    if (btnToggleVoiceAnnounce) {
-      btnToggleVoiceAnnounce.classList.toggle('radar-btn-active', Boolean(state.heatmapSpeechEnabled));
-    }
-    if (btnToggleHeatmapSpeech) {
-      btnToggleHeatmapSpeech.textContent = state.heatmapSpeechEnabled ? 'VOICE: ON' : 'VOICE: OFF';
-      btnToggleHeatmapSpeech.classList.toggle('radar-btn-active', Boolean(state.heatmapSpeechEnabled));
-    }
+    syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled));
     btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);

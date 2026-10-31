@@ -96,5 +96,10 @@ export function updateState(patch) {
 
 export function subscribeState(fn) {
   listeners.add(fn);
+  try {
+    fn(appState, {});
+  } catch (err) {
+    console.warn('[subscribeState initial error]', err);
+  }
   return () => listeners.delete(fn);
 }
