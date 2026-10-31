@@ -367,6 +367,9 @@ function handleWebHIDInputReport(event) {
   const ry = applyDeadzone((rawRy - 128) / 128);
   latestAxes = { lx, ly, rx, ry };
 
+  // Dispatch continuous analog stick movement immediately on each report
+  applyStickMotion(lx, ly, rx, ry);
+
   // 2. Buttons Byte 1: D-pad (bits 0-3) + Shape Buttons (bits 4-7)
   const b1 = data.getUint8(offset + 4);
   const dpad = b1 & 0x0f;
@@ -866,40 +869,52 @@ function applyStickMotion(lx, ly, rx, ry) {
     const now = performance.now();
 
     // Left Stick X: Clicks Per Arm (Left = fewer clicks, Right = more clicks)
-    if (Math.abs(lx) > 0.32 && now - reticleStickLastXTime > 160) {
-      reticleStickLastXTime = now;
-      const dir = lx > 0 ? 1 : -1;
-      const res = window.reticleGamepadAPI?.quickAdjustClicks(dir);
-      window.reticleGamepadAPI?.showToast(res, 'lstick');
-      updateState({ lastGamepadAction: `RETICLE: ${res}` });
+    if (Math.abs(lx) > 0.18) {
+      const interval = Math.abs(lx) > 0.6 ? 80 : 160;
+      if (now - reticleStickLastXTime > interval) {
+        reticleStickLastXTime = now;
+        const dir = lx > 0 ? 1 : -1;
+        const res = window.reticleGamepadAPI?.quickAdjustClicks(dir);
+        window.reticleGamepadAPI?.showToast(res, 'lstick');
+        updateState({ lastGamepadAction: `RETICLE: ${res}` });
+      }
     }
 
     // Left Stick Y: Click Spacing (Up = wider spacing, Down = tighter spacing)
     // Note: Up on stick produces negative Y value, so invert (-ly)
-    if (Math.abs(ly) > 0.32 && now - reticleStickLastYTime > 160) {
-      reticleStickLastYTime = now;
-      const dir = -ly > 0 ? 2 : -2;
-      const res = window.reticleGamepadAPI?.quickAdjustSpacing(dir);
-      window.reticleGamepadAPI?.showToast(res, 'lstick');
-      updateState({ lastGamepadAction: `RETICLE: ${res}` });
+    if (Math.abs(ly) > 0.18) {
+      const interval = Math.abs(ly) > 0.6 ? 80 : 160;
+      if (now - reticleStickLastYTime > interval) {
+        reticleStickLastYTime = now;
+        const dir = -ly > 0 ? 2 : -2;
+        const res = window.reticleGamepadAPI?.quickAdjustSpacing(dir);
+        window.reticleGamepadAPI?.showToast(res, 'lstick');
+        updateState({ lastGamepadAction: `RETICLE: ${res}` });
+      }
     }
 
     // Right Stick X: Center Gap (Left = tighter gap, Right = larger POI gap)
-    if (Math.abs(rx) > 0.32 && now - reticleStickRightXTime > 160) {
-      reticleStickRightXTime = now;
-      const dir = rx > 0 ? 4 : -4;
-      const res = window.reticleGamepadAPI?.quickAdjustGap(dir);
-      window.reticleGamepadAPI?.showToast(res, 'rstick');
-      updateState({ lastGamepadAction: `RETICLE: ${res}` });
+    if (Math.abs(rx) > 0.18) {
+      const interval = Math.abs(rx) > 0.6 ? 80 : 160;
+      if (now - reticleStickRightXTime > interval) {
+        reticleStickRightXTime = now;
+        const dir = rx > 0 ? 4 : -4;
+        const res = window.reticleGamepadAPI?.quickAdjustGap(dir);
+        window.reticleGamepadAPI?.showToast(res, 'rstick');
+        updateState({ lastGamepadAction: `RETICLE: ${res}` });
+      }
     }
 
     // Right Stick Y: Stroke Weight (Up = thicker lines, Down = thinner lines)
-    if (Math.abs(ry) > 0.32 && now - reticleStickRightYTime > 160) {
-      reticleStickRightYTime = now;
-      const dir = -ry > 0 ? 0.2 : -0.2;
-      const res = window.reticleGamepadAPI?.quickAdjustStroke(dir);
-      window.reticleGamepadAPI?.showToast(res, 'rstick');
-      updateState({ lastGamepadAction: `RETICLE: ${res}` });
+    if (Math.abs(ry) > 0.18) {
+      const interval = Math.abs(ry) > 0.6 ? 80 : 160;
+      if (now - reticleStickRightYTime > interval) {
+        reticleStickRightYTime = now;
+        const dir = -ry > 0 ? 0.2 : -0.2;
+        const res = window.reticleGamepadAPI?.quickAdjustStroke(dir);
+        window.reticleGamepadAPI?.showToast(res, 'rstick');
+        updateState({ lastGamepadAction: `RETICLE: ${res}` });
+      }
     }
   }
 }
@@ -1165,14 +1180,26 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // L3 (Left Stick Click) - Circle Backward through GUI Color Themes
+  // L3 (Left Stick Click) - Circle Backward through GUI Color Themes on Live Feed, or Audition on Reticle
   if (isJustPressed('l3')) {
-    cycleTheme(-1);
+    if (screen === 'live') {
+      cycleTheme(-1);
+    } else if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.activate();
+      window.reticleGamepadAPI?.showToast(res || 'AUDITION', 'lstick');
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'AUDITION'}` });
+    }
   }
 
-  // R3 (Right Stick Click) - Circle Forward through GUI Color Themes
+  // R3 (Right Stick Click) - Circle Forward through GUI Color Themes on Live Feed, or Reset on Reticle
   if (isJustPressed('r3')) {
-    cycleTheme(1);
+    if (screen === 'live') {
+      cycleTheme(1);
+    } else if (screen === 'reticle') {
+      document.getElementById('btnResetReticle')?.click();
+      window.reticleGamepadAPI?.showToast('RETICLE: RESET PRESET DEFAULTS', 'rstick');
+      updateState({ lastGamepadAction: 'RETICLE: RESET DEFAULTS' });
+    }
   }
 
   // D-Pad Up
