@@ -20,6 +20,7 @@
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
 const RING_MODES = ['AIM ROI', 'ZOOM', 'TOOLS'];
 
@@ -337,6 +338,14 @@ export function initRingController() {
   window.addEventListener(
     'keydown',
     (e) => {
+      // Silently dismiss Splash Screen if active
+      if (isSplashScreenActive()) {
+        e.preventDefault();
+        e.stopPropagation();
+        dismissSplashScreen('ring');
+        return;
+      }
+
       // Do not hijack typing if focus is inside a select or text input
       const tag = document.activeElement?.tagName;
       if (tag === 'SELECT' && !learningAction) return;

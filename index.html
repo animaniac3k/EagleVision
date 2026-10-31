@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0b2229" />
-  <title>EagleVision — USB Camera & Overlay System</title>
+  <meta name="theme-color" content="#18181B" />
+  <title>SPOTR — Recon • Detect • Alert</title>
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/layout.css" />
   <link rel="stylesheet" href="./css/viewport.css" />
@@ -14,6 +15,110 @@
   <link rel="stylesheet" href="./css/gallery.css" />
 </head>
 <body>
+  <!-- Fullscreen Tactical Splash Screen (SPOTR Brand & Logo) -->
+  <aside id="splashScreen" class="splash-screen" role="dialog" aria-modal="true" aria-label="SPOTR Splash Screen">
+    <div class="splash-content">
+      <div class="splash-logo-wrap">
+        <svg class="splash-logo-svg" viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background -->
+          <rect width="700" height="220" rx="24" fill="#18181B"/>
+
+          <!-- Icon -->
+          <g transform="translate(30,30)">
+            <!-- Tile -->
+            <rect width="160" height="160" rx="28" fill="#202024"/>
+
+            <!-- Scope Ring -->
+            <circle
+              cx="80"
+              cy="80"
+              r="34"
+              fill="none"
+              stroke="#FF6B00"
+              stroke-width="10"/>
+
+            <!-- Crosshairs -->
+            <line x1="80" y1="22" x2="80" y2="46"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="80" y1="114" x2="80" y2="138"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="22" y1="80" x2="46" y2="80"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="114" y1="80" x2="138" y2="80"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <!-- Centre Dot -->
+            <circle
+              cx="80"
+              cy="80"
+              r="7"
+              fill="#FF6B00"/>
+
+            <!-- Detection Indicator -->
+            <circle
+              class="splash-detection-dot"
+              cx="118"
+              cy="42"
+              r="9"
+              fill="#FFD166"/>
+          </g>
+
+          <!-- Logo Text -->
+          <text
+              x="225"
+              y="100"
+              fill="#F8FAFC"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="68"
+              font-weight="700"
+              letter-spacing="4">
+              SPOTR
+          </text>
+
+          <!-- Trademark -->
+          <text
+              x="485"
+              y="62"
+              fill="#FFD166"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="18"
+              font-weight="700">
+              ™
+          </text>
+
+          <!-- Tagline -->
+          <text
+              x="228"
+              y="145"
+              fill="#9CA3AF"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="22"
+              letter-spacing="1.5">
+              RECON • DETECT • ALERT
+          </text>
+
+          <!-- Accent Line -->
+          <rect
+              x="228"
+              y="165"
+              width="250"
+              height="4"
+              rx="2"
+              fill="#FF6B00"/>
+        </svg>
+      </div>
+
+      <div class="splash-footer">
+        <div class="splash-progress-track">
+          <div class="splash-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <div id="appRoot">
 
     <!-- =================================================================== -->
@@ -180,13 +285,13 @@
           <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
           <button id="btnReplayStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
           <button id="btnReplayStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
-          <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
-          <span id="replayTimeText" class="slider-val" style="min-width:98px; text-align:right;">0.0s / 20.0s</span>
+          <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" />
+          <span id="replayTimeText" class="slider-val">0.0s / 20.0s</span>
           <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
         </div>
 
         <!-- Right: Instant Replay (Automatically saves the clip to Archive) -->
-        <div class="control-pod" style="margin-left:auto;">
+        <div id="replayTriggerPod" class="control-pod" style="margin-left:auto;">
           <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Memory Buffer">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
@@ -421,13 +526,43 @@
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">PS4 / BT Gamepad</span>
-              <div class="gamepad-status-row">
+              <div class="gamepad-status-row" style="gap:6px;">
                 <span id="gamepadStatusDot" class="gamepad-dot"></span>
-                <span id="gamepadStatusText">DISCONNECTED (PRESS ANY BUTTON)</span>
+                <span id="gamepadStatusText">DISCONNECTED</span>
+                <button id="btnConnectWebHID" class="radar-btn radar-btn-sm radar-btn-active" style="height:26px; padding:0 10px; font-size:11px;" title="Connect Bluetooth PS4 Controller directly via Chrome WebHID">PAIR PS4 BT</button>
+                <button id="btnDetectGamepad" class="radar-btn radar-btn-sm" style="height:26px; padding:0 8px; font-size:11px;" title="Scan for USB / XInput Gamepads">SCAN</button>
               </div>
             </div>
             <div id="gamepadActionText" class="ring-signal-readout">IDLE</div>
+
+            <!-- Live Controller Diagnostics -->
+            <div id="gamepadDiagRow" style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); display:flex; justify-content:space-between; margin-top:6px; padding:4px 8px; background:rgba(0,0,0,0.3); border-radius:3px;">
+              <span id="gamepadFocusStatus">PAGE FOCUS: ACTIVE ✓</span>
+              <span id="gamepadSlotStatus">BACKEND: WEBHID + GAMEPAD API</span>
+            </div>
+
+            <!-- Live Controller Button & Stick Monitor -->
+            <div id="gamepadMonitor" class="gamepad-monitor-grid">
+              <div class="gp-badge" data-gp="cross">✕ CROSS</div>
+              <div class="gp-badge" data-gp="circle">◯ CIRCLE</div>
+              <div class="gp-badge" data-gp="square">▢ SQUARE</div>
+              <div class="gp-badge" data-gp="triangle">△ TRI</div>
+              <div class="gp-badge" data-gp="l1">L1</div>
+              <div class="gp-badge" data-gp="r1">R1</div>
+              <div class="gp-badge" data-gp="l2">L2</div>
+              <div class="gp-badge" data-gp="r2">R2</div>
+              <div class="gp-badge" data-gp="dpad-up">▲ UP</div>
+              <div class="gp-badge" data-gp="dpad-down">▼ DOWN</div>
+              <div class="gp-badge" data-gp="dpad-left">◀ LEFT</div>
+              <div class="gp-badge" data-gp="dpad-right">▶ RIGHT</div>
+              <div class="gp-badge" data-gp="share">SHARE</div>
+              <div class="gp-badge" data-gp="options">OPTIONS</div>
+              <div class="gp-badge" data-gp="l3">L3</div>
+              <div class="gp-badge" data-gp="r3">R3</div>
+            </div>
+
             <div class="gamepad-mapping-table" style="font-size:12px; font-family:var(--font-mono); color:var(--radar-text-secondary); margin-top:8px; line-height:1.6;">
+              <div style="color:#2dd4bf; margin-bottom:6px; font-size:11px;">🎮 <b>Direct Chrome Bluetooth:</b> Click <b>PAIR PS4 BT</b> to select your <i>Wireless Controller</i> in Chrome's permission prompt for driverless Bluetooth input.</div>
               <div>• <b>L-Stick:</b> Aim ROI Crosshair (Speed proportional)</div>
               <div>• <b>R-Stick:</b> Pan Stream when Main Zoom &gt; 1.0x</div>
               <div>• <b>L3 / R3:</b> Recenter ROI / Reset 1:1 Zoom</div>

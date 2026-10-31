@@ -62,6 +62,9 @@ export function initInstantReplay() {
 
   // Re-render when main zoom or pan changes via interface controls / gamepad / touch
   subscribeState((state, patch) => {
+    if (patch.replayActive !== undefined) {
+      document.getElementById('screenLive')?.classList.toggle('replay-active', !!state.replayActive);
+    }
     if (state.replayActive && (patch.mainZoom !== undefined || patch.mainPanX !== undefined || patch.mainPanY !== undefined)) {
       canvasEl.style.cursor = (state.mainZoom || 1.0) > 1.01 ? 'grab' : 'default';
       drawReplayImage();
@@ -174,6 +177,7 @@ export function initInstantReplay() {
     scrubber.value = '0';
     bannerText.textContent = `INSTANT REPLAY — AUTO-SAVED ${activeDuration.toFixed(1)}s (${snap.width}×${snap.height} @ ${snap.fps} FPS)`;
 
+    document.getElementById('screenLive')?.classList.add('replay-active');
     modal.classList.remove('hidden');
     replayBar.classList.remove('hidden');
     updateState({ replayActive: true });
@@ -201,6 +205,7 @@ export function initInstantReplay() {
     stopLoop();
     isPlaying = false;
     releaseFrameUrls();
+    document.getElementById('screenLive')?.classList.remove('replay-active');
     modal.classList.add('hidden');
     replayBar.classList.add('hidden');
     updateState({ replayActive: false });

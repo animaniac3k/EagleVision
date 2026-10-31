@@ -15,8 +15,12 @@ import { initVideoBrowser } from './ui/videoBrowser.js';
 import { initReticleScreen } from './ui/reticleScreen.js';
 import { initRingController } from './ui/ringController.js';
 import { initGamepadController } from './input/gamepadController.js';
+import { initSplashScreen } from './ui/splashScreen.js';
 
 async function bootstrapApp() {
+  // 0. Initialize SPOTR Tactical Splash Screen (dismisses after 3.5s or silently on Space/controller/tap)
+  initSplashScreen();
+
   // Pre-initialize voice synthesis to discover female system voices immediately
   initVoiceSynthesis();
 

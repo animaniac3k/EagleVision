@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eaglevision-v13';
+const CACHE_NAME = 'spotr-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -25,8 +25,11 @@ const ASSETS = [
   './js/ui/videoBrowser.js',
   './js/ui/reticleScreen.js',
   './js/ui/ringController.js',
+  './js/ui/splashScreen.js',
   './js/input/gamepadController.js',
-  './assets/icons/icon.svg'
+  './assets/icons/icon.svg',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

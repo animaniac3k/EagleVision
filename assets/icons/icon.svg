@@ -1,10 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#040d10"/>
-  <circle cx="256" cy="256" r="176" stroke="#2dd4bf" stroke-width="16" fill="#07161b"/>
-  <circle cx="256" cy="256" r="96" stroke="#5eead4" stroke-width="10" stroke-dasharray="24 14" fill="none"/>
-  <line x1="256" y1="36" x2="256" y2="186" stroke="#2dd4bf" stroke-width="14" stroke-linecap="round"/>
-  <line x1="256" y1="326" x2="256" y2="476" stroke="#2dd4bf" stroke-width="14" stroke-linecap="round"/>
-  <line x1="36" y1="256" x2="186" y2="256" stroke="#2dd4bf" stroke-width="14" stroke-linecap="round"/>
-  <line x1="326" y1="256" x2="476" y2="256" stroke="#2dd4bf" stroke-width="14" stroke-linecap="round"/>
-  <circle cx="256" cy="256" r="14" fill="#ccfbf1"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="100%" height="100%">
+  <!-- Tile -->
+  <rect width="160" height="160" rx="28" fill="#202024"/>
+
+  <!-- Scope Ring -->
+  <circle
+    cx="80"
+    cy="80"
+    r="34"
+    fill="none"
+    stroke="#FF6B00"
+    stroke-width="10"/>
+
+  <!-- Crosshairs -->
+  <line x1="80" y1="22" x2="80" y2="46"
+        stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+  <line x1="80" y1="114" x2="80" y2="138"
+        stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+  <line x1="22" y1="80" x2="46" y2="80"
+        stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+  <line x1="114" y1="80" x2="138" y2="80"
+        stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Centre Dot -->
+  <circle
+    cx="80"
+    cy="80"
+    r="7"
+    fill="#FF6B00"/>
+
+  <!-- Detection Indicator -->
+  <circle
+    cx="118"
+    cy="42"
+    r="9"
+    fill="#FFD166"/>
 </svg>

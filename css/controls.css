@@ -248,18 +248,72 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   transition: width 0.2s ease;
 }
 
-/* Replay Scrubber Bar */
+/* Replay Scrubber Bar — fluidly expands horizontally across available space */
 #replayBar {
-  flex: 1;
-  max-width: min(980px, 75vw);
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   background: var(--radar-panel);
   border: 2px solid var(--radar-border-strong);
-  padding: 8px 14px;
+  padding: 8px 16px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   display: flex;
   align-items: center;
   gap: 12px;
+  backdrop-filter: blur(10px);
+}
+
+#replayBar > .radar-btn-sm {
+  flex-shrink: 0;
+}
+
+#replayScrubber {
+  flex: 1 1 auto;
+  min-width: 60px;
+  cursor: pointer;
+}
+
+#replayTimeText {
+  flex-shrink: 0;
+  min-width: 180px;
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide replay trigger button pod while replay is active so replay bar expands fully */
+#screenLive.replay-active #replayTriggerPod {
+  display: none !important;
+}
+
+/* Responsive adjustments across screen sizes */
+@media (max-width: 768px) {
+  #screenLive.replay-active #ringHudPill {
+    display: none !important;
+  }
+  #replayBar {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  #replayTimeText {
+    min-width: 130px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 520px) {
+  #replayBar {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  #btnReplayStepBack,
+  #btnReplayStep {
+    padding: 0 6px;
+    font-size: 11px;
+  }
 }
 
 /* Interface Color Swatches & Photoshop-Style Picker */
@@ -312,6 +366,7 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
 .ring-hud-pill {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 10px;
   height: var(--touch-target);
   padding: 0 14px;

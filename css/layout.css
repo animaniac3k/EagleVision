@@ -258,6 +258,36 @@
   box-shadow: 0 0 8px #22c55e;
 }
 
+/* Live Gamepad Monitor Grid in Settings */
+.gamepad-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.gp-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 2px;
+  background: rgba(9, 26, 32, 0.7);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  color: var(--radar-text-muted);
+  transition: background 0.06s ease, border-color 0.06s ease, box-shadow 0.06s ease, color 0.06s ease;
+  user-select: none;
+}
+
+.gp-badge.gp-pressed {
+  background: #22c55e !important;
+  border-color: #4ade80 !important;
+  color: #041316 !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.8) !important;
+  transform: scale(0.96);
+}
+
 /* Movable & Collapsible Settings Window */
 #optionsPanel {
   position: absolute;
@@ -377,4 +407,106 @@
 .hud-val {
   color: var(--radar-text);
   font-weight: 600;
+}
+
+/* =================================================================== */
+/* SPOTR BRAND SPLASH SCREEN                                           */
+/* =================================================================== */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: radial-gradient(circle at 50% 45%, #18181b 0%, #0d0d0f 75%, #050506 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.splash-screen.splash-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  width: 100%;
+  max-width: 720px;
+  animation: splashZoomIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes splashZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.splash-logo-wrap {
+  width: 100%;
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 32px rgba(255, 107, 0, 0.18);
+  overflow: hidden;
+}
+
+.splash-logo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.splash-detection-dot {
+  animation: splashDotFlash 0.9s infinite ease-in-out;
+}
+
+@keyframes splashDotFlash {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.9));
+  }
+  50% {
+    opacity: 0.18;
+    filter: none;
+  }
+}
+
+.splash-footer {
+  width: 100%;
+  max-width: 320px;
+}
+
+.splash-progress-track {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.splash-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: #FF6B00;
+  box-shadow: 0 0 8px #FF6B00;
+  animation: splashFill 3.5s linear forwards;
+}
+
+@keyframes splashFill {
+  from { width: 0%; }
+  to { width: 100%; }
 }
