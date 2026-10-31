@@ -13,6 +13,7 @@ import {
   getEstimatedBufferMB
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { speakDetectionAnnouncement } from '../renderer/compositor.js';
 
 export function applyThemeColor(hex) {
   const clean = (hex || '#2dd4bf').replace('#', '');
@@ -58,12 +59,16 @@ export function applyThemeColor(hex) {
 
 export async function initSidebarAndTopControls(videoEl) {
   const screenLive = document.getElementById('screenLive');
+  const screenSettings = document.getElementById('screenSettings');
+  const screenReticle = document.getElementById('screenReticle');
+
   const btnDeclutterUi = document.getElementById('btnDeclutterUi');
   const btnRestoreUi = document.getElementById('btnRestoreUi');
-  const optionsPanel = document.getElementById('optionsPanel');
-  const optionsDragHandle = document.getElementById('optionsDragHandle');
   const btnToggleOptions = document.getElementById('btnToggleOptions');
-  const btnCloseOptionsInner = document.getElementById('btnCloseOptionsInner');
+  const btnSettingsBackToLive = document.getElementById('btnSettingsBackToLive');
+  const btnOpenReticleScreen = document.getElementById('btnOpenReticleScreen');
+  const btnOpenReticleScreenCard = document.getElementById('btnOpenReticleScreenCard');
+
   const btnTogglePip = document.getElementById('btnTogglePip');
   const btnToggleOverlayTop = document.getElementById('btnToggleOverlayTop');
   const btnToggleHeatmap = document.getElementById('btnToggleHeatmap');
@@ -76,7 +81,6 @@ export async function initSidebarAndTopControls(videoEl) {
   const btnRefreshCameras = document.getElementById('btnRefreshCameras');
 
   applyThemeColor(appState.themeColor || '#2dd4bf');
-  makeElementDraggable(optionsPanel, optionsDragHandle);
 
   // 0. Declutter Mode (Hides whole interface except single top-left restore button)
   btnDeclutterUi?.addEventListener('click', () => {
@@ -86,13 +90,26 @@ export async function initSidebarAndTopControls(videoEl) {
     updateState({ uiDecluttered: false });
   });
 
-  // 1. Show/Hide Settings Window
-  const toggleOptions = (force) => {
-    const next = typeof force === 'boolean' ? force : !appState.optionsOpen;
-    updateState({ optionsOpen: next });
+  // 1. Fullscreen Settings Screen Navigation
+  btnToggleOptions?.addEventListener('click', () => {
+    screenLive?.classList.add('hidden');
+    screenSettings?.classList.remove('hidden');
+    updateState({ currentScreen: 'settings' });
+  });
+
+  btnSettingsBackToLive?.addEventListener('click', () => {
+    screenSettings?.classList.add('hidden');
+    screenLive?.classList.remove('hidden');
+    updateState({ currentScreen: 'live' });
+  });
+
+  const openReticleScreen = () => {
+    screenSettings?.classList.add('hidden');
+    screenReticle?.classList.remove('hidden');
+    updateState({ currentScreen: 'reticle' });
   };
-  btnToggleOptions.addEventListener('click', () => toggleOptions());
-  btnCloseOptionsInner.addEventListener('click', () => toggleOptions(false));
+  btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
+  btnOpenReticleScreenCard?.addEventListener('click', openReticleScreen);
 
   // 2. Show/Hide Digital Zoom Window
   btnTogglePip.addEventListener('click', () => {
@@ -266,47 +283,108 @@ export async function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 10. Heatmap Sensitivity, Display Duration (up to 60s) & Voice Callout Toggle
+  // 10. Heatmap Sensitivity, Display Duration (with Infinity support) & Voice Callouts
   const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');
   const valHeatmapSens = document.getElementById('valHeatmapSens');
   const sliderHeatmapDuration = document.getElementById('sliderHeatmapDuration');
   const valHeatmapDuration = document.getElementById('valHeatmapDuration');
+  const inputHeatmapDuration = document.getElementById('inputHeatmapDuration');
+  const btnHeatmapInfinite = document.getElementById('btnHeatmapInfinite');
   const btnToggleHeatmapSpeech = document.getElementById('btnToggleHeatmapSpeech');
+
+  const sliderVoicePitch = document.getElementById('sliderVoicePitch');
+  const valVoicePitch = document.getElementById('valVoicePitch');
+  const sliderVoiceRate = document.getElementById('sliderVoiceRate');
+  const valVoiceRate = document.getElementById('valVoiceRate');
+  const btnTestVoiceSettings = document.getElementById('btnTestVoiceSettings');
 
   sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
   valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
 
-  const initHeatDur = Number(appState.heatmapDuration) || 2.0;
-  if (sliderHeatmapDuration && valHeatmapDuration) {
-    sliderHeatmapDuration.value = String(initHeatDur);
-    valHeatmapDuration.textContent = `${initHeatDur.toFixed(1)}s`;
-    sliderHeatmapDuration.addEventListener('input', (e) => {
-      const dur = Number(e.target.value) || 2.0;
-      valHeatmapDuration.textContent = `${dur.toFixed(1)}s`;
-      updateState({ heatmapDuration: dur });
-      saveSettings(appState);
-    });
+  function setHeatmapDuration(dur) {
+    if (dur >= 99999 || dur === Infinity) {
+      if (sliderHeatmapDuration) sliderHeatmapDuration.value = '125';
+      if (valHeatmapDuration) valHeatmapDuration.textContent = '∞';
+      if (inputHeatmapDuration) inputHeatmapDuration.value = '99999';
+      btnHeatmapInfinite?.classList.add('radar-btn-active');
+      updateState({ heatmapDuration: 99999 });
+    } else {
+      const clamped = Math.max(1, dur);
+      if (sliderHeatmapDuration) sliderHeatmapDuration.value = String(Math.min(120, clamped));
+      if (valHeatmapDuration) valHeatmapDuration.textContent = 's';
+      if (inputHeatmapDuration) inputHeatmapDuration.value = String(clamped);
+      btnHeatmapInfinite?.classList.remove('radar-btn-active');
+      updateState({ heatmapDuration: clamped });
+    }
+    saveSettings(appState);
   }
+
+  const initHeatDur = Number(appState.heatmapDuration) || 30;
+  setHeatmapDuration(initHeatDur);
+
+  sliderHeatmapDuration?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    if (v >= 125) {
+      setHeatmapDuration(Infinity);
+    } else {
+      setHeatmapDuration(v);
+    }
+  });
+
+  inputHeatmapDuration?.addEventListener('change', (e) => {
+    const v = Number(e.target.value) || 30;
+    setHeatmapDuration(v);
+  });
+
+  btnHeatmapInfinite?.addEventListener('click', () => {
+    if (appState.heatmapDuration >= 99999) {
+      setHeatmapDuration(30);
+    } else {
+      setHeatmapDuration(Infinity);
+    }
+  });
 
   if (btnToggleHeatmapSpeech) {
     btnToggleHeatmapSpeech.addEventListener('click', () => {
       const next = !appState.heatmapSpeechEnabled;
       updateState({ heatmapSpeechEnabled: next });
       saveSettings(appState);
-      if (next && 'speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance('Voice callouts active');
-          u.rate = 1.15;
-          window.speechSynthesis.speak(u);
-        } catch {
-          // Ignore speech synthesis errors
-        }
-      } else if (!next && 'speechSynthesis' in window) {
+      if (next) {
+        speakDetectionAnnouncement('Voice callouts active');
+      } else if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
     });
   }
+
+  // Voice Customization (Pitch & Speed)
+  if (sliderVoicePitch && valVoicePitch) {
+    const p = Number(appState.voicePitch || 1.25);
+    sliderVoicePitch.value = String(p);
+    valVoicePitch.textContent = `${p.toFixed(2)}x`;
+    sliderVoicePitch.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) || 1.25;
+      valVoicePitch.textContent = `${val.toFixed(2)}x`;
+      updateState({ voicePitch: val });
+      saveSettings(appState);
+    });
+  }
+
+  if (sliderVoiceRate && valVoiceRate) {
+    const r = Number(appState.voiceRate || 1.10);
+    sliderVoiceRate.value = String(r);
+    valVoiceRate.textContent = `${r.toFixed(2)}x`;
+    sliderVoiceRate.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) || 1.10;
+      valVoiceRate.textContent = `${val.toFixed(2)}x`;
+      updateState({ voiceRate: val });
+      saveSettings(appState);
+    });
+  }
+
+  btnTestVoiceSettings?.addEventListener('click', () => {
+    speakDetectionAnnouncement("Detection! 11 o'clock, 3 clicks");
+  });
 
   sliderHeatmapSens.addEventListener('input', (e) => {
     const sens = Number(e.target.value) || 60;
@@ -426,8 +504,12 @@ export async function initSidebarAndTopControls(videoEl) {
       btnRestoreUi.classList.toggle('hidden', !state.uiDecluttered);
     }
 
-    optionsPanel.classList.toggle('hidden', !state.optionsOpen);
-    btnToggleOptions.classList.toggle('radar-btn-active', state.optionsOpen);
+    // Fullscreen view visibility sync
+    if (screenSettings && screenLive) {
+      const isSettings = state.currentScreen === 'settings';
+      screenSettings.classList.toggle('hidden', !isSettings);
+      btnToggleOptions?.classList.toggle('radar-btn-active', isSettings);
+    }
     btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
     if (btnToggleOverlayTop) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
@@ -470,5 +552,19 @@ export async function initSidebarAndTopControls(videoEl) {
 
     btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
     btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
+
+    // Live Gamepad Connection & Action Telemetry in Settings
+    const gamepadStatusDot = document.getElementById('gamepadStatusDot');
+    const gamepadStatusText = document.getElementById('gamepadStatusText');
+    const gamepadActionText = document.getElementById('gamepadActionText');
+    if (gamepadStatusDot && gamepadStatusText) {
+      gamepadStatusDot.classList.toggle('connected', Boolean(state.gamepadConnected));
+      gamepadStatusText.textContent = state.gamepadConnected
+        ? (state.gamepadName.split('(')[0].trim() || 'Controller Connected')
+        : 'DISCONNECTED (PRESS ANY BUTTON)';
+    }
+    if (gamepadActionText && state.lastGamepadAction) {
+      gamepadActionText.textContent = state.lastGamepadAction;
+    }
   });
 }

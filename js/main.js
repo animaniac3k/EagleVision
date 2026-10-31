@@ -4,7 +4,7 @@
 import { appState, updateState } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';
 import { startCameraStream } from './camera/streamManager.js';
-import { initCompositor } from './renderer/compositor.js';
+import { initCompositor, initVoiceSynthesis } from './renderer/compositor.js';
 import { initOverlayManager } from './renderer/overlayManager.js';
 import { initZoomWindow } from './renderer/zoomWindow.js';
 import { startMemoryBuffer } from './recorder/memoryRingBuffer.js';
@@ -12,9 +12,14 @@ import { initInstantReplay } from './recorder/instantReplay.js';
 import { initHudController } from './ui/hudController.js';
 import { initSidebarAndTopControls } from './ui/sidebarControls.js';
 import { initVideoBrowser } from './ui/videoBrowser.js';
+import { initReticleScreen } from './ui/reticleScreen.js';
 import { initRingController } from './ui/ringController.js';
+import { initGamepadController } from './input/gamepadController.js';
 
 async function bootstrapApp() {
+  // Pre-initialize voice synthesis to discover female system voices immediately
+  initVoiceSynthesis();
+
   // 1. Restore saved user settings
   const saved = loadSavedSettings();
   if (saved) {
@@ -35,7 +40,9 @@ async function bootstrapApp() {
   initInstantReplay();
   await initSidebarAndTopControls(videoEl, mainCanvas);
   await initVideoBrowser();
+  initReticleScreen();
   initRingController();
+  initGamepadController();
 
   // 5. Start 20-Second Rolling In-Memory Video Buffer if enabled
   if (appState.bufferEnabled) {

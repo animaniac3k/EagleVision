@@ -56,58 +56,70 @@
     <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
       <div>
         <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC</div>
-        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">EAGLEVISION — MODULE STRUCTURE &amp; DATA PIPELINE</h1>
-        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App for ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop Execution • 5-Button BT Ring Enabled</p>
+        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">EAGLEVISION — 4-SCREEN MODULE STRUCTURE &amp; DATA PIPELINE</h1>
+        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • Female TTS &amp; PS4 Gamepad</p>
       </div>
       <div class="flex gap-3 font-mono text-xs">
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">HEATMAP &amp; RENDER</div>
-          <div class="text-base font-bold text-[#ccfbf1]">60 FPS + SHAKE GATE</div>
+          <div class="text-[#5eead4]">VOICE SYNTHESIS</div>
+          <div class="text-base font-bold text-[#ccfbf1]">FEMALE ROBOTIC TTS</div>
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">RAM RING BUFFER</div>
-          <div class="text-base font-bold text-[#2dd4bf]">5–60s @ 5–30 FPS (NATIVE RES)</div>
+          <div class="text-[#5eead4]">GAMEPAD CONTROLLER</div>
+          <div class="text-base font-bold text-[#2dd4bf]">PS4 DUALSHOCK 4 API</div>
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">REMOTE CONTROL</div>
-          <div class="text-base font-bold text-[#ccfbf1]">5-BTN BT RING</div>
+          <div class="text-[#5eead4]">REPLAY STEPPING</div>
+          <div class="text-base font-bold text-[#ccfbf1]">STEP -1 / STEP +1</div>
         </div>
       </div>
     </header>
 
+    <!-- 4-Screen Navigation Overview Banner -->
+    <div class="node-card p-4">
+      <div class="text-xs font-mono text-[#5eead4] uppercase tracking-wider mb-2 font-bold">APPLICATION SCREENS (currentScreen in js/state.js)</div>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
+        <div class="p-2.5 rounded bg-[#091a20] border border-[#2dd4bf]">
+          <span class="text-[#2dd4bf] font-bold">1. LIVE FEED (#screenLive)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">60fps viewport, floating icon strips, PiP magnifier &amp; 1-tap declutter mode.</p>
+        </div>
+        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
+          <span class="text-[#2dd4bf] font-bold">2. GALLERY (#screenGallery)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen native playback, STEP -1/+1, slow-mo, clips drawer &amp; .webm export.</p>
+        </div>
+        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
+          <span class="text-[#2dd4bf] font-bold">3. SETTINGS (#screenSettings)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen system &amp; sensor configuration, RAM meter, voice sliders, PS4 gamepad monitor.</p>
+        </div>
+        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
+          <span class="text-[#2dd4bf] font-bold">4. RETICLE (#screenReticle)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Interactive graduated crosshair customizer, click indents, POI gap &amp; tap-to-audition voice.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 3-Column Core Architecture Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-      <!-- COLUMN 1: Input & Central State -->
+      <!-- COLUMN 1: Input, Controllers & State -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">1. Input &amp; Reactive State</div>
-
-        <div class="node-card">
-          <div class="node-header">
-            <span>APP SHELL &amp; PWA</span>
-            <span class="badge">ROOT</span>
-          </div>
-          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">index.html</strong> — Screen 1 (Live) &amp; Screen 2 (Fullscreen Player)</div>
-            <div><strong class="text-[#ccfbf1]">js/main.js</strong> — Bootstraps modules, Ring Remote &amp; WakeLock</div>
-            <div><strong class="text-[#ccfbf1]">sw.js (v9) + manifest.json</strong> — Offline Service Worker</div>
-            <div><strong class="text-[#ccfbf1]">start_eaglevision.bat</strong> — Portable USB stick launcher</div>
-          </div>
-        </div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">1. Input, Gamepad &amp; Reactive State</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>USB CAMERA &amp; TEST FEED</span>
-            <span class="badge">/js/camera</span>
+            <span>PS4 / BT GAMEPAD CONTROLLER</span>
+            <span class="badge">/js/input</span>
           </div>
-          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">streamManager.js</strong></div>
+          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
+            <div><strong class="text-[#ccfbf1]">gamepadController.js</strong> — HTML5 Gamepad API</div>
             <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
-              <li>Enumerates UVC USB cameras via <code class="text-[#ccfbf1]">enumerateDevices()</code></li>
-              <li>Streams native 1920×1080 @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
-              <li>Pre-rendered 1080p radar test board fallback</li>
+              <li><strong class="text-[#ccfbf1]">Left Stick:</strong> Accelerated analog ROI crosshair steering</li>
+              <li><strong class="text-[#ccfbf1]">Right Stick:</strong> Smooth camera pan when zoomed (&gt;1.0x)</li>
+              <li><strong class="text-[#ccfbf1]">L1/R1:</strong> Stream Zoom Out / In • <strong class="text-[#ccfbf1]">L3/R3:</strong> Recenter / Reset</li>
+              <li><strong class="text-[#ccfbf1]">L2/R2:</strong> Step -1 / Step +1 Frame (Replay/Archive)</li>
+              <li><strong class="text-[#ccfbf1]">✕/○/□/△:</strong> Play/Pause, Back, Reticle, Heatmap</li>
+              <li><strong class="text-[#ccfbf1]">Options/Share:</strong> 20s Instant Replay / Open Settings</li>
             </ul>
-            <div class="pt-1"><strong class="text-[#ccfbf1]">streamStats.js</strong> — Live FPS &amp; resolution counter</div>
           </div>
         </div>
 
@@ -119,76 +131,83 @@
           <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
             <div class="text-[#2dd4bf] font-bold">Pub/Sub: updateState(patch) → subscribeState(fn)</div>
             <div class="grid grid-cols-2 gap-1.5 pt-1">
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• pipZoom / roiX,Y</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• overlayEnabled<br/>• opacity / scale</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens (10-95%)<br/>• heatmapDuration (0.5-10s)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• bufferMaxSeconds<br/>• bufferTargetFps</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• themeColor<br/>• uiOpacity (15-100%)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• ringKeyMap (5-Btn)<br/>• GPU image filters</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• currentScreen (1..4)<br/>• mainZoom / Pan</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• reticleConfig (Clicks/Gap)<br/>• overlayScale</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSpeechEnabled<br/>• voicePitch / voiceRate</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens &amp; Duration<br/>• bufferMaxSec / FPS</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• gamepadConnected<br/>• lastGamepadAction</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• ringKeyMap (5-Btn)<br/>• uiOpacity (15-100%)</div>
             </div>
             <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
           </div>
         </div>
+
+        <div class="node-card">
+          <div class="node-header">
+            <span>USB CAMERA &amp; TEST FEED</span>
+            <span class="badge">/js/camera</span>
+          </div>
+          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
+            <div><strong class="text-[#ccfbf1]">streamManager.js</strong> &amp; <strong class="text-[#ccfbf1]">streamStats.js</strong></div>
+            <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
+              <li>Enumerates UVC USB cameras via <code class="text-[#ccfbf1]">enumerateDevices()</code></li>
+              <li>Streams native 1920×1080 @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
+              <li>Pre-rendered 1080p radar test board fallback</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
-      <!-- COLUMN 2: 60fps Renderer, Micro-Change Heatmap & Overlays -->
+      <!-- COLUMN 2: 60fps Renderer, Heatmap, Reticle & Female TTS -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. 60FPS Dual-Canvas, Heatmap &amp; Overlays</div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. Compositor, Heatmap &amp; Female Voice TTS</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>DUAL-CANVAS + HEATMAP ENGINE</span>
+            <span>DUAL-CANVAS + HEATMAP + TTS</span>
             <span class="badge">compositor.js</span>
           </div>
           <div class="p-4 text-xs space-y-3 font-mono">
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
               <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Heatmap</div>
-              <div class="text-[#99f6e4]">• 160×90 luma grid with <strong class="text-[#ccfbf1]">&gt;18% Global Motion Rejection</strong> (ignores camera shake)</div>
-              <div class="text-[#99f6e4]">• Adjustable <strong class="text-[#ccfbf1]">Sensitivity (10–95%)</strong> &amp; <strong class="text-[#ccfbf1]">Display Duration (0.5–10s)</strong></div>
+              <div class="text-[#99f6e4]">• 160×90 luma grid with <strong class="text-[#ccfbf1]">&gt;18% Global Shake Rejection</strong></div>
+              <div class="text-[#99f6e4]">• Sensitivity (10–95%) &amp; Duration (1s to <strong class="text-[#ccfbf1]">Infinity ∞</strong>)</div>
               <div class="text-[#99f6e4]">• Aspect-correct 1.0x–8.0x digital zoom &amp; touch pan</div>
             </div>
 
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">B. Digital Zoom Window (#pipCanvas)</div>
-              <div class="text-[#99f6e4]">• Samples source around decoupled ROI Crosshair <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
+              <div class="text-sm font-bold text-[#2dd4bf]">B. Female Robotic Speech Announcements</div>
+              <div class="text-[#99f6e4]">• <code class="text-[#ccfbf1]">announceHeatmapDetection()</code> calculates angle from center</div>
+              <div class="text-[#99f6e4]">• Computes distance in graduated <strong class="text-[#ccfbf1]">clicks</strong> via reticle scale</div>
+              <div class="text-[#99f6e4]">• Speech phrase: <code class="text-[#5eead4]">"Detection! 11 o'clock, 3 clicks"</code></div>
+              <div class="text-[#99f6e4]">• Local Web Speech API with pitch 1.25x &amp; female voice filter</div>
+            </div>
+
+            <div class="p-3 rounded bg-[#091a20] border border-[#1b4d57] space-y-1">
+              <div class="text-sm font-bold text-[#2dd4bf]">C. Digital Zoom Window (#pipCanvas)</div>
+              <div class="text-[#99f6e4]">• Samples region centered on <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
               <div class="text-[#99f6e4]">• Scales crop by <code class="text-[#ccfbf1]">(cropW * (pw/cw)) / pipZoom</code> + overlays Heatmap</div>
             </div>
-
-            <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-              <strong class="text-[#ccfbf1]">imageFilters.js</strong> → GPU CSS <code class="text-[#5eead4]">canvas.style.filter</code>
-            </div>
           </div>
         </div>
 
-        <div class="node-card">
+        <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>ZOOM WINDOW &amp; ROI TARGET</span>
-            <span class="badge">zoomWindow.js</span>
+            <span>GRADUATED RETICLE &amp; CALIBRATION</span>
+            <span class="badge">overlayManager + reticleScreen</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Touch-draggable or BT-Ring-steered <strong class="text-[#ccfbf1]">#zoomTargetCrosshair</strong></div>
-            <div>• Top-Left PiP toggle &amp; header ROI toggle share the POI target reticle icon</div>
-            <div>• Bottom-Left &amp; Bottom-Right Corner Resize handles</div>
-            <div>• Automatic viewport boundary clamping on window resize</div>
-          </div>
-        </div>
-
-        <div class="node-card">
-          <div class="node-header">
-            <span>OPEN-CENTER CROSSHAIR &amp; IMG</span>
-            <span class="badge">overlayManager.js</span>
-          </div>
-          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Unobstructed <strong class="text-[#ccfbf1]">Open-Center Crosshair</strong> (64×64px center gap + bracket ticks, no outer circle)</div>
-            <div>• Custom local PNG / SVG / WebP image upload (<code class="text-[#ccfbf1]">LOAD IMG</code>)</div>
-            <div>• Quick On/Off button on Top-Left Bar (<code class="text-[#2dd4bf]">#btnToggleOverlayTop</code>) &amp; in Settings</div>
+            <div>• <strong class="text-[#ccfbf1]">buildGraduatedCrosshairSvg()</strong> creates dynamic SVG</div>
+            <div>• Configurable: clicks per arm (2-25), spacing px, center gap px, major tick interval, number labels &amp; concentric rings</div>
+            <div>• <strong class="text-[#ccfbf1]">getClickDistanceInPixels()</strong> exports exact on-screen click pixel distance for TTS announcements</div>
+            <div>• Interactive audition stage: click anywhere on reticle to test female voice</div>
           </div>
         </div>
       </div>
 
-      <!-- COLUMN 3: Configurable Native-Res RAM Buffer, Replay & Fullscreen Player -->
+      <!-- COLUMN 3: Native-Res RAM Buffer, Replay & Fullscreen Player -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. Native-Res RAM Buffer &amp; Fullscreen Player</div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. RAM Buffer, Replay &amp; Frame Stepping</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
@@ -209,36 +228,38 @@
             <span class="badge">instantReplay.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button or Bluetooth Ring Double-Press (<strong class="text-[#2dd4bf]">●●</strong>)</div>
+            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button or PS4 Options or BT Ring</div>
             <div>• Streams Blob ObjectURLs onto native-resolution <code class="text-[#ccfbf1]">#replayCanvas</code></div>
-            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> the native-resolution clip to IndexedDB</div>
+            <div>• <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong> frame stepping buttons</div>
+            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> native-resolution clip to IndexedDB</div>
           </div>
         </div>
 
         <div class="node-card">
           <div class="node-header">
-            <span>FULLSCREEN STORED VIDEO PLAYER</span>
+            <span>STORED VIDEO PLAYER (SCREEN 2)</span>
             <span class="badge">videoStore + videoBrowser</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
             <div>• <strong class="text-[#ccfbf1]">100% Fullscreen</strong> <code class="text-[#5eead4]">#galleryPlayerCanvas</code> with floating GUI overlay</div>
-            <div>• Collapsible left <code class="text-[#ccfbf1]">CLIPS</code> drawer + floating transport bar (Play/Pause, 0.5x Slow-Mo, STEP +1)</div>
-            <div>• <strong class="text-[#2dd4bf]">EXPORT</strong> encodes &amp; downloads a native-resolution <code class="text-[#ccfbf1]">.webm</code> file</div>
+            <div>• Dual frame stepping: <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong></div>
+            <div>• Collapsible left <code class="text-[#ccfbf1]">CLIPS</code> drawer + 0.5x Slow-Mo &amp; video zoom/pan</div>
+            <div>• <strong class="text-[#2dd4bf]">EXPORT</strong> encodes &amp; downloads native-resolution <code class="text-[#ccfbf1]">.webm</code></div>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Bottom UI, Global Opacity & 5-Button Bluetooth Ring Bar -->
+    <!-- Bottom UI, Global Opacity & Controllers Bar -->
     <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
       <div>
-        <span class="text-[#2dd4bf] font-bold">TOP-LEFT TOOLBAR &amp; GLOBAL OPACITY (sidebarControls.js):</span>
-        <span class="text-[#99f6e4] ml-2">Settings Toggle • PiP Zoom Window (POI Icon) • Overlay Guide On/Off • Heatmap Toggle • Telemetry HUD • Whole-Image Zoom Pod (− / 1.0x / + / 1:1). Global <strong class="text-[#ccfbf1]">Interface Opacity</strong> slider (15%–100%, <code class="text-[#5eead4]">--ui-opacity</code>) fades all UI chrome together.</span>
+        <span class="text-[#2dd4bf] font-bold">TOP-LEFT TOOLBAR &amp; SCREEN NAVIGATION (sidebarControls.js):</span>
+        <span class="text-[#99f6e4] ml-2">Settings Screen Toggle (⚙) • PiP Zoom Window (POI Icon) • Overlay Reticle Toggle • Heatmap Toggle • Telemetry HUD • Whole-Image Zoom Pod (− / 1.0x / + / 1:1). Global <strong class="text-[#ccfbf1]">Interface Opacity</strong> slider (15%–100%, <code class="text-[#5eead4]">--ui-opacity</code>) fades all UI chrome together.</span>
       </div>
       <div>
-        <span class="text-[#2dd4bf] font-bold">5-BUTTON BLUETOOTH RING REMOTE (ringController.js):</span>
-        <span class="text-[#99f6e4] ml-2">Single-Press <strong class="text-[#ccfbf1]">● CENTER</strong> cycles Live Modes (<code class="text-[#5eead4]">AIM ROI</code> → <code class="text-[#5eead4]">ZOOM</code> → <code class="text-[#5eead4]">TOOLS</code>) • Double-Press <strong class="text-[#ccfbf1]">●● CENTER</strong> triggers Instant Replay • Automatic <code class="text-[#5eead4]">PLAYER</code> transport mode in Replay/Archive • Built-in 5-Button D-Pad calibration in Settings.</span>
+        <span class="text-[#2dd4bf] font-bold">DUAL CONTROLLER SUPPORT (PS4 Gamepad &amp; 5-Button BT Ring):</span>
+        <span class="text-[#99f6e4] ml-2">PS4 DualShock 4 provides analog stick crosshair steering, camera pan, zoom, frame stepping, and live telemetry in Settings. 5-Button BT Ring provides mode cycling (<code class="text-[#5eead4]">AIM ROI</code> → <code class="text-[#5eead4]">ZOOM</code> → <code class="text-[#5eead4]">TOOLS</code>) and instant replay double-click.</span>
       </div>
     </div>
   </div>

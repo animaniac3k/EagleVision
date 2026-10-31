@@ -13,41 +13,51 @@ cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provide
 
   - 100% Full-Screen Camera Viewport with minimal UI footprint
   - Touch-first controls (52px hit targets, 16px-18px high-contrast typography)
-  - Top-Left Unified Toolbar: Settings Toggle, PiP Zoom Window Toggle (POI icon),
-    Overlay Guide On/Off Toggle, Micro-Change Heatmap Toggle, Telemetry HUD Toggle,
-    and the Whole-Image Zoom Stepper (- / 1.0x / + / 1:1) at the end of the strip
-  - Dynamic Radar/Instrument Appearance Engine:
-      * 6 tactical color swatches + live 2D color picker (HSL CSS token engine)
-      * Global Interface Opacity slider (15%-100%, `--ui-opacity`) that fades all
-        floating UI panels, strips, and windows in and out together
-  - Movable, Corner-Resizable Digital Zoom Window (PiP Magnifier) with a
-    decoupled, hideable ROI Target Crosshair
-  - Simplified Superimposed Overlay Guide:
-      * Unobstructed Open-Center Crosshair (64x64px center gap with inner bracket
-        ticks and no outer circle so the point of interest is never obscured)
-      * Custom local image loader (`LOAD IMG` for PNG/SVG/WebP guides)
+  - Declutter Mode: Hide all interface chrome with one tap; single restore icon
+  - Top-Left Unified Toolbar: Settings Screen Shortcut, PiP Zoom Window Toggle,
+    Overlay Reticle Toggle, Micro-Change Heatmap Toggle, Telemetry HUD Toggle,
+    and Whole-Image Zoom Stepper (- / 1.0x / + / 1:1)
+  - Dedicated Fullscreen Settings Screen (Screen 3):
+      * Clean multi-column tactical grid for camera source, memory buffer,
+        reticle overlay, heatmap & voice callouts, PS4 gamepad, image filters,
+        theme color & global opacity, and Bluetooth ring calibration
+  - Dedicated Fullscreen Reticle Customizer & Click Calibration (Screen 4):
+      * Live interactive SVG graduated reticle with configurable clicks/indents per arm,
+        click pixel spacing, unobstructed center gap for POI, center brackets, major ticks,
+        number labels, concentric distance rings, and stroke weight
+      * Interactive audition stage: click anywhere on the reticle stage to simulate detection
+        and audition female robotic voice announcements
+  - Female Voice Detection Announcements (Text-to-Speech):
+      * Zero-dependency local Web Speech API synthesis
+      * Speaks angle (1 to 12 o'clock) and distance in graduated reticle clicks:
+        e.g., "Detection! 11 o'clock, 3 clicks"
+      * Dynamically adapts to custom reticle spacing and user overlay zoom scale
+      * Configurable voice pitch (female tone) and speech speed
+  - PS4 / Bluetooth Gamepad Support (HTML5 Gamepad API):
+      * Silent background controller integration for Sony DualShock 4 and standard gamepads
+      * Left Analog Stick: Smooth accelerated ROI crosshair aiming
+      * Right Analog Stick: Smooth camera pan when zoomed in (>1.0x)
+      * L1 / R1: Zoom In / Out; L2 / R2: Step -1 / +1 Frame
+      * L3 / R3: Recenter ROI / Reset 1:1 Zoom
+      * D-Pad: Zoom Window magnification & Main Zoom / Step
+      * Cross (X): Play/Pause / Mode; Circle (O): Return to Live Feed
+      * Square: Reticle Toggle; Triangle: Heatmap Toggle
+      * Options: 20s Instant Replay (Auto-Save); Share: Settings Screen
   - Localized Micro-Change Heatmap Engine:
-      * Highlights subtle, localized changes in high-contrast thermal/radar colors
-      * Global Motion Gate (>18% whole-frame change) rejects camera shake/panning
-      * Adjustable Sensitivity (10%-95%) and Display Duration (0.5s-10.0s)
-  - Native-Resolution Configurable In-Memory Frame Ring Buffer:
-      * Adjustable Duration (5s-60s) and Frame Rate (5-30 FPS) in RAM
-      * Live Memory Availability Meter (USED MB vs. ESTIMATED MB vs. FREE RAM Budget)
-  - One-Tap Instant Replay with Auto-Save to IndexedDB Archive
+      * High-contrast thermal markings for subtle motion; global motion gate rejects camera shake
+      * Configurable sensitivity and display duration (custom seconds up to infinity ∞)
+  - Native-Resolution In-Memory Video Buffer (5s-60s @ 5-30 FPS) with live RAM meter
+  - One-Tap Instant Replay with Auto-Save to IndexedDB Archive and Step -1 / +1 frame buttons
   - Fullscreen Stored Video Player (Screen 2) with floating GUI overlay, collapsible
-    Clips drawer, 0.5x slow-motion, STEP +1 frame advance, and native-resolution
-    .webm file export to disk
-  - 5-Button Bluetooth Scrolling Ring Remote Controller (`ringController.js`) with
-    mode cycling (`AIM ROI` -> `ZOOM` -> `TOOLS` + automatic `PLAYER` transport),
-    double-click Instant Replay, and live 5-button calibration in Settings
+    Clips drawer, 0.5x slow-motion, dual STEP -1 / STEP +1 frame buttons, and native-res .webm export
 
 
 2. DIRECTORY & MODULE STRUCTURE
 -------------------------------
 /EagleVision
-├── index.html                        # Main app shell (Screen 1: Live, Screen 2: Fullscreen Player)
+├── index.html                        # App shell (Screens: 1 Live, 2 Gallery, 3 Settings, 4 Reticle)
 ├── manifest.json                     # PWA manifest (standalone, landscape)
-├── sw.js                             # Network-first Service Worker (eaglevision-v9)
+├── sw.js                             # Network-first Service Worker (eaglevision-v11)
 ├── start_eaglevision.bat             # One-click portable USB launcher for Windows
 ├── README.md                         # Quickstart & portable usage instructions
 ├── /docs
@@ -59,31 +69,34 @@ cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provide
 │       └── icon.svg                  # Vector radar reticle PWA icon
 ├── /css
 │   ├── variables.css                 # Dynamic --radar-* HSL properties & --ui-opacity
-│   ├── layout.css                    # Full-screen layout, floating strips, draggable panels
+│   ├── layout.css                    # Screens 1-4 layout, floating strips, settings grid, reticle stage
 │   ├── viewport.css                  # Main canvas, PiP window, corner resize handles, ROI
-│   ├── controls.css                  # Touch buttons, sliders, memory meter, ring D-pad
+│   ├── controls.css                  # Touch buttons, sliders, memory meter, ring D-pad, gamepad telemetry
 │   └── gallery.css                   # Fullscreen Stored Video Player & floating drawer/bar
 └── /js
-    ├── main.js                       # Application bootstrap, WakeLock & Service Worker init
-    ├── state.js                      # Central reactive pub/sub state store (appState)
+    ├── main.js                       # Application bootstrap, WakeLock, Gamepad & Reticle init
+    ├── state.js                      # Central reactive state store (appState)
     ├── /camera
     │   ├── streamManager.js          # USB camera enumeration, hot-plug & 1080p test signal
     │   └── streamStats.js            # Real-time FPS & resolution telemetry tracker
+    ├── /input
+    │   └── gamepadController.js      # PS4 / Bluetooth gamepad integration via HTML5 Gamepad API
     ├── /renderer
-    │   ├── compositor.js             # 60fps dual-canvas renderer + Micro-Change Heatmap
+    │   ├── compositor.js             # Dual-canvas renderer + Heatmap + Female voice speech synthesis
     │   ├── zoomWindow.js             # Draggable ROI crosshair, resizable PiP & resize clamp
     │   ├── imageFilters.js           # GPU CSS filter string builder
-    │   └── overlayManager.js         # Open-center crosshair SVG & custom image overlay
+    │   └── overlayManager.js         # Dynamic graduated reticle generator & click distance math
     ├── /recorder
     │   ├── memoryRingBuffer.js       # Native-resolution configurable RAM JPEG ring buffer
-    │   └── instantReplay.js          # Native-res RAM replay player + automatic archive save
+    │   └── instantReplay.js          # Native-res RAM replay player + Step -1/+1 + automatic archive save
     ├── /storage
     │   ├── videoStore.js             # IndexedDB CRUD for frame archives + native .webm export
-    │   └── settingsStore.js          # LocalStorage persistence for user UI & ring settings
+    │   └── settingsStore.js          # LocalStorage persistence for user UI, reticle & voice settings
     └── /ui
         ├── hudController.js          # Toggleable live telemetry overlay
-        ├── sidebarControls.js        # Top-left controls, settings, memory meter, UI opacity
-        ├── videoBrowser.js           # Fullscreen Stored Video Player & collapsible drawer
+        ├── sidebarControls.js        # Settings screen controller, memory meter, UI opacity, voice audition
+        ├── reticleScreen.js          # Fullscreen Reticle Customizer & Click Calibration controller
+        ├── videoBrowser.js           # Fullscreen Stored Video Player & Step -1/+1 frame controls
         └── ringController.js         # 5-button Bluetooth scrolling ring remote & calibrator
 
 
@@ -91,72 +104,48 @@ cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provide
 ------------------------------------
 
 3.1 Central Reactive State (js/state.js)
-  - Holds the single source of truth (`appState`) for main/PiP zoom levels, ROI
-    target coordinates (`roiX`, `roiY`), overlay guide state, image adjustments,
-    heatmap sensitivity & display duration (`heatmapDuration`), memory ring buffer
-    duration/FPS (`bufferMaxSeconds`, `bufferTargetFps`), global interface opacity
-    (`uiOpacity`), theme color (`themeColor`), and custom Bluetooth ring bindings.
-  - Modules call `updateState(patch)` to mutate state and `subscribeState(fn)`
-    to reactively update DOM elements or rendering parameters.
+  - Holds the single source of truth (`appState`) for all screens (`currentScreen`: 'live' | 'gallery' | 'settings' | 'reticle'),
+    zoom levels, ROI target `(roiX, roiY)`, overlay state, reticle configuration (`reticleConfig`),
+    heatmap sensitivity, duration (`heatmapDuration`), speech announcements (`heatmapSpeechEnabled`),
+    voice settings (`voicePitch`, `voiceRate`), gamepad telemetry, and ring bindings.
+  - Subscribed modules react immediately to state updates via `subscribeState(fn)`.
 
-3.2 USB Camera & Pre-Rendered Test Signal (js/camera/streamManager.js)
-  - Queries `navigator.mediaDevices.enumerateDevices()` for USB/UVC video inputs
-    and listens to `devicechange` for plug-and-play detection.
-  - Requests 1920x1080 @ 60fps via `getUserMedia` and feeds `<video id="cameraVideoEl">`.
-  - If no camera is connected (or "BUILT-IN TEST SIGNAL" is chosen), pre-renders
-    a static 1080p inspection board onto an offscreen bitmap and animates a radar
-    scanline and timecode at 30fps with near-zero CPU overhead.
+3.2 Graduated Reticle & Click Distance Math (js/renderer/overlayManager.js)
+  - Renders dynamic graduated reticle SVG based on `appState.reticleConfig`:
+      * `clickCount`: indents per arm (2 to 25)
+      * `clickSpacing`: pixel distance between clicks
+      * `centerGap`: unobstructed central viewport area
+      * `innerBrackets`: bounding POI crosshair brackets
+      * `majorInterval`: longer tick lines every N clicks
+      * `showLabels`: click distance number markings
+      * `concentricRings`: circular distance rings
+  - Exports `getClickDistanceInPixels(viewportW, viewportH, overlayScale)` to calculate
+    the physical on-screen pixel distance represented by 1 click, factoring both SVG viewBox
+    scaling and user overlay scale.
 
-3.3 60fps Dual-Canvas Compositor & Localized Micro-Change Heatmap (js/renderer/compositor.js)
-  - Runs a `requestAnimationFrame` loop that reads `<video id="cameraVideoEl">`
-    and draws aspect-correct, pan/zoom-cropped frames onto `#mainCanvas`.
-  - Simultaneously renders the magnified region centered on `(roiX, roiY)` onto
-    `#pipCanvas`, scaled relative to the main canvas pixel ratio (`(cropW * (pw / cw)) / pipZoom`)
-    so `3.0x` in the Zoom Window is physically 3.0x larger on screen.
-  - Localized Micro-Change Heatmap:
-      * Samples a fast 160x90 luminance grid each frame.
-      * Global Motion Gate: if >18% of cells change simultaneously (camera movement),
-        immediately re-anchors `refLuma` and suppresses global heatmap spikes.
-      * Localized changes accumulate thermal intensity and decay exponentially
-        using `Math.exp((-2.545 * dtSec) / heatmapDuration)` so markings persist
-        on screen for the exact user-selected Display Duration (0.5s to 10.0s).
+3.3 Female Voice Text-To-Speech Detection Announcements (js/renderer/compositor.js)
+  - `announceHeatmapDetection(detections, cw, ch)`:
+      * Finds the strongest cluster of localized motion from the heatmap grid.
+      * Calculates clockwise angle from the reticle center (0.5, 0.5) in 12 clock hours.
+      * Calculates Euclidean distance in clicks using `getClickDistanceInPixels()`.
+      * Generates phrases such as: "Detection! 11 o'clock, 3 clicks".
+  - `speakDetectionAnnouncement(text)`:
+      * Dispatches `SpeechSynthesisUtterance` via local browser speech engine.
+      * Auto-selects English female voices (e.g. Zira, Samantha, Victoria, Google UK English Female).
+      * Applies robotic/crisp female pitch (default 1.25x) and speed (1.10x).
+      * Debounces repeat alerts to prevent audio chatter.
 
-3.4 Decoupled ROI Crosshair & Corner-Resizable Zoom Window (js/renderer/zoomWindow.js)
-  - `#zoomTargetCrosshair` can be dragged by touch or nudged via the 5-button
-    Bluetooth ring to update `(roiX, roiY)`, and toggled via the POI reticle button
-    inside the Zoom Window header.
-  - `#pipZoomWindow` can be dragged or resized from its bottom-left (`#pipResizeSW`)
-    or bottom-right (`#pipResizeSE`) corner handle, and is clamped within viewport
-    bounds on window resize.
+3.4 PS4 / Bluetooth Gamepad Controller (js/input/gamepadController.js)
+  - Polled every animation frame using HTML5 `navigator.getGamepads()`.
+  - Analog stick deadzone filtering (0.16) and non-linear acceleration for precision ROI crosshair steering.
+  - Silently operates without modifying the screen unless buttons are triggered.
+  - Live connection status dot, device name, and last action are displayed in Settings.
 
-3.5 Open-Center Crosshair & Custom Image Overlay (js/renderer/overlayManager.js)
-  - Toggled from either the Top-Left bar (`#btnToggleOverlayTop`) or Settings (`#btnToggleOverlay`).
-  - Renders a pure Open-Center Crosshair (horizontal and vertical arms with a 64x64px
-    center gap and 4 inner bracket ticks, with no circular ring) or a user-loaded
-    image (`LOAD IMG`), with adjustable Opacity and Scale.
-
-3.6 Native-Resolution Configurable In-Memory Ring Buffer (js/recorder/memoryRingBuffer.js)
-  - Captures frames at the camera's exact native resolution (`videoWidth x videoHeight`)
-    at `bufferTargetFps` (5-30 FPS) for `bufferMaxSeconds` (5s-60s).
-  - Stores compressed JPEG `ArrayBuffer`s in RAM and exposes a live memory budget
-    meter (`getAvailableMemoryBudgetMB()`, `getEstimatedBufferMB()`) in Settings.
-
-3.7 Auto-Saving Instant Replay & Fullscreen Video Player (instantReplay.js, videoBrowser.js)
-  - Pressing `REPLAY` (or double-pressing the Bluetooth Ring Center button) snapshots
-    the RAM ring buffer, plays it at native resolution using lightweight `Blob`
-    ObjectURLs and a single `HTMLImageElement` decoder, and automatically saves
-    the clip into IndexedDB (`EagleVisionVideoDB`).
-  - Screen 2 (`#screenGallery`) renders saved clips at 100% fullscreen with a
-    floating GUI overlay (collapsible left `CLIPS` drawer + bottom transport bar
-    with `PLAY/PAUSE`, `0.5x` slow-mo, `STEP +1`, scrubber, and native-resolution
-    `.webm` export).
-
-3.8 5-Button Bluetooth Scrolling Ring Remote (js/ui/ringController.js)
-  - Listens for Keyboard (`Arrow*`, `Page*`, `Enter`, `Space`), Consumer Media
-    (`AudioVolume*`, `MediaTrack*`, `MediaPlayPause`), and `Wheel` events.
-  - Single-press `CENTER` cycles Live modes (`AIM ROI` -> `ZOOM` -> `TOOLS`);
-    double-press `CENTER` triggers Instant Replay anywhere.
-  - Includes a 5-button D-pad calibration card (`BT Ring Remote`) in Settings.
+3.5 Native Dual-Direction Frame Stepping (instantReplay.js, videoBrowser.js)
+  - Both Instant Replay and Saved Video Gallery provide:
+      * `STEP -1`: Steps backward exactly 1 frame (`playheadSec - frameStepSec`).
+      * `STEP +1`: Steps forward exactly 1 frame (`playheadSec + frameStepSec`).
+      * Pauses playback automatically and re-renders the exact decoded frame immediately.
 
 
 4. PORTABLE USAGE GUIDE (USB STICK / LAPTOP / CHROMEBOOK)
@@ -168,6 +157,5 @@ Option A: Running Directly from a USB Stick on Any Laptop (Windows / Mac / Linux
      `http://localhost:8080` in Chrome, Edge, or Brave.
 
 Option B: Installing as a 100% Offline App on Lenovo Duet 3 / Laptop
-  1. Open the app URL in Chrome and click the "Install EagleVision" icon in the
-     address bar.
+  1. Open `http://localhost:8080` in Chrome and click "Install EagleVision" in the address bar.
   2. Once installed, launch EagleVision from the app shelf anytime 100% offline.

@@ -11,6 +11,87 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
+import { getClickDistanceInPixels, getCenterGapDistanceInPixels } from './overlayManager.js';
+
+let cachedFemaleVoice = null;
+
+export function pickFemaleVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || !voices.length) return null;
+
+  const femaleKeywords = [
+    'female', 'zira', 'samantha', 'victoria', 'karen', 'moira',
+    'fiona', 'tessa', 'susan', 'hazel', 'catherine', 'helena',
+    'natural (female)', 'google uk english female', 'google us english female',
+    'jenny', 'aria', 'ava', 'en-us-x-sfg#female', 'en-us-x-tpd#female'
+  ];
+
+  // Try matching keywords in English voices first
+  for (const kw of femaleKeywords) {
+    const v = voices.find((voice) =>
+      voice.lang.startsWith('en') &&
+      (voice.name.toLowerCase().includes(kw) || voice.voiceURI.toLowerCase().includes(kw))
+    );
+    if (v) {
+      cachedFemaleVoice = v;
+      return v;
+    }
+  }
+
+  // Next, try any voice matching female keyword regardless of language
+  for (const kw of femaleKeywords) {
+    const v = voices.find((voice) =>
+      voice.name.toLowerCase().includes(kw) || voice.voiceURI.toLowerCase().includes(kw)
+    );
+    if (v) {
+      cachedFemaleVoice = v;
+      return v;
+    }
+  }
+
+  // Fallback to any English voice
+  const enVoice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
+  cachedFemaleVoice = enVoice;
+  return enVoice;
+}
+
+export function initVoiceSynthesis() {
+  if (!('speechSynthesis' in window)) return;
+  pickFemaleVoice();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      pickFemaleVoice();
+    };
+  }
+  window.speechSynthesis.addEventListener?.('voiceschanged', () => {
+    pickFemaleVoice();
+  });
+}
+
+// Immediately trigger voice discovery in browser
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  initVoiceSynthesis();
+}
+
+export function speakDetectionAnnouncement(phrase) {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(phrase);
+    if (!cachedFemaleVoice) {
+      pickFemaleVoice();
+    }
+    if (cachedFemaleVoice) {
+      utter.voice = cachedFemaleVoice;
+    }
+    utter.pitch = Number(appState.voicePitch) || 1.25;
+    utter.rate = Number(appState.voiceRate) || 1.1;
+    window.speechSynthesis.speak(utter);
+  } catch (err) {
+    console.warn('Speech synthesis error:', err);
+  }
+}
 
 const HEAT_W = 160;
 const HEAT_H = 90;
@@ -54,39 +135,35 @@ export function initCompositor(videoEl) {
     // Ignore if detection is outside the currently visible main viewport
     if (detViewX < 0 || detViewX > 1 || detViewY < 0 || detViewY > 1) return;
 
-    // Reference origin: where the zoomed-in ROI target is pointing (appState.roiX, appState.roiY)
-    const aspect = ch > 0 ? cw / ch : 1.6;
-    const dx = (detViewX - appState.roiX) * aspect;
-    const dy = detViewY - appState.roiY;
-    const dist = Math.hypot(dx, dy);
+    // Center of main reticle (center of screen viewport: 0.5, 0.5)
+    const dx = (detViewX - 0.5) * cw;
+    const dy = (detViewY - 0.5) * ch;
+    const distPx = Math.hypot(dx, dy);
 
-    // 1 tick = 8% of viewport height (approx 1 ROI reticle radius)
-    const ticks = Math.round(dist / 0.08);
-    let phrase = '';
-    let hudSummary = '';
+    // Dynamic pixel distance of 1 click/indent & center gap based on reticle config & overlay scale
+    const clickPx = getClickDistanceInPixels(cw, ch, appState.overlayScale);
+    const gapHalfPx = getCenterGapDistanceInPixels(cw, ch, appState.overlayScale);
 
-    if (ticks <= 0) {
-      phrase = 'Detection, on target';
-      hudSummary = '🔊 ON TARGET';
-    } else {
-      // Clock angle: 0 deg = 12 o'clock (up, -dy), 90 deg = 3 o'clock (+dx)
-      const angleDeg = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
-      const clockHour = Math.round(angleDeg / 30) || 12;
-      const tickWord = ticks === 1 ? 'tick' : 'ticks';
-      phrase = `Detection, ${clockHour} o'clock, ${ticks} ${tickWord}`;
-      hudSummary = `🔊 ${clockHour} O'CLOCK • ${ticks} ${tickWord.toUpperCase()}`;
+    let clicks = 0;
+    if (distPx > gapHalfPx + clickPx * 0.35) {
+      clicks = Math.max(1, Math.round((distPx - gapHalfPx) / Math.max(1, clickPx)));
     }
+
+    // Clock angle from center: 0 deg = 12 o'clock (-dy), 90 deg = 3 o'clock (+dx)
+    const angleDeg = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+    let clockHour = Math.round(angleDeg / 30);
+    if (clockHour === 0) clockHour = 12;
+
+    const clickWord = clicks === 1 ? 'click' : 'clicks';
+    const phrase = clicks === 0
+      ? 'Detection! Center'
+      : `Detection! ${clockHour} o'clock, ${clicks} ${clickWord}`;
+    const hudSummary = clicks === 0
+      ? '🔊 DETECTION: CENTER'
+      : `🔊 ${clockHour} O'CLOCK • ${clicks} ${clickWord.toUpperCase()}`;
 
     lastSpeechTimeMs = now;
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(phrase);
-      utter.rate = 1.15;
-      utter.pitch = 1.0;
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // Ignore speech synthesis errors on restricted platforms
-    }
+    speakDetectionAnnouncement(phrase);
 
     const ringActionText = document.getElementById('ringActionText');
     if (ringActionText) {

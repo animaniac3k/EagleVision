@@ -96,9 +96,10 @@
           </svg>
         </button>
 
-        <button id="btnToggleOptions" class="radar-btn radar-btn-active" title="Show / Hide Settings Window">
+        <button id="btnToggleOptions" class="radar-btn" title="Open System & Settings Screen">
           <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
           </svg>
         </button>
 
@@ -153,205 +154,6 @@
         </button>
       </nav>
 
-      <!-- MOVABLE & COLLAPSIBLE SETTINGS WINDOW -->
-      <aside id="optionsPanel">
-        <header id="optionsDragHandle" class="panel-header">
-          <div class="panel-title">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/>
-            </svg>
-            <span>SETTINGS</span>
-          </div>
-          <button id="btnCloseOptionsInner" class="radar-btn radar-btn-sm" title="Hide Settings">✕</button>
-        </header>
-
-        <div class="panel-body">
-          <!-- 1. USB Camera Source -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <label for="cameraSelect" class="settings-label">Camera Source</label>
-              <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" title="Rescan USB Cameras">↻</button>
-            </div>
-            <select id="cameraSelect" class="radar-select"></select>
-          </div>
-
-          <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Memory Recording</span>
-              <span id="valBufferResolution" class="slider-val" style="font-size:13px;">1920×1080</span>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Buffer Duration</span>
-                <span id="valBufferDuration" class="slider-val">20s</span>
-              </div>
-              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Frame Rate</span>
-                <span id="valBufferFps" class="slider-val">15 FPS</span>
-              </div>
-              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
-            </div>
-
-            <!-- Live Memory Availability & Requirement Meter -->
-            <div class="memory-meter-box">
-              <div class="memory-meter-labels">
-                <span id="memUsedLabel">USED: 0.0 MB</span>
-                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
-              </div>
-              <div class="memory-bar-track">
-                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
-                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. Superimpose Overlay Guide (Simplified: Open-Center Crosshair + Load Image Only) -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Overlay Guide</span>
-              <button id="btnToggleOverlay" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-            </div>
-
-            <div class="overlay-grid">
-              <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">CROSSHAIR</button>
-              <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
-            </div>
-            <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Opacity</span>
-                <span id="valOvOpacity" class="slider-val">75%</span>
-              </div>
-              <input id="sliderOvOpacity" type="range" min="10" max="100" value="75" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Guide Scale</span>
-                <span id="valOvScale" class="slider-val">100%</span>
-              </div>
-              <input id="sliderOvScale" type="range" min="25" max="200" value="100" class="radar-slider" />
-            </div>
-          </div>
-
-          <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration (up to 60s) & Voice Callout -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Heatmap Config</span>
-              <button id="btnToggleHeatmapSpeech" class="radar-btn radar-btn-sm" title="Announce Heatmap Detections via Speech (Clock Direction & Ticks from ROI Target)">VOICE: OFF</button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Sensitivity</span>
-                <span id="valHeatmapSens" class="slider-val">60%</span>
-              </div>
-              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Display Duration</span>
-                <div class="duration-custom-controls">
-                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Enter Custom Heatmap Duration in Seconds" />
-                  <span id="valHeatmapDuration" class="slider-val" style="min-width:22px;">s</span>
-                  <button id="btnHeatmapInfinite" class="radar-btn radar-btn-sm" style="height:28px; min-width:34px; padding:0 6px; font-size:14px;" title="Toggle Infinite Heatmap Persistence (∞)">∞</button>
-                </div>
-              </div>
-              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" title="Drag right to 125 for Infinite (∞) or enter any custom seconds above" />
-            </div>
-          </div>
-
-          <!-- 5. Image Manipulation -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Image Adjust</span>
-              <button id="btnResetFilters" class="radar-btn radar-btn-sm">RESET</button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Brightness</span>
-                <span id="valBrightness" class="slider-val">100%</span>
-              </div>
-              <input id="sliderBrightness" type="range" min="40" max="200" value="100" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Contrast</span>
-                <span id="valContrast" class="slider-val">100%</span>
-              </div>
-              <input id="sliderContrast" type="range" min="40" max="220" value="100" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Saturation</span>
-                <span id="valSaturation" class="slider-val">100%</span>
-              </div>
-              <input id="sliderSaturation" type="range" min="0" max="200" value="100" class="radar-slider" />
-            </div>
-
-            <div class="overlay-grid">
-              <button id="btnFilterInvert" class="radar-btn radar-btn-sm">INVERT</button>
-              <button id="btnFilterGrayscale" class="radar-btn radar-btn-sm">MONO</button>
-            </div>
-          </div>
-
-          <!-- 6. Interface Theme Color & Global UI Opacity -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Interface Appearance</span>
-              <input id="colorPickerCustom" type="color" value="#2dd4bf" class="theme-color-input" title="Pick Custom Interface Color" />
-            </div>
-            <div class="swatch-row">
-              <button class="theme-swatch active" data-color="#2dd4bf" style="background:#2dd4bf;" title="Radar Teal"></button>
-              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Phosphor Green"></button>
-              <button class="theme-swatch" data-color="#38bdf8" style="background:#38bdf8;" title="Sonar Cyan-Blue"></button>
-              <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
-              <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
-              <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Interface Opacity</span>
-                <span id="valUiOpacity" class="slider-val">100%</span>
-              </div>
-              <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
-            </div>
-          </div>
-
-          <!-- 7. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">BT Ring Remote</span>
-              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
-            </div>
-            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
-            <div class="ring-dpad-grid">
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
-              <div></div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
       <!-- STREAM TELEMETRY HUD OVERLAY -->
       <aside id="hudOverlay" class="hidden">
         <div class="hud-header">
@@ -376,6 +178,8 @@
         <!-- Center: Instant Replay Scrubber Bar -->
         <div id="replayBar" class="hidden">
           <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
+          <button id="btnReplayStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
+          <button id="btnReplayStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
           <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
           <span id="replayTimeText" class="slider-val" style="min-width:98px; text-align:right;">0.0s / 20.0s</span>
           <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
@@ -447,6 +251,7 @@
           <div class="player-btn-group">
             <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-active">PAUSE ⏸</button>
             <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
+            <button id="btnGalleryStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
             <button id="btnGalleryStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
           </div>
 
@@ -461,6 +266,373 @@
           </div>
         </div>
       </footer>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 3: FULLSCREEN SETTINGS SCREEN                                -->
+    <!-- =================================================================== -->
+    <section id="screenSettings" class="screen-view hidden">
+      <header class="settings-screen-header">
+        <button id="btnSettingsBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+          <span>← LIVE FEED</span>
+        </button>
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>SYSTEM & SENSOR SETTINGS</span>
+        </span>
+        <button id="btnOpenReticleScreen" class="radar-btn radar-btn-active" title="Open Custom Reticle & Click Calibration">
+          <span>🎯 CUSTOM RETICLE</span>
+        </button>
+      </header>
+
+      <div class="settings-screen-body">
+        <div class="settings-screen-grid">
+          <!-- 1. USB Camera Source -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <label for="cameraSelect" class="settings-label">Camera Source</label>
+              <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" title="Rescan USB Cameras">↻</button>
+            </div>
+            <select id="cameraSelect" class="radar-select"></select>
+          </div>
+
+          <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Memory Recording</span>
+              <span id="valBufferResolution" class="slider-val" style="font-size:13px;">1920×1080</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Buffer Duration</span>
+                <span id="valBufferDuration" class="slider-val">20s</span>
+              </div>
+              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Frame Rate</span>
+                <span id="valBufferFps" class="slider-val">15 FPS</span>
+              </div>
+              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
+            </div>
+
+            <!-- Live Memory Availability & Requirement Meter -->
+            <div class="memory-meter-box">
+              <div class="memory-meter-labels">
+                <span id="memUsedLabel">USED: 0.0 MB</span>
+                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
+              </div>
+              <div class="memory-bar-track">
+                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
+                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Superimpose Overlay Guide & Reticle Customizer Shortcut -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Overlay Reticle</span>
+              <button id="btnToggleOverlay" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+            </div>
+
+            <div class="overlay-grid">
+              <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">RETICLE</button>
+              <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
+            </div>
+            <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
+
+            <div style="margin: 10px 0 14px 0;">
+              <button id="btnOpenReticleScreenCard" class="radar-btn radar-btn-sm radar-btn-active" style="width:100%;" title="Open Graduated Reticle Customizer (Indents, Spacing, Gap, Rings)">🎯 CUSTOMIZE GRADUATED RETICLE</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Opacity</span>
+                <span id="valOvOpacity" class="slider-val">75%</span>
+              </div>
+              <input id="sliderOvOpacity" type="range" min="10" max="100" value="75" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Reticle Scale</span>
+                <span id="valOvScale" class="slider-val">100%</span>
+              </div>
+              <input id="sliderOvScale" type="range" min="25" max="200" value="100" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration & Female Voice Callout -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Heatmap & Voice</span>
+              <button id="btnToggleHeatmapSpeech" class="radar-btn radar-btn-sm" title="Announce Heatmap Detections via Speech (Clock Direction & Ticks from ROI Target)">VOICE: OFF</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Sensitivity</span>
+                <span id="valHeatmapSens" class="slider-val">60%</span>
+              </div>
+              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Display Duration</span>
+                <div class="duration-custom-controls">
+                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Enter Custom Heatmap Duration in Seconds" />
+                  <span id="valHeatmapDuration" class="slider-val" style="min-width:22px;">s</span>
+                  <button id="btnHeatmapInfinite" class="radar-btn radar-btn-sm" style="height:28px; min-width:34px; padding:0 6px; font-size:14px;" title="Toggle Infinite Heatmap Persistence (∞)">∞</button>
+                </div>
+              </div>
+              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" title="Drag right to 125 for Infinite (∞) or enter any custom seconds above" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Voice Pitch (Female Tone)</span>
+                <span id="valVoicePitch" class="slider-val">1.25x</span>
+              </div>
+              <input id="sliderVoicePitch" type="range" min="0.8" max="1.8" step="0.05" value="1.25" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Voice Speed</span>
+                <span id="valVoiceRate" class="slider-val">1.10x</span>
+              </div>
+              <input id="sliderVoiceRate" type="range" min="0.8" max="1.6" step="0.05" value="1.1" class="radar-slider" />
+            </div>
+
+            <div style="margin-top:10px;">
+              <button id="btnTestVoiceSettings" class="radar-btn radar-btn-sm" style="width:100%;" title="Audition female detection announcement">AUDITION: "Detection! 11 o'clock, 3 clicks"</button>
+            </div>
+          </div>
+
+          <!-- 5. PS4 / Bluetooth Gamepad Controller -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">PS4 / BT Gamepad</span>
+              <div class="gamepad-status-row">
+                <span id="gamepadStatusDot" class="gamepad-dot"></span>
+                <span id="gamepadStatusText">DISCONNECTED (PRESS ANY BUTTON)</span>
+              </div>
+            </div>
+            <div id="gamepadActionText" class="ring-signal-readout">IDLE</div>
+            <div class="gamepad-mapping-table" style="font-size:12px; font-family:var(--font-mono); color:var(--radar-text-secondary); margin-top:8px; line-height:1.6;">
+              <div>• <b>L-Stick:</b> Aim ROI Crosshair (Speed proportional)</div>
+              <div>• <b>R-Stick:</b> Pan Stream when Main Zoom &gt; 1.0x</div>
+              <div>• <b>L3 / R3:</b> Recenter ROI / Reset 1:1 Zoom</div>
+              <div>• <b>D-Pad:</b> Zoom Window (▲/▼), Main Zoom/Step (◀/▶)</div>
+              <div>• <b>L1 / R1:</b> Main Stream Zoom Out / In</div>
+              <div>• <b>L2 / R2:</b> Step Frame -1 / +1 (Replay & Clips)</div>
+              <div>• <b>✕ Cross:</b> Play/Pause or Cycle Mode</div>
+              <div>• <b>○ Circle:</b> Return to Live Screen</div>
+              <div>• <b>□ Square:</b> Reticle Guide On/Off</div>
+              <div>• <b>△ Triangle:</b> Heatmap On/Off</div>
+              <div>• <b>Options:</b> 20s Instant Replay (Auto-Save)</div>
+              <div>• <b>Share:</b> Open / Close Settings Screen</div>
+            </div>
+          </div>
+
+          <!-- 6. Image Manipulation -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Image Adjust</span>
+              <button id="btnResetFilters" class="radar-btn radar-btn-sm">RESET</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Brightness</span>
+                <span id="valBrightness" class="slider-val">100%</span>
+              </div>
+              <input id="sliderBrightness" type="range" min="40" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Contrast</span>
+                <span id="valContrast" class="slider-val">100%</span>
+              </div>
+              <input id="sliderContrast" type="range" min="40" max="220" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Saturation</span>
+                <span id="valSaturation" class="slider-val">100%</span>
+              </div>
+              <input id="sliderSaturation" type="range" min="0" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="overlay-grid">
+              <button id="btnFilterInvert" class="radar-btn radar-btn-sm">INVERT</button>
+              <button id="btnFilterGrayscale" class="radar-btn radar-btn-sm">MONO</button>
+            </div>
+          </div>
+
+          <!-- 7. Interface Theme Color & Global UI Opacity -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Interface Appearance</span>
+              <input id="colorPickerCustom" type="color" value="#2dd4bf" class="theme-color-input" title="Pick Custom Interface Color" />
+            </div>
+            <div class="swatch-row">
+              <button class="theme-swatch active" data-color="#2dd4bf" style="background:#2dd4bf;" title="Radar Teal"></button>
+              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Phosphor Green"></button>
+              <button class="theme-swatch" data-color="#38bdf8" style="background:#38bdf8;" title="Sonar Cyan-Blue"></button>
+              <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
+              <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
+              <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Interface Opacity</span>
+                <span id="valUiOpacity" class="slider-val">100%</span>
+              </div>
+              <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 8. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">BT Ring Remote</span>
+              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
+            </div>
+            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
+            <div class="ring-dpad-grid">
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
+              <div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 4: FULLSCREEN RETICLE CUSTOMIZER & CALIBRATION SCREEN        -->
+    <!-- =================================================================== -->
+    <section id="screenReticle" class="screen-view hidden">
+      <header class="reticle-screen-header">
+        <button id="btnReticleBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+          <span>← LIVE FEED</span>
+        </button>
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"/>
+            <path stroke-linecap="round" d="M12 3v4M12 17v4M3 12h4M17 12h4"/>
+          </svg>
+          <span>RETICLE CUSTOMIZER & CLICK CALIBRATION</span>
+        </span>
+        <div style="display:flex; gap:10px;">
+          <button id="btnResetReticle" class="radar-btn radar-btn-sm" title="Reset Reticle to Default 10-Click Preset">RESET PRESET</button>
+          <button id="btnReticleToSettings" class="radar-btn radar-btn-active" title="Return to Settings Screen">⚙ SETTINGS</button>
+        </div>
+      </header>
+
+      <div class="reticle-workspace">
+        <!-- Interactive Full Reticle Preview Stage -->
+        <div id="reticlePreviewStage" class="reticle-stage-area" title="Click anywhere on the preview to test speech announcement">
+          <svg id="reticlePreviewSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="reticle-stage-hint">TAP PREVIEW TO TEST FEMALE VOICE (ANGLE & CLICKS)</div>
+        </div>
+
+        <!-- Customization Drawer -->
+        <aside class="reticle-sidebar-drawer">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Click Geometry</span>
+              <button id="btnTestCallout" class="radar-btn radar-btn-sm radar-btn-active" title="Audition Sample Speech Callout">AUDITION</button>
+            </div>
+            <div id="calloutTestText" class="ring-signal-readout">READY (CLICK PREVIEW OR TAP AUDITION)</div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Clicks Per Arm</span>
+                <span id="valReticleClicks" class="slider-val">10 clicks</span>
+              </div>
+              <input id="sliderReticleClicks" type="range" min="2" max="25" step="1" value="10" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Click Spacing</span>
+                <span id="valReticleSpacing" class="slider-val">32 px</span>
+              </div>
+              <input id="sliderReticleSpacing" type="range" min="10" max="80" step="2" value="32" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Gap (POI View)</span>
+                <span id="valReticleGap" class="slider-val">64 px</span>
+              </div>
+              <input id="sliderReticleGap" type="range" min="0" max="140" step="4" value="64" class="radar-slider" />
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Markings & Accents</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Brackets</span>
+                <button id="btnToggleReticleBrackets" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Major Tick Interval</span>
+                <span id="valReticleMajor" class="slider-val">EVERY 5</span>
+              </div>
+              <input id="sliderReticleMajor" type="range" min="0" max="10" step="1" value="5" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Number Labels</span>
+                <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Concentric Rings</span>
+                <button id="btnToggleReticleRings" class="radar-btn radar-btn-sm">OFF</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Stroke Weight</span>
+                <span id="valReticleStroke" class="slider-val">1.8 px</span>
+              </div>
+              <input id="sliderReticleStroke" type="range" min="0.5" max="5.0" step="0.2" value="1.8" class="radar-slider" />
+            </div>
+          </div>
+        </aside>
+      </div>
     </section>
 
   </div>

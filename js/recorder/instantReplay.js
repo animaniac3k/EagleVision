@@ -5,8 +5,11 @@
  * resolution using lightweight Blob ObjectURLs and a single HTMLImageElement
  * decoder (using near-zero extra RAM even for long 1080p/4K recordings),
  * while automatically saving the clip to the Stored Video Archive.
+ *
+ * Supports zoom & pan using the interface zoom controls, and exact single-frame
+ * stepping backward and forward.
  */
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { saveVideoClip } from '../storage/videoStore.js';
 import { refreshGalleryClips } from '../ui/videoBrowser.js';
@@ -27,17 +30,82 @@ export function initInstantReplay() {
   const ctx = canvasEl.getContext('2d');
   const replayBar = document.getElementById('replayBar');
   const btnPlayPause = document.getElementById('btnReplayPlayPause');
+  const btnStepBack = document.getElementById('btnReplayStepBack');
+  const btnStep = document.getElementById('btnReplayStep');
   const scrubber = document.getElementById('replayScrubber');
   const timeText = document.getElementById('replayTimeText');
   const bannerText = document.getElementById('replayBannerText');
   const btnReplay = document.getElementById('btnReplay20s');
   const btnClose = document.getElementById('btnCloseReplay');
 
+  function drawReplayImage() {
+    if (!decoderImg.complete || !decoderImg.naturalWidth) return;
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+    const imgW = decoderImg.naturalWidth || canvasEl.width;
+    const imgH = decoderImg.naturalHeight || canvasEl.height;
+    const z = Math.max(1.0, appState.mainZoom || 1.0);
+    const cropW = imgW / z;
+    const cropH = imgH / z;
+    const panLimitX = (imgW - cropW) / 2;
+    const panLimitY = (imgH - cropH) / 2;
+    const sx = (imgW - cropW) / 2 + (appState.mainPanX || 0) * panLimitX;
+    const sy = (imgH - cropH) / 2 + (appState.mainPanY || 0) * panLimitY;
+
+    ctx.drawImage(decoderImg, sx, sy, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
+  }
+
   decoderImg.onload = () => {
     if (!appState.replayActive) return;
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    ctx.drawImage(decoderImg, 0, 0, canvasEl.width, canvasEl.height);
+    drawReplayImage();
   };
+
+  // Re-render when main zoom or pan changes via interface controls / gamepad / touch
+  subscribeState((state, patch) => {
+    if (state.replayActive && (patch.mainZoom !== undefined || patch.mainPanX !== undefined || patch.mainPanY !== undefined)) {
+      canvasEl.style.cursor = (state.mainZoom || 1.0) > 1.01 ? 'grab' : 'default';
+      drawReplayImage();
+    }
+  });
+
+  // Touch / Pointer Panning during replay when zoomed in (>1.0x)
+  let panning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let startOffsetX = 0;
+  let startOffsetY = 0;
+
+  canvasEl.addEventListener('pointerdown', (e) => {
+    if ((appState.mainZoom || 1.0) <= 1.01) return;
+    panning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    startOffsetX = appState.mainPanX || 0;
+    startOffsetY = appState.mainPanY || 0;
+    canvasEl.style.cursor = 'grabbing';
+    canvasEl.setPointerCapture(e.pointerId);
+  });
+
+  canvasEl.addEventListener('pointermove', (e) => {
+    if (!panning) return;
+    const rect = canvasEl.getBoundingClientRect();
+    const dx = (e.clientX - panStartX) / Math.max(1, rect.width);
+    const dy = (e.clientY - panStartY) / Math.max(1, rect.height);
+    const maxPan = Math.max(0, (1 - 1 / (appState.mainZoom || 1.0)) / 2);
+    updateState({
+      mainPanX: Math.max(-maxPan, Math.min(maxPan, startOffsetX - dx / (appState.mainZoom || 1.0))),
+      mainPanY: Math.max(-maxPan, Math.min(maxPan, startOffsetY - dy / (appState.mainZoom || 1.0)))
+    });
+  });
+
+  const stopPan = () => {
+    if (panning) {
+      panning = false;
+      canvasEl.style.cursor = (appState.mainZoom || 1.0) > 1.01 ? 'grab' : 'default';
+    }
+  };
+  canvasEl.addEventListener('pointerup', stopPan);
+  canvasEl.addEventListener('pointercancel', stopPan);
 
   function stopLoop() {
     if (rafId) {
@@ -60,10 +128,12 @@ export function initInstantReplay() {
     if (idx !== lastRenderedIdx && activeFrameUrls[idx]) {
       lastRenderedIdx = idx;
       decoderImg.src = activeFrameUrls[idx];
+    } else {
+      drawReplayImage();
     }
 
     scrubber.value = String(playheadSec.toFixed(2));
-    timeText.textContent = `${playheadSec.toFixed(1)}s / ${activeDuration.toFixed(1)}s`;
+    timeText.textContent = `${playheadSec.toFixed(2)}s / ${activeDuration.toFixed(1)}s (F ${idx + 1}/${activeFrameUrls.length})`;
     btnPlayPause.textContent = isPlaying ? '⏸' : '▶';
   }
 
@@ -98,6 +168,7 @@ export function initInstantReplay() {
 
     canvasEl.width = snap.width || 1920;
     canvasEl.height = snap.height || 1080;
+    canvasEl.style.cursor = (appState.mainZoom || 1.0) > 1.01 ? 'grab' : 'default';
 
     scrubber.max = String(activeDuration.toFixed(2));
     scrubber.value = '0';
@@ -140,6 +211,29 @@ export function initInstantReplay() {
     lastTickMs = performance.now();
     renderCurrentFrame();
   });
+
+  // Frame-by-frame stepping backward / forward (exact frame index delta)
+  function stepReplayFrame(delta) {
+    if (!activeFrameUrls.length) return;
+    isPlaying = false;
+    const totalFrames = activeFrameUrls.length;
+    let currentIdx = lastRenderedIdx >= 0 ? lastRenderedIdx : Math.floor((playheadSec / activeDuration) * totalFrames);
+    let nextIdx = currentIdx + delta;
+    if (nextIdx < 0) nextIdx = totalFrames - 1;
+    if (nextIdx >= totalFrames) nextIdx = 0;
+
+    lastRenderedIdx = nextIdx;
+    playheadSec = (nextIdx / totalFrames) * activeDuration;
+    decoderImg.src = activeFrameUrls[nextIdx];
+
+    scrubber.value = String(playheadSec.toFixed(2));
+    timeText.textContent = `${playheadSec.toFixed(2)}s / ${activeDuration.toFixed(1)}s (F ${nextIdx + 1}/${totalFrames})`;
+    btnPlayPause.textContent = '▶';
+    lastTickMs = performance.now();
+  }
+
+  btnStepBack?.addEventListener('click', () => stepReplayFrame(-1));
+  btnStep?.addEventListener('click', () => stepReplayFrame(1));
 
   scrubber.addEventListener('input', (e) => {
     playheadSec = parseFloat(e.target.value) || 0;

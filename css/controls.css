@@ -251,10 +251,10 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
 /* Replay Scrubber Bar */
 #replayBar {
   flex: 1;
-  max-width: 520px;
+  max-width: min(980px, 75vw);
   background: var(--radar-panel);
   border: 2px solid var(--radar-border-strong);
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   display: flex;

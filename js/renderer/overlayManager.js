@@ -1,80 +1,207 @@
 /**
  * Superimpose Guide Overlays
- * Simplified to:
- * 1. Open-Center Graduated Crosshair (with 64px open center gap and uniform
- *    horizontal & vertical tick marks for distance callouts)
+ *
+ * Supports:
+ * 1. Fully Customizable Graduated Reticle / Crosshair (with indents/clicks along
+ *    horizontal & vertical arms, center gap, click numbers, and optional concentric rings)
  * 2. Custom User-Loaded Image (PNG/SVG/WebP)
  */
 import { appState, subscribeState } from '../state.js';
 
-// Each tick mark along the horizontal and vertical crosshair arms is spaced
-// by 32 SVG viewBox units from the center (400, 250).
-// Tick 1 is at the inner gap bracket (32 units from center).
-export const CROSSHAIR_VIEWBOX_W = 800;
-export const CROSSHAIR_VIEWBOX_H = 500;
-export const CROSSHAIR_TICK_SVG_UNITS = 32;
+export const RETICLE_VIEWBOX_W = 800;
+export const RETICLE_VIEWBOX_H = 500;
 
 /**
- * Returns the exact on-screen pixel distance of 1 crosshair tick,
- * dynamically accounting for viewport dimensions and Guide Scale (25%..200%).
+ * Returns the exact on-screen pixel distance of 1 reticle click / indent,
+ * dynamically taking into account viewport dimensions and Guide Scale (25%..200%).
  */
-export function getCrosshairTickPixelSize(viewportW, viewportH, overlayScalePercent = 100) {
-  const baseUnitPx = Math.min(
-    Math.max(1, viewportW) / CROSSHAIR_VIEWBOX_W,
-    Math.max(1, viewportH) / CROSSHAIR_VIEWBOX_H
+export function getClickDistanceInPixels(viewportW, viewportH, overlayScalePercent = 100) {
+  const cfg = appState.reticleConfig || {};
+  const clickSpacingSvgUnits = Math.max(8, Number(cfg.clickSpacing) || 32);
+
+  // SVG viewBox is 800x500 with preserveAspectRatio="xMidYMid meet"
+  const baseScale = Math.min(
+    Math.max(1, viewportW) / RETICLE_VIEWBOX_W,
+    Math.max(1, viewportH) / RETICLE_VIEWBOX_H
   );
-  const scaleFactor = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100);
-  return CROSSHAIR_TICK_SVG_UNITS * baseUnitPx * scaleFactor;
+  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100);
+  return clickSpacingSvgUnits * baseScale * scaleMultiplier;
 }
 
-function buildGraduatedCrosshairSvg() {
-  const cx = 400;
-  const cy = 250;
-  const step = CROSSHAIR_TICK_SVG_UNITS; // 32 units per tick
+/**
+ * Returns the on-screen pixel distance from reticle center to the edge of the center gap.
+ */
+export function getCenterGapDistanceInPixels(viewportW, viewportH, overlayScalePercent = 100) {
+  const cfg = appState.reticleConfig || {};
+  const gapHalfSvgUnits = Math.max(0, (Number(cfg.centerGap) || 64) / 2);
+
+  const baseScale = Math.min(
+    Math.max(1, viewportW) / RETICLE_VIEWBOX_W,
+    Math.max(1, viewportH) / RETICLE_VIEWBOX_H
+  );
+  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100);
+  return gapHalfSvgUnits * baseScale * scaleMultiplier;
+}
+
+/**
+ * Builds the complete SVG markup for the customizable graduated reticle.
+ * Can be rendered on the main feed (#svgOverlay) or inside the Reticle Customizer preview stage.
+ */
+export function buildGraduatedCrosshairSvg(customConfig = null) {
+  const cfg = Object.assign(
+    {
+      clickCount: 10,
+      clickSpacing: 32,
+      centerGap: 64,
+      innerBrackets: true,
+      majorInterval: 5,
+      minorTickLen: 10,
+      majorTickLen: 18,
+      showLabels: true,
+      concentricRings: false,
+      ringInterval: 5,
+      strokeWidth: 1.8,
+      reticleColor: ''
+    },
+    appState.reticleConfig || {},
+    customConfig || {}
+  );
+
+  const cx = RETICLE_VIEWBOX_W / 2; // 400
+  const cy = RETICLE_VIEWBOX_H / 2; // 250
+  const step = Math.max(8, Number(cfg.clickSpacing) || 32);
+  const clicks = Math.max(2, Math.min(25, Number(cfg.clickCount) || 10));
+  const gapHalf = Math.max(0, (Number(cfg.centerGap) || 64) / 2);
+  const sw = Number(cfg.strokeWidth) || 1.8;
+  const strokeColor = cfg.reticleColor ? cfg.reticleColor : 'var(--radar-accent)';
+  const majorInt = Math.max(0, Number(cfg.majorInterval) || 5);
+  const minorLen = Math.max(3, Number(cfg.minorTickLen) || 10);
+  const majorLen = Math.max(6, Number(cfg.majorTickLen) || 18);
+  const showLabels = Boolean(cfg.showLabels);
+
   const lines = [];
+  const armLen = clicks * step;
 
-  // Horizontal arms with 64px open center gap (368..432, i.e. ±1 tick)
-  // Left arm: 80..368 (Ticks 1..10), Right arm: 432..720 (Ticks 1..10)
-  lines.push(
-    `<line x1="80" y1="${cy}" x2="368" y2="${cy}" stroke="var(--radar-accent)" stroke-width="1.8" />`,
-    `<line x1="432" y1="${cy}" x2="720" y2="${cy}" stroke="var(--radar-accent)" stroke-width="1.8" />`
-  );
-
-  // Vertical arms with 64px open center gap (218..282, i.e. ±1 tick)
-  // Top arm: 26..218 (Ticks 1..7), Bottom arm: 282..474 (Ticks 1..7)
-  lines.push(
-    `<line x1="${cx}" y1="26" x2="${cx}" y2="218" stroke="var(--radar-accent)" stroke-width="1.8" />`,
-    `<line x1="${cx}" y1="282" x2="${cx}" y2="474" stroke="var(--radar-accent)" stroke-width="1.8" />`
-  );
-
-  // Horizontal Tick Marks (Ticks 1 to 10 on Left & Right arms)
-  for (let t = 1; t <= 10; t++) {
-    const offset = t * step;
-    const isMajor = t === 1 || t % 5 === 0;
-    const halfLen = isMajor ? 9 : 5;
-    const sw = isMajor ? '1.8' : '1.4';
-    const xLeft = cx - offset;
-    const xRight = cx + offset;
-
+  // Main Arms - Horizontal (Left & Right extending from gap outward)
+  const xArmStart = Math.max(8, cx - gapHalf - armLen);
+  const xArmEnd = Math.min(RETICLE_VIEWBOX_W - 8, cx + gapHalf + armLen);
+  if (gapHalf > 0) {
     lines.push(
-      `<line x1="${xLeft}" y1="${cy - halfLen}" x2="${xLeft}" y2="${cy + halfLen}" stroke="var(--radar-accent)" stroke-width="${sw}" />`,
-      `<line x1="${xRight}" y1="${cy - halfLen}" x2="${xRight}" y2="${cy + halfLen}" stroke="var(--radar-accent)" stroke-width="${sw}" />`
+      `<line x1="${xArmStart}" y1="${cy}" x2="${cx - gapHalf}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx + gapHalf}" y1="${cy}" x2="${xArmEnd}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`
+    );
+  } else {
+    lines.push(
+      `<line x1="${xArmStart}" y1="${cy}" x2="${xArmEnd}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`
     );
   }
 
-  // Vertical Tick Marks (Ticks 1 to 7 on Top & Bottom arms)
-  for (let t = 1; t <= 7; t++) {
-    const offset = t * step;
-    const isMajor = t === 1 || t % 5 === 0;
-    const halfLen = isMajor ? 9 : 5;
-    const sw = isMajor ? '1.8' : '1.4';
-    const yTop = cy - offset;
-    const yBottom = cy + offset;
-
+  // Main Arms - Vertical (Top & Bottom extending from gap outward)
+  const yArmStart = Math.max(8, cy - gapHalf - armLen);
+  const yArmEnd = Math.min(RETICLE_VIEWBOX_H - 8, cy + gapHalf + armLen);
+  if (gapHalf > 0) {
     lines.push(
-      `<line x1="${cx - halfLen}" y1="${yTop}" x2="${cx + halfLen}" y2="${yTop}" stroke="var(--radar-accent)" stroke-width="${sw}" />`,
-      `<line x1="${cx - halfLen}" y1="${yBottom}" x2="${cx + halfLen}" y2="${yBottom}" stroke="var(--radar-accent)" stroke-width="${sw}" />`
+      `<line x1="${cx}" y1="${yArmStart}" x2="${cx}" y2="${cy - gapHalf}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx}" y1="${cy + gapHalf}" x2="${cx}" y2="${yArmEnd}" stroke="${strokeColor}" stroke-width="${sw}" />`
     );
+  } else {
+    lines.push(
+      `<line x1="${cx}" y1="${yArmStart}" x2="${cx}" y2="${yArmEnd}" stroke="${strokeColor}" stroke-width="${sw}" />`
+    );
+  }
+
+  // Inner Gap Bracket Ticks (if gap is open and enabled)
+  if (gapHalf > 0 && cfg.innerBrackets) {
+    const bracketLen = 8;
+    lines.push(
+      `<line x1="${cx - gapHalf}" y1="${cy - bracketLen}" x2="${cx - gapHalf}" y2="${cy + bracketLen}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx + gapHalf}" y1="${cy - bracketLen}" x2="${cx + gapHalf}" y2="${cy + bracketLen}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx - bracketLen}" y1="${cy - gapHalf}" x2="${cx + bracketLen}" y2="${cy - gapHalf}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx - bracketLen}" y1="${cy + gapHalf}" x2="${cx + bracketLen}" y2="${cy + gapHalf}" stroke="${strokeColor}" stroke-width="${sw}" />`
+    );
+  }
+
+  // Optional Concentric Range Circles connecting corresponding clicks
+  if (cfg.concentricRings) {
+    const ringInt = Math.max(1, Number(cfg.ringInterval) || 5);
+    for (let t = ringInt; t <= clicks; t += ringInt) {
+      const radius = gapHalf + t * step;
+      lines.push(
+        `<circle cx="${cx}" cy="${cy}" r="${radius}" stroke="${strokeColor}" stroke-width="1.2" stroke-dasharray="6 4" fill="none" opacity="0.45" />`
+      );
+    }
+  }
+
+  // Horizontal Indents / Tick Marks (Left & Right - 1 to clicks)
+  for (let t = 1; t <= clicks; t++) {
+    const offset = gapHalf + t * step;
+    const isMajor = majorInt > 0 && t % majorInt === 0;
+    const tickLen = isMajor ? majorLen : minorLen;
+    const tickW = isMajor ? Math.min(sw * 1.2, 3.2) : Math.max(sw * 0.8, 1.2);
+    const half = tickLen / 2;
+
+    const xL = cx - offset;
+    const xR = cx + offset;
+
+    // Left tick
+    if (xL >= 6) {
+      lines.push(
+        `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+      );
+      if (showLabels && isMajor) {
+        lines.push(
+          `<text x="${xL}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+        );
+      }
+    }
+
+    // Right tick
+    if (xR <= RETICLE_VIEWBOX_W - 6) {
+      lines.push(
+        `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+      );
+      if (showLabels && isMajor) {
+        lines.push(
+          `<text x="${xR}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+        );
+      }
+    }
+  }
+
+  // Vertical Indents / Tick Marks (Top & Bottom - 1 to clicks)
+  for (let t = 1; t <= clicks; t++) {
+    const offset = gapHalf + t * step;
+    const isMajor = majorInt > 0 && t % majorInt === 0;
+    const tickLen = isMajor ? majorLen : minorLen;
+    const tickW = isMajor ? Math.min(sw * 1.2, 3.2) : Math.max(sw * 0.8, 1.2);
+    const half = tickLen / 2;
+
+    const yT = cy - offset;
+    const yB = cy + offset;
+
+    // Top tick
+    if (yT >= 6) {
+      lines.push(
+        `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+      );
+      if (showLabels && isMajor) {
+        lines.push(
+          `<text x="${cx + half + 4}" y="${yT + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+        );
+      }
+    }
+
+    // Bottom tick
+    if (yB <= RETICLE_VIEWBOX_H - 6) {
+      lines.push(
+        `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+      );
+      if (showLabels && isMajor) {
+        lines.push(
+          `<text x="${cx + half + 4}" y="${yB + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+        );
+      }
+    }
   }
 
   return lines.join('\n');
@@ -85,24 +212,24 @@ export function initOverlayManager() {
   const svgOverlay = document.getElementById('svgOverlay');
   const customImg = document.getElementById('customOverlayImg');
 
-  svgOverlay.innerHTML = buildGraduatedCrosshairSvg();
-
   function renderOverlay(state) {
+    if (!overlayLayer || !svgOverlay) return;
     overlayLayer.classList.toggle('hidden', !state.overlayEnabled);
     overlayLayer.style.opacity = String(state.overlayOpacity / 100);
     const scaleVal = state.overlayScale / 100;
     svgOverlay.style.transform = `scale(${scaleVal})`;
-    customImg.style.transform = `scale(${scaleVal})`;
+    if (customImg) customImg.style.transform = `scale(${scaleVal})`;
 
-    if (state.overlayType === 'custom' && state.customOverlayUrl) {
+    if (state.overlayType === 'custom' && state.customOverlayUrl && customImg) {
       svgOverlay.classList.add('hidden');
       customImg.classList.remove('hidden');
       if (customImg.src !== state.customOverlayUrl) {
         customImg.src = state.customOverlayUrl;
       }
     } else {
-      customImg.classList.add('hidden');
+      if (customImg) customImg.classList.add('hidden');
       svgOverlay.classList.remove('hidden');
+      svgOverlay.innerHTML = buildGraduatedCrosshairSvg(state.reticleConfig);
     }
   }
 

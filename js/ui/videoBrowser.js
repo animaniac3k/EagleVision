@@ -79,7 +79,7 @@ function renderGalleryFrame() {
   }
 
   scrubber.value = String(playheadSec.toFixed(2));
-  timeReadout.textContent = `${playheadSec.toFixed(1)}s / ${clipDuration.toFixed(1)}s`;
+  timeReadout.textContent = `${playheadSec.toFixed(2)}s / ${clipDuration.toFixed(1)}s (F ${idx + 1}/${frameUrls.length})`;
   btnPlayPause.textContent = isPlaying ? 'PAUSE ⏸' : 'PLAY ▶';
 }
 
@@ -215,6 +215,7 @@ export async function initVideoBrowser() {
   const scrubber = document.getElementById('galleryScrubber');
   const btnPlayPause = document.getElementById('btnGalleryPlayPause');
   const btnSlowMo = document.getElementById('btnGallerySlowMo');
+  const btnStepBack = document.getElementById('btnGalleryStepBack');
   const btnStep = document.getElementById('btnGalleryStep');
   const btnDownload = document.getElementById('btnGalleryDownload');
   const btnDelete = document.getElementById('btnGalleryDelete');
@@ -325,13 +326,28 @@ export async function initVideoBrowser() {
     btnSlowMo.classList.toggle('radar-btn-active', playbackSpeed < 0.9);
   });
 
-  btnStep.addEventListener('click', () => {
+  // Frame-by-frame stepping backward / forward (exact frame index delta)
+  function stepGalleryFrame(delta) {
     if (!frameUrls.length) return;
     isPlaying = false;
-    const stepSec = clipDuration / Math.max(1, frameUrls.length);
-    playheadSec = (playheadSec + stepSec) % clipDuration;
-    renderGalleryFrame();
-  });
+    const totalFrames = frameUrls.length;
+    let currentIdx = lastDrawnIdx >= 0 ? lastDrawnIdx : Math.floor((playheadSec / clipDuration) * totalFrames);
+    let nextIdx = currentIdx + delta;
+    if (nextIdx < 0) nextIdx = totalFrames - 1;
+    if (nextIdx >= totalFrames) nextIdx = 0;
+
+    lastDrawnIdx = nextIdx;
+    playheadSec = (nextIdx / totalFrames) * clipDuration;
+    galleryImg.src = frameUrls[nextIdx];
+
+    scrubber.value = String(playheadSec.toFixed(2));
+    timeReadout.textContent = `${playheadSec.toFixed(2)}s / ${clipDuration.toFixed(1)}s (F ${nextIdx + 1}/${totalFrames})`;
+    btnPlayPause.textContent = 'PLAY ▶';
+    lastTickMs = performance.now();
+  }
+
+  btnStepBack?.addEventListener('click', () => stepGalleryFrame(-1));
+  btnStep?.addEventListener('click', () => stepGalleryFrame(1));
 
   scrubber.addEventListener('input', (e) => {
     playheadSec = parseFloat(e.target.value) || 0;

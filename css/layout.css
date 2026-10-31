@@ -81,6 +81,183 @@
   display: none !important;
 }
 
+/* Screen 3: Fullscreen Settings Screen */
+#screenSettings {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--radar-bg-deep);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-screen-header {
+  height: 60px;
+  background: var(--radar-panel);
+  border-bottom: 1px solid var(--radar-border);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-panel);
+  z-index: 20;
+}
+
+.settings-screen-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--radar-text);
+  letter-spacing: 0.05em;
+}
+
+.settings-screen-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  touch-action: pan-y;
+}
+
+.settings-screen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Screen 4: Fullscreen Reticle Customizer Screen */
+#screenReticle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--radar-bg-deep);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.reticle-screen-header {
+  height: 60px;
+  background: var(--radar-panel);
+  border-bottom: 1px solid var(--radar-border);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-panel);
+  z-index: 20;
+}
+
+.reticle-workspace {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.reticle-stage-area {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--radar-bg);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(20, 83, 92, 0.16) 0%, rgba(4, 13, 16, 0.98) 75%),
+    linear-gradient(rgba(45, 212, 191, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+#reticlePreviewSvg {
+  width: 90%;
+  height: 90%;
+  max-width: 900px;
+  max-height: 560px;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.reticle-stage-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--radar-text-muted);
+  pointer-events: none;
+}
+
+.reticle-test-ping {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--radar-danger);
+  box-shadow: 0 0 16px var(--radar-danger);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: ping-pulse 1.1s ease-out forwards;
+}
+
+@keyframes ping-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
+}
+
+.reticle-sidebar-drawer {
+  width: 380px;
+  max-width: 100%;
+  background: var(--radar-panel);
+  border-left: 1px solid var(--radar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+/* Controller Status and Monitor Elements */
+.gamepad-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.gamepad-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--radar-border);
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.gamepad-dot.connected {
+  background-color: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
 /* Movable & Collapsible Settings Window */
 #optionsPanel {
   position: absolute;
