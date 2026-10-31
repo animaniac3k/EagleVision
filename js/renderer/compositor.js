@@ -154,13 +154,20 @@ export function initCompositor(videoEl) {
     let clockHour = Math.round(angleDeg / 30);
     if (clockHour === 0) clockHour = 12;
 
-    const clickWord = clicks === 1 ? 'click' : 'clicks';
+    const alertWord = (appState.voiceAlertKeyword || 'Detection').trim();
+    let rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
+    // Singularize if clicks === 1 and unit is clicks
+    let unitWord = rawUnit;
+    if (clicks === 1 && rawUnit.toLowerCase() === 'clicks') {
+      unitWord = 'click';
+    }
+
     const phrase = clicks === 0
-      ? 'Detection! Center'
-      : `Detection! ${clockHour} o'clock, ${clicks} ${clickWord}`;
+      ? `${alertWord}! Center`
+      : `${alertWord}! ${clockHour} o'clock, ${clicks} ${unitWord}`;
     const hudSummary = clicks === 0
-      ? '🔊 DETECTION: CENTER'
-      : `🔊 ${clockHour} O'CLOCK • ${clicks} ${clickWord.toUpperCase()}`;
+      ? `🔊 ${alertWord.toUpperCase()}: CENTER`
+      : `🔊 ${clockHour} O'CLOCK • ${clicks} ${unitWord.toUpperCase()}`;
 
     lastSpeechTimeMs = now;
     speakDetectionAnnouncement(phrase);

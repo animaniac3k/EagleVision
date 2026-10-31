@@ -48,11 +48,14 @@ export function saveSettings(state) {
       heatmapSpeechEnabled: Boolean(state.heatmapSpeechEnabled),
       voicePitch: state.voicePitch || 1.25,
       voiceRate: state.voiceRate || 1.1,
+      voiceAlertKeyword: state.voiceAlertKeyword || 'Detection',
+      voiceUnitKeyword: state.voiceUnitKeyword || 'clicks',
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
       themeColor: state.themeColor || '#2dd4bf',
       uiOpacity: state.uiOpacity ?? 100,
+      touchpadSensitivity: state.touchpadSensitivity ?? 50,
       ringKeyMap: state.ringKeyMap || {}
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));

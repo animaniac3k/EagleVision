@@ -370,6 +370,32 @@
   transform: scale(0.88);
 }
 
+/* Tactical Reticle Gamepad Keyboard/Stick Focus Indicator */
+.reticle-gp-focused {
+  outline: 2px solid var(--radar-primary) !important;
+  outline-offset: 3px;
+  background: rgba(45, 212, 191, 0.14) !important;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.35);
+  transition: all 0.12s ease;
+}
+
+/* Voice Announcement Toggle Button in Top-Left Strip */
+#btnToggleVoiceAnnounce.radar-btn-active {
+  color: var(--radar-primary);
+  border-color: var(--radar-primary);
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.45);
+}
+#btnToggleVoiceAnnounce:not(.radar-btn-active) {
+  opacity: 0.65;
+}
+#btnToggleVoiceAnnounce:not(.radar-btn-active) #voiceWavesPath {
+  display: none;
+}
+#btnToggleVoiceAnnounce:not(.radar-btn-active) #voiceMuteSlash {
+  display: block !important;
+}
+
 /* Movable & Collapsible Settings Window */
 #optionsPanel {
   position: absolute;

@@ -344,17 +344,26 @@ export async function initSidebarAndTopControls(videoEl) {
     }
   });
 
+  function toggleVoiceSpeech() {
+    const next = !appState.heatmapSpeechEnabled;
+    updateState({ heatmapSpeechEnabled: next });
+    saveSettings(appState);
+    if (next) {
+      const alertWord = appState.voiceAlertKeyword || 'Detection';
+      speakDetectionAnnouncement(`${alertWord}! Voice callouts active`);
+    } else if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
   if (btnToggleHeatmapSpeech) {
-    btnToggleHeatmapSpeech.addEventListener('click', () => {
-      const next = !appState.heatmapSpeechEnabled;
-      updateState({ heatmapSpeechEnabled: next });
-      saveSettings(appState);
-      if (next) {
-        speakDetectionAnnouncement('Voice callouts active');
-      } else if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    });
+    btnToggleHeatmapSpeech.addEventListener('click', toggleVoiceSpeech);
+  }
+
+  // Top-Left Floating Strip Voice Toggle Button
+  const btnToggleVoiceAnnounce = document.getElementById('btnToggleVoiceAnnounce');
+  if (btnToggleVoiceAnnounce) {
+    btnToggleVoiceAnnounce.addEventListener('click', toggleVoiceSpeech);
   }
 
   // Voice Customization (Pitch & Speed)
@@ -382,9 +391,74 @@ export async function initSidebarAndTopControls(videoEl) {
     });
   }
 
-  btnTestVoiceSettings?.addEventListener('click', () => {
-    speakDetectionAnnouncement("Detection! 11 o'clock, 3 clicks");
+  // Voice Keyword Customization
+  const inputVoiceAlertKeyword = document.getElementById('inputVoiceAlertKeyword');
+  const inputVoiceUnitKeyword = document.getElementById('inputVoiceUnitKeyword');
+
+  function updateAuditionButtonText() {
+    if (!btnTestVoiceSettings) return;
+    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
+    const unit = (appState.voiceUnitKeyword || 'clicks').trim();
+    btnTestVoiceSettings.textContent = `AUDITION: "${prefix}! 11 o'clock, 3 ${unit}"`;
+  }
+
+  if (inputVoiceAlertKeyword) {
+    inputVoiceAlertKeyword.value = appState.voiceAlertKeyword || 'Detection';
+    inputVoiceAlertKeyword.addEventListener('input', (e) => {
+      const val = e.target.value.trim() || 'Detection';
+      updateState({ voiceAlertKeyword: val });
+      saveSettings(appState);
+      updateAuditionButtonText();
+    });
+  }
+
+  if (inputVoiceUnitKeyword) {
+    inputVoiceUnitKeyword.value = appState.voiceUnitKeyword || 'clicks';
+    inputVoiceUnitKeyword.addEventListener('input', (e) => {
+      const val = e.target.value.trim() || 'clicks';
+      updateState({ voiceUnitKeyword: val });
+      saveSettings(appState);
+      updateAuditionButtonText();
+    });
+  }
+
+  // Voice Preset Quick Chips
+  document.querySelectorAll('.btn-voice-preset').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prefix = btn.dataset.prefix || 'Detection';
+      const unit = btn.dataset.unit || 'clicks';
+      if (inputVoiceAlertKeyword) inputVoiceAlertKeyword.value = prefix;
+      if (inputVoiceUnitKeyword) inputVoiceUnitKeyword.value = unit;
+      updateState({ voiceAlertKeyword: prefix, voiceUnitKeyword: unit });
+      saveSettings(appState);
+      updateAuditionButtonText();
+      speakDetectionAnnouncement(`${prefix}! 11 o'clock, 3 ${unit}`);
+    });
   });
+
+  updateAuditionButtonText();
+
+  btnTestVoiceSettings?.addEventListener('click', () => {
+    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
+    const unit = (appState.voiceUnitKeyword || 'clicks').trim();
+    speakDetectionAnnouncement(`${prefix}! 11 o'clock, 3 ${unit}`);
+  });
+
+  // Touchpad Virtual Mouse Sensitivity Slider in Settings
+  const sliderTouchSens = document.getElementById('sliderTouchpadSensitivity');
+  const valTouchSens = document.getElementById('valTouchpadSensitivity');
+  if (sliderTouchSens) {
+    const s = Number(appState.touchpadSensitivity ?? 50);
+    sliderTouchSens.value = String(s);
+    if (valTouchSens) valTouchSens.textContent = `${s}%`;
+    sliderTouchSens.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) || 50;
+      if (valTouchSens) valTouchSens.textContent = `${val}%`;
+      updateState({ touchpadSensitivity: val, lastGamepadAction: `TOUCHPAD SENSITIVITY: ${val}%` });
+      saveSettings(appState);
+    });
+  }
 
   sliderHeatmapSens.addEventListener('input', (e) => {
     const sens = Number(e.target.value) || 60;
@@ -515,6 +589,9 @@ export async function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+    if (btnToggleVoiceAnnounce) {
+      btnToggleVoiceAnnounce.classList.toggle('radar-btn-active', Boolean(state.heatmapSpeechEnabled));
+    }
     if (btnToggleHeatmapSpeech) {
       btnToggleHeatmapSpeech.textContent = state.heatmapSpeechEnabled ? 'VOICE: ON' : 'VOICE: OFF';
       btnToggleHeatmapSpeech.classList.toggle('radar-btn-active', Boolean(state.heatmapSpeechEnabled));

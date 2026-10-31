@@ -65,6 +65,8 @@ export const appState = {
   heatmapSpeechEnabled: false, // Voice callouts ("Detection! 11 o'clock, 3 clicks")
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
   voiceRate: 1.1,         // Voice speech rate (0.8..1.5)
+  voiceAlertKeyword: 'Detection', // Customizable alert keyword (e.g. Contact, Target, Alert)
+  voiceUnitKeyword: 'clicks',     // Customizable distance unit (e.g. clicks, mils, marks, units)
 
   // Configurable In-Memory Rolling Recording Buffer
   bufferEnabled: true,
@@ -78,6 +80,7 @@ export const appState = {
   themeColor: '#2dd4bf',
   uiOpacity: 100,
   uiDecluttered: false,
+  touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)
   ringKeyMap: {},
   gamepadConnected: false,
   gamepadName: '',

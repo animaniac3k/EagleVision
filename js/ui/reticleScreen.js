@@ -91,6 +91,91 @@ export function initReticleScreen() {
     renderPreview();
   }
 
+  // Exported Gamepad Control Definitions for Reticle Customizer
+  const RETICLE_CONTROLS = [
+    { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 25, step: 1, elementId: 'sliderReticleClicks' },
+    { key: 'clickSpacing', label: 'Click Spacing', min: 10, max: 80, step: 2, elementId: 'sliderReticleSpacing' },
+    { key: 'centerGap', label: 'Center Gap', min: 0, max: 140, step: 4, elementId: 'sliderReticleGap' },
+    { key: 'innerBrackets', label: 'Center Brackets', isToggle: true, elementId: 'btnToggleReticleBrackets' },
+    { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
+    { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
+    { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
+    { key: 'strokeWidth', label: 'Stroke Weight', min: 0.6, max: 5.0, step: 0.2, isFloat: true, elementId: 'sliderReticleStroke' }
+  ];
+
+  let focusedIndex = 0;
+
+  function updateReticleControlHighlight() {
+    RETICLE_CONTROLS.forEach((c, idx) => {
+      const el = document.getElementById(c.elementId);
+      const container = el ? (el.closest('.slider-group') || el) : null;
+      if (container) {
+        container.classList.toggle('reticle-gp-focused', idx === focusedIndex);
+        if (idx === focusedIndex) {
+          container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    });
+  }
+
+  // Attach gamepad interface methods to window for clean cross-module invocation
+  window.reticleGamepadAPI = {
+    cycleFocus: (delta) => {
+      focusedIndex = (focusedIndex + delta + RETICLE_CONTROLS.length) % RETICLE_CONTROLS.length;
+      updateReticleControlHighlight();
+      return RETICLE_CONTROLS[focusedIndex];
+    },
+    adjust: (delta) => {
+      const ctrl = RETICLE_CONTROLS[focusedIndex];
+      if (!ctrl) return 'UNKNOWN';
+      const cfg = appState.reticleConfig || {};
+
+      if (ctrl.isToggle) {
+        const nextVal = !cfg[ctrl.key];
+        updateReticleConfig({ [ctrl.key]: nextVal });
+        return `${ctrl.label}: ${nextVal ? 'ON' : 'OFF'}`;
+      } else {
+        const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : 10));
+        let nextVal = cur + delta * ctrl.step;
+        nextVal = Math.max(ctrl.min, Math.min(ctrl.max, nextVal));
+        if (ctrl.isFloat) {
+          nextVal = Math.round(nextVal * 10) / 10;
+        } else {
+          nextVal = Math.round(nextVal);
+        }
+        updateReticleConfig({ [ctrl.key]: nextVal });
+        return `${ctrl.label}: ${nextVal}${ctrl.isFloat ? 'px' : ''}`;
+      }
+    },
+    activate: () => {
+      const ctrl = RETICLE_CONTROLS[focusedIndex];
+      if (!ctrl) return 'READY';
+      if (ctrl.isToggle) {
+        return window.reticleGamepadAPI.adjust(1);
+      } else {
+        const testClicks = Math.min(3, appState.reticleConfig?.clickCount || 10);
+        const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
+        const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
+        const phrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
+        if (calloutTestText) calloutTestText.textContent = `🔊 "${phrase}"`;
+        speakDetectionAnnouncement(phrase);
+        return `AUDITION: "${phrase}"`;
+      }
+    },
+    quickAdjustClicks: (delta) => {
+      const cfg = appState.reticleConfig || {};
+      const next = Math.max(2, Math.min(25, (cfg.clickCount || 10) + delta));
+      updateReticleConfig({ clickCount: next });
+      return `CLICKS PER ARM: ${next}`;
+    },
+    quickAdjustSpacing: (delta) => {
+      const cfg = appState.reticleConfig || {};
+      const next = Math.max(10, Math.min(80, (cfg.clickSpacing || 32) + delta));
+      updateReticleConfig({ clickSpacing: next });
+      return `CLICK SPACING: ${next}px`;
+    }
+  };
+
   // Navigation
   btnReticleBackToLive?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
@@ -158,7 +243,9 @@ export function initReticleScreen() {
   // Test Speech Announcement button
   btnTestCallout?.addEventListener('click', () => {
     const testClicks = Math.min(3, appState.reticleConfig?.clickCount || 10);
-    const testPhrase = `Detection! 11 o'clock, ${testClicks} ${testClicks === 1 ? 'click' : 'clicks'}`;
+    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
+    const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
+    const testPhrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
     if (calloutTestText) calloutTestText.textContent = `🔊 "${testPhrase}"`;
     speakDetectionAnnouncement(testPhrase);
   });
@@ -191,8 +278,12 @@ export function initReticleScreen() {
     let clockHour = Math.round(angleDeg / 30);
     if (clockHour === 0) clockHour = 12;
 
-    const clickWord = clicks === 1 ? 'click' : 'clicks';
-    const phrase = clicks === 0 ? 'Detection! Center' : `Detection! ${clockHour} o'clock, ${clicks} ${clickWord}`;
+    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
+    let rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
+    let unitWord = rawUnit;
+    if (clicks === 1 && rawUnit.toLowerCase() === 'clicks') unitWord = 'click';
+
+    const phrase = clicks === 0 ? `${prefix}! Center` : `${prefix}! ${clockHour} o'clock, ${clicks} ${unitWord}`;
 
     if (calloutTestText) {
       calloutTestText.textContent = `🔊 "${phrase}"`;

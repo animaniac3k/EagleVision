@@ -45,6 +45,8 @@ let vmHideTimeout = null;
 let vmIsDragging = false;
 let vmDragTargetEl = null;
 let vmLastPhysicalClick = false;
+let reticleStickLastXTime = 0;
+let reticleStickLastYTime = 0;
 
 // Stick Tuning: Power curve provides 50-70% reduction at low end for fine-tick adjustments
 const DEADZONE = 0.16;
@@ -534,9 +536,10 @@ function processTouchpadVirtualMouse(touch, physicalClick) {
       if (Math.abs(rawDx) >= 1 || Math.abs(rawDy) >= 1) {
         const dist = Math.hypot(rawDx, rawDy);
         if (dist < 400) {
+          const sensRatio = (appState.touchpadSensitivity ?? 50) / 100;
           const speedFactor = dist > 40 ? 1.45 : dist > 18 ? 1.25 : 1.0;
-          const dx = rawDx * 1.35 * speedFactor;
-          const dy = rawDy * 1.35 * speedFactor;
+          const dx = rawDx * 1.35 * sensRatio * speedFactor;
+          const dy = rawDy * 1.35 * sensRatio * speedFactor;
 
           vmCursorX = Math.max(6, Math.min(window.innerWidth - 6, vmCursorX + dx));
           vmCursorY = Math.max(6, Math.min(window.innerHeight - 6, vmCursorY + dy));
@@ -855,6 +858,23 @@ function applyStickMotion(lx, ly, rx, ry) {
     const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + cry * PAN_SPEED));
     updateState({ mainPanX: nx, mainPanY: ny });
   }
+
+  // Reticle Customizer Screen: Left Stick navigates and tunes crosshair controls
+  if (appState.currentScreen === 'reticle') {
+    const now = performance.now();
+    if (Math.abs(ly) > 0.55 && now - reticleStickLastYTime > 260) {
+      reticleStickLastYTime = now;
+      const dir = ly > 0 ? 1 : -1;
+      const ctrl = window.reticleGamepadAPI?.cycleFocus(dir);
+      updateState({ lastGamepadAction: `SELECT: ${ctrl ? ctrl.label.toUpperCase() : 'CONTROL'}` });
+    }
+    if (Math.abs(lx) > 0.55 && now - reticleStickLastXTime > 180) {
+      reticleStickLastXTime = now;
+      const dir = lx > 0 ? 1 : -1;
+      const res = window.reticleGamepadAPI?.adjust(dir);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'ADJUST'}` });
+    }
+  }
 }
 
 /**
@@ -955,7 +975,10 @@ function dispatchControllerInputs(actionState) {
 
   // Cross (✕)
   if (isJustPressed('cross')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.activate();
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'ACTIVATE'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGalleryPlayPause')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CROSS (PLAY/PAUSE)' });
     } else if (appState.replayActive) {
@@ -991,7 +1014,10 @@ function dispatchControllerInputs(actionState) {
 
   // Square (▢)
   if (isJustPressed('square')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      document.getElementById('btnToggleReticleRings')?.click();
+      updateState({ lastGamepadAction: 'RETICLE: TOGGLE DISTANCE RINGS' });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGallerySlowMo')?.click();
       updateState({ lastGamepadAction: 'BUTTON: SQUARE (0.5x SLOW-MO)' });
     } else {
@@ -1002,7 +1028,10 @@ function dispatchControllerInputs(actionState) {
 
   // Triangle (△)
   if (isJustPressed('triangle')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      document.getElementById('btnResetReticle')?.click();
+      updateState({ lastGamepadAction: 'RETICLE: RESET DEFAULTS' });
+    } else if (screen === 'gallery') {
       document.getElementById('btnToggleGalleryDrawer')?.click();
       updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (CLIPS DRAWER)' });
     } else {
@@ -1013,7 +1042,10 @@ function dispatchControllerInputs(actionState) {
 
   // L1 (Bumper)
   if (isJustPressed('l1')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.quickAdjustClicks(-1);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'CLICKS -1'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('galleryZoomMinus')?.click();
       updateState({ lastGamepadAction: 'BUTTON: L1 (VIDEO ZOOM -)' });
     } else {
@@ -1024,7 +1056,10 @@ function dispatchControllerInputs(actionState) {
 
   // R1 (Bumper)
   if (isJustPressed('r1')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.quickAdjustClicks(1);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'CLICKS +1'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('galleryZoomPlus')?.click();
       updateState({ lastGamepadAction: 'BUTTON: R1 (VIDEO ZOOM +)' });
     } else {
@@ -1033,9 +1068,12 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // L2 (Trigger) - Step Backward 1 Frame
+  // L2 (Trigger) - Step Backward 1 Frame / Reticle spacing -2px
   if (isJustPressed('l2')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.quickAdjustSpacing(-2);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'SPACING -2px'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStepBack')?.click();
       updateState({ lastGamepadAction: 'TRIGGER: L2 (STEP -1 FRAME)' });
     } else if (appState.replayActive) {
@@ -1044,9 +1082,12 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // R2 (Trigger) - Step Forward 1 Frame
+  // R2 (Trigger) - Step Forward 1 Frame / Reticle spacing +2px
   if (isJustPressed('r2')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.quickAdjustSpacing(2);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'SPACING +2px'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStep')?.click();
       updateState({ lastGamepadAction: 'TRIGGER: R2 (STEP +1 FRAME)' });
     } else if (appState.replayActive) {
@@ -1087,7 +1128,10 @@ function dispatchControllerInputs(actionState) {
 
   // D-Pad Up
   if (isJustPressed('dpad-up')) {
-    if (screen === 'live') {
+    if (screen === 'reticle') {
+      const ctrl = window.reticleGamepadAPI?.cycleFocus(-1);
+      updateState({ lastGamepadAction: `SELECT: ${ctrl ? ctrl.label.toUpperCase() : 'PREV CONTROL'}` });
+    } else if (screen === 'live') {
       document.getElementById('pipZoomPlus')?.click();
       updateState({ lastGamepadAction: 'D-PAD: UP (WIN ZOOM +)' });
     }
@@ -1095,7 +1139,10 @@ function dispatchControllerInputs(actionState) {
 
   // D-Pad Down
   if (isJustPressed('dpad-down')) {
-    if (screen === 'live') {
+    if (screen === 'reticle') {
+      const ctrl = window.reticleGamepadAPI?.cycleFocus(1);
+      updateState({ lastGamepadAction: `SELECT: ${ctrl ? ctrl.label.toUpperCase() : 'NEXT CONTROL'}` });
+    } else if (screen === 'live') {
       document.getElementById('pipZoomMinus')?.click();
       updateState({ lastGamepadAction: 'D-PAD: DOWN (WIN ZOOM -)' });
     }
@@ -1103,7 +1150,10 @@ function dispatchControllerInputs(actionState) {
 
   // D-Pad Left
   if (isJustPressed('dpad-left')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.adjust(-1);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'DECREASE'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStepBack')?.click();
       updateState({ lastGamepadAction: 'D-PAD: LEFT (STEP -1)' });
     } else if (appState.replayActive) {
@@ -1117,7 +1167,10 @@ function dispatchControllerInputs(actionState) {
 
   // D-Pad Right
   if (isJustPressed('dpad-right')) {
-    if (screen === 'gallery') {
+    if (screen === 'reticle') {
+      const res = window.reticleGamepadAPI?.adjust(1);
+      updateState({ lastGamepadAction: `RETICLE: ${res || 'INCREASE'}` });
+    } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStep')?.click();
       updateState({ lastGamepadAction: 'D-PAD: RIGHT (STEP +1)' });
     } else if (appState.replayActive) {
