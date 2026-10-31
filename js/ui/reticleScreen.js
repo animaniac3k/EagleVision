@@ -104,14 +104,38 @@ export function initReticleScreen() {
   ];
 
   let focusedIndex = 0;
+  let menuFocusActive = false;
+  let toastTimeout = null;
+
+  function showReticleToast(text, activePillKey = null) {
+    const toastEl = document.getElementById('reticleGamepadToast');
+    const textEl = document.getElementById('reticleToastText');
+    if (toastEl && textEl) {
+      textEl.textContent = text;
+      toastEl.classList.remove('hidden');
+      toastEl.style.opacity = '1';
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toastEl.style.opacity = '0';
+        setTimeout(() => toastEl.classList.add('hidden'), 250);
+      }, 1800);
+    }
+    if (activePillKey) {
+      const pill = document.querySelector(`.gp-leg-pill[data-leg="${activePillKey}"]`);
+      if (pill) {
+        pill.classList.add('active');
+        setTimeout(() => pill.classList.remove('active'), 250);
+      }
+    }
+  }
 
   function updateReticleControlHighlight() {
     RETICLE_CONTROLS.forEach((c, idx) => {
       const el = document.getElementById(c.elementId);
       const container = el ? (el.closest('.slider-group') || el) : null;
       if (container) {
-        container.classList.toggle('reticle-gp-focused', idx === focusedIndex);
-        if (idx === focusedIndex) {
+        container.classList.toggle('reticle-gp-focused', menuFocusActive && idx === focusedIndex);
+        if (menuFocusActive && idx === focusedIndex) {
           container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
       }
@@ -120,12 +144,23 @@ export function initReticleScreen() {
 
   // Attach gamepad interface methods to window for clean cross-module invocation
   window.reticleGamepadAPI = {
+    showToast: (text, activePillKey = null) => {
+      showReticleToast(text, activePillKey);
+    },
+    isFocusedOnMenu: () => menuFocusActive,
+    initFocus: () => {
+      menuFocusActive = true;
+      updateReticleControlHighlight();
+    },
     cycleFocus: (delta) => {
+      menuFocusActive = true;
       focusedIndex = (focusedIndex + delta + RETICLE_CONTROLS.length) % RETICLE_CONTROLS.length;
       updateReticleControlHighlight();
       return RETICLE_CONTROLS[focusedIndex];
     },
     adjust: (delta) => {
+      menuFocusActive = true;
+      updateReticleControlHighlight();
       const ctrl = RETICLE_CONTROLS[focusedIndex];
       if (!ctrl) return 'UNKNOWN';
       const cfg = appState.reticleConfig || {};
@@ -133,7 +168,7 @@ export function initReticleScreen() {
       if (ctrl.isToggle) {
         const nextVal = !cfg[ctrl.key];
         updateReticleConfig({ [ctrl.key]: nextVal });
-        return `${ctrl.label}: ${nextVal ? 'ON' : 'OFF'}`;
+        return `${ctrl.label.toUpperCase()}: ${nextVal ? 'ON' : 'OFF'}`;
       } else {
         const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : 10));
         let nextVal = cur + delta * ctrl.step;
@@ -144,10 +179,12 @@ export function initReticleScreen() {
           nextVal = Math.round(nextVal);
         }
         updateReticleConfig({ [ctrl.key]: nextVal });
-        return `${ctrl.label}: ${nextVal}${ctrl.isFloat ? 'px' : ''}`;
+        return `${ctrl.label.toUpperCase()}: ${nextVal}${ctrl.isFloat ? 'px' : ''}`;
       }
     },
     activate: () => {
+      menuFocusActive = true;
+      updateReticleControlHighlight();
       const ctrl = RETICLE_CONTROLS[focusedIndex];
       if (!ctrl) return 'READY';
       if (ctrl.isToggle) {
@@ -173,6 +210,19 @@ export function initReticleScreen() {
       const next = Math.max(10, Math.min(80, (cfg.clickSpacing || 32) + delta));
       updateReticleConfig({ clickSpacing: next });
       return `CLICK SPACING: ${next}px`;
+    },
+    quickAdjustGap: (delta) => {
+      const cfg = appState.reticleConfig || {};
+      const next = Math.max(0, Math.min(140, (cfg.centerGap ?? 64) + delta));
+      updateReticleConfig({ centerGap: next });
+      return `CENTER GAP: ${next}px`;
+    },
+    quickAdjustStroke: (delta) => {
+      const cfg = appState.reticleConfig || {};
+      const cur = Number(cfg.strokeWidth || 1.8);
+      const next = Math.max(0.6, Math.min(5.0, Math.round((cur + delta) * 10) / 10));
+      updateReticleConfig({ strokeWidth: next });
+      return `STROKE WEIGHT: ${next.toFixed(1)}px`;
     }
   };
 
@@ -299,9 +349,16 @@ export function initReticleScreen() {
     setTimeout(() => pingDot.remove(), 1200);
   });
 
+  let wasOnReticle = false;
   subscribeState(() => {
     if (appState.currentScreen === 'reticle') {
       renderPreview();
+      if (!wasOnReticle) {
+        wasOnReticle = true;
+        window.reticleGamepadAPI?.initFocus();
+      }
+    } else {
+      wasOnReticle = false;
     }
   });
 

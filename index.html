@@ -732,8 +732,27 @@
       <div class="reticle-workspace">
         <!-- Interactive Full Reticle Preview Stage -->
         <div id="reticlePreviewStage" class="reticle-stage-area" title="Click anywhere on the preview to test speech announcement">
+          <!-- Real-Time Gamepad Action Toast / OSD Pill -->
+          <div id="reticleGamepadToast" class="reticle-gamepad-toast hidden">
+            <span id="reticleToastText">CLICKS PER ARM: 10</span>
+          </div>
+
           <svg id="reticlePreviewSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
-          <div class="reticle-stage-hint">TAP PREVIEW TO TEST FEMALE VOICE (ANGLE & CLICKS)</div>
+
+          <!-- Interactive Controller Legend Strip -->
+          <div class="reticle-gamepad-legend">
+            <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK</kbd> CLICKS / SPACING</span>
+            <span class="gp-leg-pill" data-leg="rstick"><kbd>R-STICK</kbd> GAP / WEIGHT</span>
+            <span class="gp-leg-pill" data-leg="square"><kbd>▢</kbd> RINGS</span>
+            <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
+            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> LABELS</span>
+            <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
+            <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> SPACING</span>
+            <span class="gp-leg-pill" data-leg="dpad"><kbd>D-PAD</kbd> MENU</span>
+            <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> EXIT</span>
+          </div>
+
+          <div class="reticle-stage-hint">TAP PREVIEW OR USE JOYSTICK / BUTTONS TO SCULPT CROSSHAIR</div>
         </div>
 
         <!-- Customization Drawer -->

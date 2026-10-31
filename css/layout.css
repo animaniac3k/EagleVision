@@ -192,17 +192,85 @@
 
 .reticle-stage-hint {
   position: absolute;
-  bottom: 14px;
+  bottom: 46px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--radar-panel);
+  background: rgba(4, 13, 16, 0.75);
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-sm);
-  padding: 6px 14px;
+  padding: 4px 12px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 11px;
   color: var(--radar-text-muted);
   pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Real-Time Gamepad Action Toast inside Reticle Customizer */
+.reticle-gamepad-toast {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 13, 16, 0.94);
+  border: 1px solid var(--radar-primary);
+  border-radius: var(--radius-sm);
+  padding: 8px 20px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--radar-primary);
+  box-shadow: 0 0 16px rgba(45, 212, 191, 0.5);
+  pointer-events: none;
+  z-index: 30;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Bottom Controller Legend Strip */
+.reticle-gamepad-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 95%;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.gp-leg-pill {
+  background: rgba(4, 13, 16, 0.88);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--radar-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.gp-leg-pill kbd {
+  background: rgba(45, 212, 191, 0.18);
+  color: var(--radar-primary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 700;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+}
+
+.gp-leg-pill.active {
+  border-color: var(--radar-primary);
+  color: var(--radar-primary);
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.55);
+  transform: scale(1.08);
 }
 
 .reticle-test-ping {
