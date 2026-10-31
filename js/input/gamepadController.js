@@ -342,14 +342,12 @@ function handleWebHIDInputReport(event) {
     sendDualShock4BluetoothInit(activeHIDDevice);
   }
 
-  let offset = 0;
-  if (reportId === 0x11 || reportId === 0x31) {
-    offset = 1;
-  } else if (reportId === 0x01) {
-    offset = 0;
-  } else if (data.byteLength >= 10) {
-    offset = 1;
-  }
+  // DualShock 4 Report Offset:
+  // - Bluetooth Extended Mode (Report 0x11 / 0x31, 77-78 bytes): 2-byte transport header (padding1[2])
+  //   Sticks start at byte 2, buttons at bytes 6, 7, 8.
+  // - USB Mode (Report 0x01, 64 bytes) & Basic BT (10 bytes): Zero transport header bytes.
+  //   Sticks start at byte 0, buttons at bytes 4, 5, 6.
+  const offset = (reportId === 0x11 || reportId === 0x31 || data.byteLength >= 70) ? 2 : 0;
 
   if (data.byteLength < offset + 6) return;
 
