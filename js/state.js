@@ -81,6 +81,7 @@ export const appState = {
   uiOpacity: 100,
   uiDecluttered: false,
   touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)
+  reticleAimSpeed: 50,     // 15% to 150%, default 50% (50% max speed for pinpoint reticle positioning)
   ringKeyMap: {},
   gamepadConnected: false,
   gamepadName: '',

@@ -56,6 +56,7 @@ export function saveSettings(state) {
       themeColor: state.themeColor || '#2dd4bf',
       uiOpacity: state.uiOpacity ?? 100,
       touchpadSensitivity: state.touchpadSensitivity ?? 50,
+      reticleAimSpeed: state.reticleAimSpeed ?? 50,
       ringKeyMap: state.ringKeyMap || {}
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));

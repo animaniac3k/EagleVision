@@ -486,6 +486,21 @@ export async function initSidebarAndTopControls(videoEl) {
     });
   }
 
+  // Reticle Aim Speed (Joystick Max Speed) Slider in Settings
+  const sliderAimSpeed = document.getElementById('sliderReticleAimSpeed');
+  const valAimSpeed = document.getElementById('valReticleAimSpeed');
+  if (sliderAimSpeed) {
+    const s = Number(appState.reticleAimSpeed ?? 50);
+    sliderAimSpeed.value = String(s);
+    if (valAimSpeed) valAimSpeed.textContent = `${s}%`;
+    sliderAimSpeed.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) || 50;
+      if (valAimSpeed) valAimSpeed.textContent = `${val}%`;
+      updateState({ reticleAimSpeed: val, lastGamepadAction: `RETICLE AIM SPEED: ${val}%` });
+      saveSettings(appState);
+    });
+  }
+
   sliderHeatmapSens.addEventListener('input', (e) => {
     const sens = Number(e.target.value) || 60;
     valHeatmapSens.textContent = `${sens}%`;

@@ -52,8 +52,8 @@ let reticleStickRightYTime = 0;
 
 // Stick Tuning: Power curve provides 50-70% reduction at low end for fine-tick adjustments
 const DEADZONE = 0.16;
-const ROI_SPEED = 0.012;
-const PAN_SPEED = 0.014;
+const BASE_ROI_SPEED = 0.012;
+const BASE_PAN_SPEED = 0.014;
 
 // Tactical GUI Color Schemes (Cycled via L3 / R3)
 const GUI_THEMES = [
@@ -841,11 +841,14 @@ function applyStickCurve(v) {
  */
 function applyStickMotion(lx, ly, rx, ry) {
   // Left Stick: Moves ROI Target Crosshair (roiX, roiY) in live mode
+  // Maximum speed reduced by ~50% (scaled by reticleAimSpeed, default 50%) to allow pinpoint positioning
   if (appState.currentScreen === 'live' && (lx !== 0 || ly !== 0)) {
+    const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
+    const currentRoiSpeed = BASE_ROI_SPEED * aimRatio;
     const clx = applyStickCurve(lx);
     const cly = applyStickCurve(ly);
-    let nx = Math.max(0.04, Math.min(0.96, appState.roiX + clx * ROI_SPEED));
-    let ny = Math.max(0.04, Math.min(0.96, appState.roiY + cly * ROI_SPEED));
+    let nx = Math.max(0.04, Math.min(0.96, appState.roiX + clx * currentRoiSpeed));
+    let ny = Math.max(0.04, Math.min(0.96, appState.roiY + cly * currentRoiSpeed));
     updateState({
       roiX: nx,
       roiY: ny,
@@ -856,11 +859,13 @@ function applyStickMotion(lx, ly, rx, ry) {
 
   // Right Stick: Pans Main View when zoomed in (>1.0x) in live mode
   if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || ry !== 0)) {
+    const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
+    const currentPanSpeed = BASE_PAN_SPEED * aimRatio;
     const crx = applyStickCurve(rx);
     const cry = applyStickCurve(ry);
     const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
-    const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX + crx * PAN_SPEED));
-    const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + cry * PAN_SPEED));
+    const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX + crx * currentPanSpeed));
+    const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + cry * currentPanSpeed));
     updateState({ mainPanX: nx, mainPanY: ny });
   }
 
