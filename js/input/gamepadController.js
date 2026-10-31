@@ -45,6 +45,7 @@ let vmHideTimeout = null;
 let vmIsDragging = false;
 let vmDragTargetEl = null;
 let vmLastPhysicalClick = false;
+let vmL2Down = false;
 let reticleStickLastXTime = 0;
 let reticleStickLastYTime = 0;
 let reticleStickRightXTime = 0;
@@ -701,6 +702,23 @@ function endVirtualDrag(x, y) {
     if (interactive && typeof interactive.click === 'function') {
       interactive.click();
     }
+
+    // If dragged/clicked on main video canvas in live screen, aim the ROI target crosshair right there!
+    const canvasWrapper = el.closest('.canvas-wrapper') || (el.id === 'mainCanvas' ? el : null);
+    if (canvasWrapper && appState.currentScreen === 'live') {
+      const rect = canvasWrapper.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const roiX = Math.max(0.04, Math.min(0.96, (x - rect.left) / rect.width));
+        const roiY = Math.max(0.04, Math.min(0.96, (y - rect.top) / rect.height));
+        updateState({
+          roiX,
+          roiY,
+          pipEnabled: true,
+          roiTargetVisible: true,
+          lastGamepadAction: `AIM ROI (${Math.round(roiX * 100)}%, ${Math.round(roiY * 100)}%)`
+        });
+      }
+    }
   }
   vmDragTargetEl = null;
 }
@@ -742,10 +760,40 @@ function triggerVirtualClick(x, y) {
         roiY,
         pipEnabled: true,
         roiTargetVisible: true,
-        lastGamepadAction: `TOUCHPAD CLICK: AIM ROI (${Math.round(roiX * 100)}%, ${Math.round(roiY * 100)}%)`
+        lastGamepadAction: `LEFT CLICK: AIM ROI (${Math.round(roiX * 100)}%, ${Math.round(roiY * 100)}%)`
       });
     }
   }
+}
+
+/**
+ * Dispatches a simulated Right Mouse Click at (x, y)
+ */
+function triggerVirtualRightClick(x, y) {
+  wakeVirtualMouse();
+  setVirtualMouseState('clicked');
+  setTimeout(() => setVirtualMouseState('normal'), 180);
+
+  const el = document.elementFromPoint(x, y);
+  if (!el) return;
+
+  const target = el.closest('button, input, select, a, [data-gp], [data-tab], .radar-btn, .ov-btn') || el;
+
+  target.dispatchEvent(new PointerEvent('pointerdown', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2, buttons: 2, pointerId: 101, isPrimary: true
+  }));
+  target.dispatchEvent(new MouseEvent('mousedown', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2, buttons: 2
+  }));
+  target.dispatchEvent(new PointerEvent('pointerup', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2, buttons: 0, pointerId: 101, isPrimary: true
+  }));
+  target.dispatchEvent(new MouseEvent('mouseup', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2, buttons: 0
+  }));
+  target.dispatchEvent(new MouseEvent('contextmenu', {
+    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2
+  }));
 }
 
 function updateRangeSliderFromX(slider, clientX) {
@@ -1131,34 +1179,26 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // L2 (Trigger) - Step Backward 1 Frame / Reticle spacing -2px
+  // L2 (Left Trigger) - Left Mouse Click & Drag with Virtual Mouse (works seamlessly with trackpad)
   if (isJustPressed('l2')) {
-    if (screen === 'reticle') {
-      const res = window.reticleGamepadAPI?.quickAdjustSpacing(-2);
-      window.reticleGamepadAPI?.showToast(res || 'SPACING -2px', 'triggers');
-      updateState({ lastGamepadAction: `RETICLE: ${res || 'SPACING -2px'}` });
-    } else if (screen === 'gallery') {
-      document.getElementById('btnGalleryStepBack')?.click();
-      updateState({ lastGamepadAction: 'TRIGGER: L2 (STEP -1 FRAME)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnReplayStepBack')?.click();
-      updateState({ lastGamepadAction: 'TRIGGER: L2 (STEP -1 FRAME)' });
+    wakeVirtualMouse();
+    vmL2Down = true;
+    vmIsDragging = true;
+    startVirtualDrag(vmCursorX, vmCursorY);
+    updateState({ lastGamepadAction: 'TRIGGER: L2 (LEFT MOUSE CLICK)' });
+  } else if (!actionState['l2'] && vmL2Down) {
+    vmL2Down = false;
+    if (!vmLastPhysicalClick) {
+      vmIsDragging = false;
+      endVirtualDrag(vmCursorX, vmCursorY);
     }
   }
 
-  // R2 (Trigger) - Step Forward 1 Frame / Reticle spacing +2px
+  // R2 (Right Trigger) - Right Mouse Click with Virtual Mouse (Context Menu)
   if (isJustPressed('r2')) {
-    if (screen === 'reticle') {
-      const res = window.reticleGamepadAPI?.quickAdjustSpacing(2);
-      window.reticleGamepadAPI?.showToast(res || 'SPACING +2px', 'triggers');
-      updateState({ lastGamepadAction: `RETICLE: ${res || 'SPACING +2px'}` });
-    } else if (screen === 'gallery') {
-      document.getElementById('btnGalleryStep')?.click();
-      updateState({ lastGamepadAction: 'TRIGGER: R2 (STEP +1 FRAME)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnReplayStep')?.click();
-      updateState({ lastGamepadAction: 'TRIGGER: R2 (STEP +1 FRAME)' });
-    }
+    wakeVirtualMouse();
+    triggerVirtualRightClick(vmCursorX, vmCursorY);
+    updateState({ lastGamepadAction: 'TRIGGER: R2 (RIGHT MOUSE CLICK)' });
   }
 
   // Options - Open / Close Settings (Options) Screen

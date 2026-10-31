@@ -19,11 +19,11 @@
   <aside id="splashScreen" class="splash-screen" role="dialog" aria-modal="true" aria-label="SPOTR Splash Screen">
     <div class="splash-content">
       <div class="splash-logo-wrap">
-        <svg class="splash-logo-svg" viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+        <svg class="splash-logo-svg" viewBox="0 0 520 220" xmlns="http://www.w3.org/2000/svg">
           <!-- Background -->
-          <rect width="700" height="220" rx="24" fill="#18181B"/>
+          <rect width="520" height="220" rx="24" fill="#18181B"/>
 
-          <!-- Icon -->
+          <!-- Icon (Static) -->
           <g transform="translate(30,30)">
             <!-- Tile -->
             <rect width="160" height="160" rx="28" fill="#202024"/>
@@ -57,22 +57,21 @@
               r="7"
               fill="#FF6B00"/>
 
-            <!-- Detection Indicator -->
+            <!-- Detection Indicator (Static) -->
             <circle
-              class="splash-detection-dot"
               cx="118"
               cy="42"
               r="9"
               fill="#FFD166"/>
           </g>
 
-          <!-- Logo Text -->
+          <!-- Logo Brand Text -->
           <text
               x="225"
-              y="100"
+              y="103"
               fill="#F8FAFC"
               font-family="Arial, Helvetica, sans-serif"
-              font-size="68"
+              font-size="72"
               font-weight="700"
               letter-spacing="4">
               SPOTR
@@ -80,41 +79,54 @@
 
           <!-- Trademark -->
           <text
-              x="485"
+              x="470"
               y="62"
               fill="#FFD166"
               font-family="Arial, Helvetica, sans-serif"
-              font-size="18"
+              font-size="16"
               font-weight="700">
               ™
           </text>
 
           <!-- Tagline -->
           <text
-              x="228"
+              x="225"
               y="145"
               fill="#9CA3AF"
               font-family="Arial, Helvetica, sans-serif"
-              font-size="22"
-              letter-spacing="1.5">
+              font-size="18.5"
+              font-weight="500"
+              letter-spacing="2.3">
               RECON • DETECT • ALERT
           </text>
 
-          <!-- Accent Line -->
+          <!-- Loading Progress Track (Inside Logo Perimeter) -->
           <rect
-              x="228"
-              y="165"
-              width="250"
+              class="splash-line-track"
+              x="225"
+              y="166"
+              width="261"
               height="4"
               rx="2"
-              fill="#FF6B00"/>
-        </svg>
-      </div>
+              fill="rgba(255, 255, 255, 0.12)"/>
 
-      <div class="splash-footer">
-        <div class="splash-progress-track">
-          <div class="splash-progress-bar"></div>
-        </div>
+          <!-- Loading Progress Bar (Inside Logo Perimeter) -->
+          <rect
+              class="splash-line-progress"
+              x="225"
+              y="166"
+              width="0"
+              height="4"
+              rx="2"
+              fill="#FF6B00">
+            <animate
+                attributeName="width"
+                from="0"
+                to="261"
+                dur="3.5s"
+                fill="freeze"/>
+          </rect>
+        </svg>
       </div>
     </div>
   </aside>
@@ -629,7 +641,7 @@
               <div>• <b>L3 / R3 (Press Sticks In):</b> GUI Color Scheme (◀ Prev / ▶ Next)</div>
               <div>• <b>D-Pad:</b> Zoom Window (▲/▼), Main Zoom/Step (◀/▶)</div>
               <div>• <b>L1 / R1:</b> Main Stream Zoom Out / In</div>
-              <div>• <b>L2 / R2:</b> Step Frame -1 / +1 (Replay & Clips)</div>
+              <div>• <b>L2 / R2:</b> Left Mouse Click / Drag (L2) & Right Mouse Click (R2)</div>
               <div>• <b>✕ Cross:</b> Play/Pause or Cycle Mode</div>
               <div>• <b>○ Circle:</b> Return to Live Screen</div>
               <div>• <b>□ Square:</b> Reticle Guide On/Off</div>
@@ -761,7 +773,7 @@
             <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
             <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> TOGGLE / AUDITION</span>
             <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
-            <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> SPACING</span>
+            <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> MOUSE CLICK</span>
             <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> LIVE FEED</span>
           </div>
 

@@ -617,9 +617,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
   width: 100%;
-  max-width: 720px;
+  max-width: 540px;
   animation: splashZoomIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -647,43 +646,21 @@
   height: auto;
 }
 
-.splash-detection-dot {
-  animation: splashDotFlash 0.9s infinite ease-in-out;
+/* Loading Line Progress inside Logo Badge Perimeter */
+.splash-line-track {
+  opacity: 0.85;
 }
 
-@keyframes splashDotFlash {
-  0%, 100% {
-    opacity: 1;
-    filter: drop-shadow(0 0 6px rgba(255, 209, 102, 0.9));
+.splash-line-progress {
+  filter: drop-shadow(0 0 6px rgba(255, 107, 0, 0.85));
+  animation: splashFillInside 3.5s linear forwards;
+}
+
+@keyframes splashFillInside {
+  from {
+    width: 0px;
   }
-  50% {
-    opacity: 0.18;
-    filter: none;
+  to {
+    width: 261px;
   }
-}
-
-.splash-footer {
-  width: 100%;
-  max-width: 320px;
-}
-
-.splash-progress-track {
-  width: 100%;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.splash-progress-bar {
-  width: 0%;
-  height: 100%;
-  background: #FF6B00;
-  box-shadow: 0 0 8px #FF6B00;
-  animation: splashFill 3.5s linear forwards;
-}
-
-@keyframes splashFill {
-  from { width: 0%; }
-  to { width: 100%; }
 }
