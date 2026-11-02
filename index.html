@@ -875,8 +875,30 @@
       <!-- Real-Time Hardware Signal & Action Readout -->
       <div id="cmLiveActionBanner" class="cm-live-banner">READY (PRESS ANY CONTROLLER BUTTON, TRIGGER, STICK OR KEY TO TEST)</div>
 
+      <!-- Device Selector Sub-Tabs (Gamepad vs 7-Button Remote) -->
+      <div class="cm-tab-bar">
+        <button id="tabBtnGamepad" class="cm-tab-btn active" title="Gamepad & Joystick Configurator">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="4"/>
+            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
+          </svg>
+          <span>GAMEPAD / JOYSTICK</span>
+        </button>
+        <button id="tabBtnRemote" class="cm-tab-btn" title="7-Button Wireless Bluetooth Remote / Ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="2" width="12" height="20" rx="3"/>
+            <circle cx="12" cy="10" r="3.5"/>
+            <circle cx="9.5" cy="17" r="1.2"/>
+            <circle cx="14.5" cy="17" r="1.2"/>
+          </svg>
+          <span>7-BTN BLUETOOTH REMOTE / RING</span>
+        </button>
+      </div>
+
       <div class="controller-screen-body">
-        <div class="controller-workspace-grid">
+        <!-- TAB 1: GAMEPAD / JOYSTICK WORKSPACE -->
+        <div id="viewGamepadConfig" class="cm-view-tab">
+          <div class="controller-workspace-grid">
           <!-- Left Column: Visual Controller Representation & Stick Calibration -->
           <div class="cm-hardware-col">
             <!-- 1. Interactive Visual Controller Diagram & Live Monitoring -->
@@ -1058,6 +1080,162 @@
 
               <div class="cm-table-footer-hint">
                 💡 <b>TIP:</b> Click any <b>BINDING</b> button, then press any button, trigger, or stick on your controller to rebind. Press <kbd>ESC</kbd> to cancel.
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- TAB 2: 7-BUTTON BLUETOOTH REMOTE / RING WORKSPACE -->
+        <div id="viewRemoteConfig" class="cm-view-tab hidden">
+          <div class="controller-workspace-grid">
+            <!-- Left Column: Visual Remote Representation & Live Signal Diagnostics -->
+            <div class="cm-hardware-col">
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <span class="settings-label">Live Remote Monitor</span>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span id="remoteStatusDot" class="gamepad-dot" style="background:#10B981; box-shadow:0 0 8px #10B981;"></span>
+                    <span id="remoteStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">BLUETOOTH HID LISTENING</span>
+                  </div>
+                </div>
+
+                <!-- Remote Hardware Schematic Box -->
+                <div class="remote-device-box">
+                  <svg class="remote-device-svg" viewBox="0 0 280 330" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Type-C Port at Top -->
+                    <rect x="110" y="6" width="60" height="10" rx="4" fill="#0A0A0C" stroke="#3F3F46" stroke-width="1.5"/>
+
+                    <!-- Main Remote Body -->
+                    <rect x="15" y="20" width="250" height="295" rx="38" fill="#1C1D22" stroke="#2C2D35" stroke-width="3"/>
+                    <rect x="22" y="27" width="236" height="281" rx="32" fill="#141518" stroke="#1F2026" stroke-width="1"/>
+
+                    <!-- Top LED Status Indicator -->
+                    <circle id="remoteLedDot" class="remote-led-dot" cx="54" cy="74" r="5" fill="#3F3F46" stroke="#27272A" stroke-width="1"/>
+                    <text x="54" y="90" fill="#71717A" font-family="monospace" font-size="7" text-anchor="middle">LED</text>
+
+                    <!-- Center Action Button (Play / Pause / Lock) -->
+                    <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
+                      <circle cx="140" cy="132" r="26" fill="#2B2C33" stroke="#3E3F4A" stroke-width="2"/>
+                      <polygon points="132,125 132,139 142,132" fill="#F8FAFC"/>
+                      <line x1="145" y1="125" x2="145" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
+                      <line x1="149" y1="125" x2="149" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
+                    </g>
+
+                    <!-- D-Pad Directional Cluster (Radial symmetry, uniform 8px gap) -->
+                    <!-- Up Sector Button -->
+                    <g id="rBtnUP" class="remote-visual-btn" data-remote-act="UP">
+                      <path d="M 100.0 77.0 A 68 68 0 0 1 180.0 77.0 L 160.0 104.5 A 34 34 0 0 0 120.0 104.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,75 134,84 146,84" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Down Sector Button -->
+                    <g id="rBtnDOWN" class="remote-visual-btn" data-remote-act="DOWN">
+                      <path d="M 180.0 187.0 A 68 68 0 0 1 100.0 187.0 L 120.0 159.5 A 34 34 0 0 0 160.0 159.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,189 134,180 146,180" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Left Sector Button -->
+                    <g id="rBtnLEFT" class="remote-visual-btn" data-remote-act="LEFT">
+                      <path d="M 85.0 172.0 A 68 68 0 0 1 85.0 92.0 L 112.5 112.0 A 34 34 0 0 0 112.5 152.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="83,132 92,126 92,138" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Right Sector Button -->
+                    <g id="rBtnRIGHT" class="remote-visual-btn" data-remote-act="RIGHT">
+                      <path d="M 195.0 92.0 A 68 68 0 0 1 195.0 172.0 L 167.5 152.0 A 34 34 0 0 0 167.5 112.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="197,132 188,126 188,138" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Bottom Left Button (⏻ 1 - Instant Replay) -->
+                    <g id="rBtnBTN1" class="remote-visual-btn" data-remote-act="BTN1">
+                      <circle cx="86" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
+                      <!-- Vector Power Symbol -->
+                      <path d="M 86 238 L 86 245 M 80.5 242 A 6.5 6.5 0 1 0 91.5 242" stroke="#FF8533" stroke-width="2" fill="none" stroke-linecap="round"/>
+                      <text x="86" y="265" fill="#E2E8F0" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">1</text>
+                      <text x="86" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">REPLAY</text>
+                    </g>
+
+                    <!-- Bottom Right Button (2 - Mode Switcher) -->
+                    <g id="rBtnBTN2" class="remote-visual-btn" data-remote-act="BTN2">
+                      <circle cx="194" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
+                      <text x="194" y="258" fill="#F8FAFC" font-family="monospace" font-size="20" font-weight="bold" text-anchor="middle">2</text>
+                      <text x="194" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">MODE</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Live Remote State Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <span class="settings-label">Remote State & Optics Status</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:12px; font-family:var(--font-mono);">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">ACTIVE REMOTE MODE:</span>
+                    <button id="btnCycleRemoteModeTab" class="remote-mode-pill" title="Click to cycle remote mode">[ 1/3 PAN VIEW ]</button>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">FFP RETICLE SYNC:</span>
+                    <button id="btnToggleFfpTab" class="radar-btn radar-btn-sm" title="Toggle First Focal Plane Lock">LOCKED 🔒</button>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">LAST RAW SIGNAL:</span>
+                    <span id="remoteLastSignalText" style="color:var(--radar-primary); font-weight:700;">READY (PRESS ANY REMOTE BUTTON)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Mapping & Calibration Table + Cheatsheet -->
+            <div class="cm-mapping-col">
+              <div class="settings-card" style="flex:1; display:flex; flex-direction:column;">
+                <div class="settings-card-header">
+                  <span class="settings-label">7-Button Remote Calibration & Action Table</span>
+                  <button id="btnResetRemoteTabMap" class="radar-btn radar-btn-sm" title="Reset remote bindings to defaults">RESET REMOTE DEFAULTS</button>
+                </div>
+
+                <div class="cm-table-wrap">
+                  <table class="cm-mapping-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 22%;">PHYSICAL BUTTON</th>
+                        <th style="width: 44%;">DISCRETE ONE-FINGER FUNCTION</th>
+                        <th style="width: 18%;">BOUND HID KEY</th>
+                        <th style="width: 16%; text-align:center;">CALIBRATE</th>
+                      </tr>
+                    </thead>
+                    <tbody id="remoteMappingTableBody">
+                      <!-- Dynamically rendered by controllerScreen.js -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Field Quick Reference Cheatsheet -->
+                <div class="remote-quick-guide-grid">
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">① [PAN VIEW] MODE</div>
+                    <div>• <b>▲▼◀▶</b> Pan live camera feed</div>
+                    <div>• <b>● CENTER</b> Re-center pan (0,0)</div>
+                    <div>• <b>BTN 1</b> Instant Replay in/out</div>
+                    <div>• <b>BTN 2</b> Switch to ZOOM VIEW</div>
+                  </div>
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">② [ZOOM VIEW] MODE</div>
+                    <div>• <b>▲ / ▼</b> Zoom live stream (±0.25x)</div>
+                    <div>• <b>◀ / ▶</b> Coarse zoom step (±0.5x)</div>
+                    <div>• <b>● CENTER</b> Reset zoom to 1.0x (1:1)</div>
+                    <div>• <i>(FFP auto-scales reticle with zoom)</i></div>
+                  </div>
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">③ [RETICLE CAL] MODE</div>
+                    <div>• <b>▲ / ▼</b> Fine spacing (±1px)</div>
+                    <div>• <b>◀ / ▶</b> Coarse spacing (±5px)</div>
+                    <div>• <b>● CENTER</b> <b>LOCK / UNLOCK FFP 🔒</b></div>
+                    <div>• <b>BTN 2</b> Return to PAN VIEW</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

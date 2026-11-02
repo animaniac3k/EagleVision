@@ -12,6 +12,7 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
+import { DEFAULT_KEY_MAP, REMOTE_MODES, getActiveRemoteMode, setRemoteMode } from './ringController.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [
@@ -255,6 +256,59 @@ export const ACTION_DEFINITIONS = [
     desc: 'Toggle ON/OFF whichever secondary tool is currently selected on the cyclic dock',
     defaultGamepad: 'cross',
     defaultKey: 'Enter'
+  }
+];
+
+// 7-Button Wireless Remote Action Definitions
+export const REMOTE_BUTTON_DEFS = [
+  {
+    id: 'BTN1',
+    name: 'BUTTON 1 (PWR 1)',
+    badge: 'REPLAY',
+    desc: 'Instant Replay In / Out (1-click trigger in/out from any mode)',
+    defaultCodes: 'AudioVolumeUp, KeyX, KeyR, F12'
+  },
+  {
+    id: 'BTN2',
+    name: 'BUTTON 2 (2)',
+    badge: 'MODE',
+    desc: 'Discrete Mode Switcher (PAN → ZOOM → RETICLE) • Slow-Mo in Replay',
+    defaultCodes: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
+  },
+  {
+    id: 'CENTER',
+    name: 'CENTER (▶||)',
+    badge: 'ACTION',
+    desc: 'Context Action: Re-center Pan (0,0) • Reset Zoom (1.0x) • Lock/Unlock FFP 🔒 • Play/Pause Video',
+    defaultCodes: 'Enter, Space, MediaPlayPause, KeyF'
+  },
+  {
+    id: 'UP',
+    name: 'UP (▲)',
+    badge: 'D-PAD',
+    desc: 'Pan Up • Zoom In (+0.25x) • Reticle Spacing +1px • Replay Restart',
+    defaultCodes: 'ArrowUp, PageUp, KeyW'
+  },
+  {
+    id: 'DOWN',
+    name: 'DOWN (▼)',
+    badge: 'D-PAD',
+    desc: 'Pan Down • Zoom Out (-0.25x) • Reticle Spacing -1px • Replay Exit to Live',
+    defaultCodes: 'ArrowDown, PageDown, KeyS'
+  },
+  {
+    id: 'LEFT',
+    name: 'LEFT (◀)',
+    badge: 'D-PAD',
+    desc: 'Pan Left • Zoom Coarse Step Down • Reticle Spacing -5px • Replay Step -1 Frame',
+    defaultCodes: 'ArrowLeft, MediaTrackPrevious, KeyA'
+  },
+  {
+    id: 'RIGHT',
+    name: 'RIGHT (▶)',
+    badge: 'D-PAD',
+    desc: 'Pan Right • Zoom Coarse Step Up • Reticle Spacing +5px • Replay Step +1 Frame',
+    defaultCodes: 'ArrowRight, MediaTrackNext, KeyD'
   }
 ];
 
@@ -697,6 +751,184 @@ export function initControllerScreen() {
 
   syncCalibrationSliders();
   renderMappingTable();
+
+  // -------------------------------------------------------------------------
+  // 7-BUTTON WIRELESS BLUETOOTH REMOTE TAB INTEGRATION
+  // -------------------------------------------------------------------------
+  const tabBtnGamepad = document.getElementById('tabBtnGamepad');
+  const tabBtnRemote = document.getElementById('tabBtnRemote');
+  const viewGamepadConfig = document.getElementById('viewGamepadConfig');
+  const viewRemoteConfig = document.getElementById('viewRemoteConfig');
+  const remoteMappingTableBody = document.getElementById('remoteMappingTableBody');
+  const btnCycleRemoteModeTab = document.getElementById('btnCycleRemoteModeTab');
+  const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
+  const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
+  const remoteLastSignalText = document.getElementById('remoteLastSignalText');
+
+  let activeLearningRemoteAct = null;
+
+  function syncRemoteStateUI() {
+    const activeMode = getActiveRemoteMode();
+    if (btnCycleRemoteModeTab) {
+      btnCycleRemoteModeTab.textContent = `[ ${activeMode} ]`;
+    }
+    if (btnToggleFfpTab) {
+      const isLocked = Boolean(appState.reticleFfpMode);
+      btnToggleFfpTab.textContent = isLocked ? 'LOCKED 🔒' : 'MANUAL 🔓';
+      btnToggleFfpTab.classList.toggle('radar-btn-active', isLocked);
+    }
+  }
+
+  function renderRemoteTable() {
+    if (!remoteMappingTableBody) return;
+    const customMap = appState.ringKeyMap || {};
+
+    remoteMappingTableBody.innerHTML = REMOTE_BUTTON_DEFS.map((def) => {
+      const isCustom = Boolean(customMap[def.id]);
+      const boundKey = customMap[def.id] || def.defaultCodes;
+      const isLearning = activeLearningRemoteAct === def.id;
+
+      let keyPillsHtml = '';
+      if (isLearning) {
+        keyPillsHtml = '<span class="remote-key-tag learning">PRESS KEY ON REMOTE...</span>';
+      } else {
+        const keyList = boundKey.split(',').map((k) => k.trim()).filter(Boolean);
+        keyPillsHtml = keyList.map((k, idx) => {
+          const pillClass = isCustom ? 'custom' : (idx === 0 ? 'primary' : '');
+          return `<span class="remote-key-tag ${pillClass}">${k}</span>`;
+        }).join('');
+      }
+
+      return `
+        <tr>
+          <td>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="cm-badge" style="background:rgba(255,107,0,0.15); border:1px solid rgba(255,107,0,0.4); color:var(--radar-primary); font-size:10px; padding:2px 6px; border-radius:4px;">${def.badge}</span>
+              <strong style="color:var(--radar-text); font-size:12px;">${def.name}</strong>
+            </div>
+          </td>
+          <td>
+            <span style="font-size:12px; color:var(--radar-text-muted);">${def.desc}</span>
+          </td>
+          <td>
+            <div class="remote-key-tags-cell">
+              ${keyPillsHtml}
+            </div>
+          </td>
+          <td style="text-align:center;">
+            <button class="radar-btn radar-btn-sm remote-learn-btn ${isLearning ? 'radar-btn-active' : ''}" data-remote-act="${def.id}" style="font-size:11px; height:26px; padding:0 10px;">
+              ${isLearning ? 'WAITING...' : 'LEARN'}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    remoteMappingTableBody.querySelectorAll('.remote-learn-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.remoteAct;
+        if (activeLearningRemoteAct === act) {
+          activeLearningRemoteAct = null;
+        } else {
+          activeLearningRemoteAct = act;
+          showToastBanner(`PRESS BUTTON [${act}] ON YOUR REMOTE TO CALIBRATE`);
+        }
+        renderRemoteTable();
+      });
+    });
+  }
+
+  function switchControllerTab(tab) {
+    if (tab === 'remote') {
+      tabBtnRemote?.classList.add('active');
+      tabBtnGamepad?.classList.remove('active');
+      viewRemoteConfig?.classList.remove('hidden');
+      viewGamepadConfig?.classList.add('hidden');
+      renderRemoteTable();
+      syncRemoteStateUI();
+    } else {
+      tabBtnGamepad?.classList.add('active');
+      tabBtnRemote?.classList.remove('active');
+      viewGamepadConfig?.classList.remove('hidden');
+      viewRemoteConfig?.classList.add('hidden');
+    }
+  }
+
+  tabBtnGamepad?.addEventListener('click', () => switchControllerTab('gamepad'));
+  tabBtnRemote?.addEventListener('click', () => switchControllerTab('remote'));
+
+  btnCycleRemoteModeTab?.addEventListener('click', () => {
+    const currentMode = getActiveRemoteMode();
+    const curIdx = REMOTE_MODES.indexOf(currentMode);
+    const nextIdx = (curIdx + 1) % REMOTE_MODES.length;
+    setRemoteMode(nextIdx);
+    syncRemoteStateUI();
+    showToastBanner(`REMOTE MODE SWITCHED TO: ${REMOTE_MODES[nextIdx]}`);
+  });
+
+  btnToggleFfpTab?.addEventListener('click', () => {
+    const nextFfp = !appState.reticleFfpMode;
+    updateState({ reticleFfpMode: nextFfp });
+    saveSettings(appState);
+    syncRemoteStateUI();
+    showToastBanner(nextFfp ? 'FIRST FOCAL PLANE (FFP) LOCKED 🔒' : 'RETICLE SET TO MANUAL SFP 🔓');
+  });
+
+  btnResetRemoteTabMap?.addEventListener('click', () => {
+    activeLearningRemoteAct = null;
+    updateState({ ringKeyMap: {} });
+    saveSettings(appState);
+    renderRemoteTable();
+    showToastBanner('REMOTE BUTTON MAPPINGS RESET TO DEFAULTS');
+  });
+
+  // Listen for real-time remote button signals
+  window.addEventListener('spotr-remote-button', (e) => {
+    const { action, signalCode } = e.detail;
+
+    // A. If learning a button in the Remote table
+    if (activeLearningRemoteAct) {
+      const act = activeLearningRemoteAct;
+      activeLearningRemoteAct = null;
+      const customMap = appState.ringKeyMap || {};
+      customMap[act] = signalCode;
+      updateState({ ringKeyMap: { ...customMap } });
+      saveSettings(appState);
+      renderRemoteTable();
+      showToastBanner(`REMOTE [${act}] BOUND TO ${signalCode}`);
+    }
+
+    // B. Real-time visual button glow on SVG schematic
+    if (action) {
+      const visualBtn = document.querySelector(`.remote-visual-btn[data-remote-act="${action}"]`);
+      if (visualBtn) {
+        visualBtn.classList.add('remote-active-glow');
+        setTimeout(() => visualBtn.classList.remove('remote-active-glow'), 260);
+      }
+    }
+
+    // C. LED indicator flash
+    const led = document.getElementById('remoteLedDot');
+    if (led) {
+      led.classList.add('active');
+      setTimeout(() => led.classList.remove('active'), 260);
+    }
+
+    // D. Update diagnostic telemetry banner
+    if (remoteLastSignalText) {
+      remoteLastSignalText.textContent = `${signalCode} → [${action || 'UNMAPPED'}]`;
+    }
+    const liveBanner = document.getElementById('cmLiveActionBanner');
+    if (liveBanner) {
+      liveBanner.textContent = `REMOTE SIGNAL: [${action || 'RAW'}] ${signalCode} (${new Date().toLocaleTimeString()})`;
+    }
+
+    syncRemoteStateUI();
+  });
+
+  // Initial render of remote table and state
+  renderRemoteTable();
+  syncRemoteStateUI();
 }
 
 function showToastBanner(msg) {

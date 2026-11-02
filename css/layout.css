@@ -830,6 +830,202 @@
   text-overflow: ellipsis;
 }
 
+/* Controller Configurator Device Sub-Tabs */
+.cm-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(13, 14, 18, 0.95);
+  border-bottom: 1px solid var(--radar-border);
+  flex-shrink: 0;
+}
+
+.cm-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: var(--radar-surface);
+  border: 1px solid var(--radar-border);
+  border-radius: 6px;
+  color: var(--radar-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.cm-tab-btn:hover {
+  color: var(--radar-text);
+  border-color: rgba(255, 107, 0, 0.5);
+  background: rgba(255, 107, 0, 0.08);
+}
+
+.cm-tab-btn.active {
+  color: #fff;
+  background: rgba(255, 107, 0, 0.18);
+  border-color: var(--radar-primary);
+  box-shadow: 0 0 10px rgba(255, 107, 0, 0.25);
+}
+
+.cm-tab-btn svg {
+  flex-shrink: 0;
+}
+
+.cm-view-tab {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cm-view-tab.hidden {
+  display: none !important;
+}
+
+/* 7-Button Wireless Bluetooth Remote Visualizer & Calibrator */
+.remote-device-box {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--radar-border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 380px;
+}
+
+.remote-device-svg {
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.7));
+}
+
+.remote-visual-btn {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.remote-visual-btn:hover {
+  filter: brightness(1.25);
+}
+
+.remote-visual-btn.remote-active-glow {
+  fill: var(--radar-primary) !important;
+  stroke: #FF8533 !important;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.95)) !important;
+}
+
+.remote-visual-btn.remote-active-glow text,
+.remote-visual-btn.remote-active-glow path {
+  fill: #0D0E12 !important;
+  stroke: #0D0E12 !important;
+}
+
+.remote-led-dot {
+  transition: all 0.2s ease;
+}
+
+.remote-led-dot.active {
+  fill: #10B981 !important;
+  filter: drop-shadow(0 0 6px #10B981);
+}
+
+.remote-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(255, 107, 0, 0.15);
+  border: 1px solid rgba(255, 107, 0, 0.4);
+  color: var(--radar-primary);
+}
+
+/* Discrete Key Pills in Remote Mapping Table (No Text-Wrap Collisions) */
+.remote-key-tags-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.remote-key-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #94A3B8;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.remote-key-tag.primary {
+  color: #38BDF8;
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(56, 189, 248, 0.08);
+  font-weight: 600;
+}
+
+.remote-key-tag.custom {
+  color: #FF8533;
+  border-color: rgba(255, 107, 0, 0.5);
+  background: rgba(255, 107, 0, 0.15);
+  font-weight: 700;
+}
+
+.remote-key-tag.learning {
+  color: #fff;
+  border-color: var(--radar-primary);
+  background: rgba(255, 107, 0, 0.25);
+  animation: radarPulse 1s infinite alternate;
+}
+
+.remote-quick-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 800px) {
+  .remote-quick-guide-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.remote-guide-card {
+  background: rgba(24, 24, 27, 0.6);
+  border: 1px solid var(--radar-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.remote-guide-card-title {
+  color: var(--radar-primary);
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .controller-screen-body {
   flex: 1;
   overflow-y: auto;

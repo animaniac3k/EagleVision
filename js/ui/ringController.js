@@ -1,46 +1,56 @@
 /**
- * 5-Button Bluetooth Scrolling Ring Controller Integration
- * (Targeted for Wireless Bluetooth Scrolling Ring — Up / Down / Left / Right / Center)
+ * SPOTR 7-Button Wireless Bluetooth Remote / Ring Controller Integration
  *
- * How 5 buttons control the entire EagleVision interface hands-free:
- * - Single-Press CENTER (●): Cycles Ring Mode on Live Feed:
- *     1. [AIM ROI]  : ▲/▼/◀/▶ moves the Zoom Window Target Crosshair across the image
- *     2. [ZOOM]     : ▲/▼ adjusts Zoom Window (+/−), ◀/▶ adjusts Main Whole-Image Zoom (−/+)
- *     3. [TOOLS]    : ▲ toggles Heatmap, ▼ toggles Crosshair Guide, ◀ toggles Settings, ▶ triggers Instant Replay
- * - Double-Press CENTER (●●): Immediately triggers INSTANT REPLAY from any mode (or exits Replay back to Live).
- * - Automatic Video Player Mode (during Instant Replay or Fullscreen Saved Clips):
- *     - ● CENTER    : Play / Pause (Double-press exits to Live Feed)
- *     - ◀ / ▶       : Step / Scrub backward & forward through the recording
- *     - ▲ UP        : Toggle 0.5x Slow-Motion (or restart replay)
- *     - ▼ DOWN      : Close Replay / Toggle Saved Clips Drawer
+ * Designed for one-finger tactical operation:
+ * - Button 1 (⏻ 1): Instant Replay In / Out toggle (Always 1-click in/out)
+ * - Button 2 (2)  : Discrete Mode Switcher cycling 3 live modes:
+ *     1. [PAN VIEW]    : ▲/▼/◀/▶ pans the magnified live video stream, ● re-centers pan (0,0)
+ *     2. [ZOOM VIEW]   : ▲/▼ zooms main live stream in/out (+/−0.25x), ● resets zoom to 1.0x
+ *     3. [RETICLE CAL] : ▲/▼/◀/▶ expands/contracts crosshair hashmark spacing, ● Locks / Unlocks FFP mode 🔒
+ * - Center (▶||)  : Context-sensitive action (Re-center / Reset 1:1 / Lock FFP / Video Play-Pause)
+ * - Auto-Player Mode in Instant Replay / Gallery:
+ *     - ● CENTER : Play / Pause
+ *     - ◀ / ▶    : Step -1 / +1 Frame for forensic frame-by-frame review
+ *     - ▲ / ▼    : Restart Replay / Exit to Live
+ *     - BTN 2    : Toggle 0.5x Slow-Motion
  *
- * Includes a built-in "LEARN RING BUTTONS" calibration utility in Settings so any
- * Bluetooth HID mode (Keyboard Arrow/Page keys, Media Volume/Track keys, or Wheel ticks)
- * can be custom-bound on the fly.
+ * Includes live hardware signal diagnostics, visual button glowing,
+ * and a one-click "Learn Button" calibration tool in the Controller Screen.
  */
+
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
-const RING_MODES = ['AIM ROI', 'ZOOM', 'TOOLS'];
+export const REMOTE_MODES = ['PAN VIEW', 'ZOOM VIEW', 'RETICLE CAL'];
 
-const DEFAULT_KEY_MAP = {
-  UP: ['ArrowUp', 'PageUp', 'AudioVolumeUp', 'KeyW'],
-  DOWN: ['ArrowDown', 'PageDown', 'AudioVolumeDown', 'KeyS'],
+export const DEFAULT_KEY_MAP = {
+  UP: ['ArrowUp', 'PageUp', 'KeyW'],
+  DOWN: ['ArrowDown', 'PageDown', 'KeyS'],
   LEFT: ['ArrowLeft', 'MediaTrackPrevious', 'KeyA'],
   RIGHT: ['ArrowRight', 'MediaTrackNext', 'KeyD'],
-  CENTER: ['Enter', 'NumpadEnter', 'Space', 'MediaPlayPause', 'KeyF']
+  CENTER: ['Enter', 'NumpadEnter', 'Space', 'MediaPlayPause', 'KeyF'],
+  BTN1: ['AudioVolumeUp', 'KeyX', 'KeyR', 'F12'],
+  BTN2: ['AudioVolumeDown', 'KeyM', 'KeyT', 'Tab', 'KeyB']
 };
 
-export function initRingController() {
-  let modeIndex = 0;
-  let learningAction = null; // 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'CENTER' | null
-  let centerClickTimer = null;
-  let lastCenterClickMs = 0;
-  let hudFadeTimer = null;
-  let lastWheelMs = 0;
+let modeIndex = 0;
+let learningAction = null;
+let hudFadeTimer = null;
+let lastWheelMs = 0;
 
-  // Merge user custom learned bindings if saved
+export function getActiveRemoteMode() {
+  if (appState.currentScreen === 'gallery' || appState.replayActive) {
+    return 'PLAYER';
+  }
+  return REMOTE_MODES[modeIndex];
+}
+
+export function setRemoteMode(idx) {
+  modeIndex = ((idx % REMOTE_MODES.length) + REMOTE_MODES.length) % REMOTE_MODES.length;
+}
+
+export function initRingController() {
   const customMap = appState.ringKeyMap || {};
 
   const ringHudPill = document.getElementById('ringHudPill');
@@ -50,17 +60,10 @@ export function initRingController() {
   const btnResetRingMap = document.getElementById('btnResetRingMap');
   const learnButtons = document.querySelectorAll('.ring-learn-btn');
 
-  function getActiveModeName() {
-    if (appState.currentScreen === 'gallery' || appState.replayActive) {
-      return 'PLAYER';
-    }
-    return RING_MODES[modeIndex];
-  }
-
   function flashRingHud(actionSummary) {
-    const modeName = getActiveModeName();
+    const modeName = getActiveRemoteMode();
     if (ringModeBadge) {
-      ringModeBadge.textContent = `RING: ${modeName}`;
+      ringModeBadge.textContent = `REMOTE: ${modeName}`;
     }
     if (ringActionText && actionSummary) {
       ringActionText.textContent = actionSummary;
@@ -74,6 +77,13 @@ export function initRingController() {
     }
   }
 
+  function getModeHint(mode) {
+    if (mode === 'PAN VIEW') return '[ 1/3 PAN ] ▲▼◀▶ PAN LIVE FEED • ● CENTER';
+    if (mode === 'ZOOM VIEW') return `[ 2/3 ZOOM ] ▲▼ ZOOM FEED • ● 1:1 RESET ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`;
+    if (mode === 'RETICLE CAL') return `[ 3/3 RETICLE ] ▲▼ MILS • ● ${appState.reticleFfpMode ? 'FFP LOCKED 🔒' : 'LOCK FFP'}`;
+    return '● PLAY/PAUSE • ◀▶ STEP 1 FRAME • BTN1 EXIT';
+  }
+
   function updateLearnButtonsUI() {
     learnButtons.forEach((btn) => {
       const act = btn.dataset.ringAct;
@@ -82,10 +92,27 @@ export function initRingController() {
       const customCode = customMap[act];
       const baseLabel = btn.dataset.baseLabel || act;
       btn.textContent = isLearning
-        ? 'PRESS RING...'
+        ? 'PRESS REMOTE...'
         : customCode
           ? `${baseLabel} [${customCode.replace('Key', '').replace('Arrow', '')}]`
           : baseLabel;
+    });
+
+    // Also update remote tab calibration buttons if present
+    const remoteLearnBtns = document.querySelectorAll('.remote-learn-btn');
+    remoteLearnBtns.forEach((btn) => {
+      const act = btn.dataset.remoteAct;
+      const isLearning = learningAction === act;
+      btn.classList.toggle('radar-btn-active', isLearning);
+      const customCode = customMap[act];
+      const currentLabel = btn.querySelector('.btn-bound-key');
+      if (currentLabel) {
+        currentLabel.textContent = isLearning
+          ? 'PRESS REMOTE...'
+          : customCode
+            ? customCode.replace('Key', '').replace('Arrow', '')
+            : (DEFAULT_KEY_MAP[act]?.[0] || 'NONE');
+      }
     });
   }
 
@@ -93,20 +120,20 @@ export function initRingController() {
   if (ringHudPill) {
     ringHudPill.addEventListener('click', () => {
       if (appState.currentScreen === 'gallery' || appState.replayActive) return;
-      modeIndex = (modeIndex + 1) % RING_MODES.length;
-      flashRingHud( getModeHint(RING_MODES[modeIndex]) );
+      modeIndex = (modeIndex + 1) % REMOTE_MODES.length;
+      flashRingHud(getModeHint(REMOTE_MODES[modeIndex]));
     });
   }
 
-  // Set up interactive "Learn Ring Buttons" in Settings
+  // Set up interactive "Learn Ring Buttons"
   learnButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const act = btn.dataset.ringAct;
       learningAction = learningAction === act ? null : act;
       if (ringLastSignalEl) {
         ringLastSignalEl.textContent = learningAction
-          ? `WAITING FOR [${learningAction}] PRESS ON RING...`
-          : 'READY (5-BTN RING)';
+          ? `WAITING FOR [${learningAction}] PRESS ON REMOTE...`
+          : 'READY (7-BTN REMOTE)';
       }
       updateLearnButtonsUI();
     });
@@ -119,17 +146,10 @@ export function initRingController() {
       updateState({ ringKeyMap: {} });
       saveSettings(appState);
       if (ringLastSignalEl) {
-        ringLastSignalEl.textContent = 'DEFAULT MAPPING RESTORED';
+        ringLastSignalEl.textContent = 'DEFAULT MAPPINGS RESTORED';
       }
       updateLearnButtonsUI();
     });
-  }
-
-  function getModeHint(mode) {
-    if (mode === 'AIM ROI') return '▲▼◀▶ MOVE ROI TARGET';
-    if (mode === 'ZOOM') return '▲▼ WIN ZOOM • ◀▶ MAIN ZOOM';
-    if (mode === 'TOOLS') return '▲ HEAT • ▼ GUIDE • ◀ SET • ▶ REPLAY';
-    return '● PLAY/PAUSE • ◀▶ SCRUB';
   }
 
   function resolveRingAction(codeOrKey) {
@@ -137,7 +157,7 @@ export function initRingController() {
     for (const [act, boundCode] of Object.entries(customMap)) {
       if (boundCode === codeOrKey) return act;
     }
-    // 2. Check built-in multi-protocol ring bindings
+    // 2. Check built-in multi-protocol remote bindings
     for (const [act, codes] of Object.entries(DEFAULT_KEY_MAP)) {
       if (codes.includes(codeOrKey)) return act;
     }
@@ -154,38 +174,120 @@ export function initRingController() {
     rangeEl.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  // -------------------------------------------------------------------------
+  // ACTION EXECUTION (One-Finger Ergonomics)
+  // -------------------------------------------------------------------------
+
+  function executeBtn1() {
+    // Button 1 (⏻ 1): Instant Replay In / Out toggle
+    if (appState.currentScreen === 'gallery') {
+      document.getElementById('btnBackToLive')?.click();
+      flashRingHud('BTN 1: RETURN TO LIVE FEED');
+      return;
+    }
+
+    if (appState.replayActive) {
+      document.getElementById('btnCloseReplay')?.click();
+      flashRingHud('BTN 1: RETURN TO LIVE FEED');
+      return;
+    }
+
+    // Enter Instant Replay
+    document.getElementById('btnReplay20s')?.click();
+    flashRingHud('BTN 1: INSTANT REPLAY');
+  }
+
+  function executeBtn2() {
+    // Button 2 (2): Mode Switcher / Replay Slow-Mo
+    if (appState.replayActive) {
+      document.getElementById('btnReplaySlowMo')?.click();
+      flashRingHud('BTN 2: TOGGLE SLOW-MO (0.5x)');
+      return;
+    }
+
+    if (appState.currentScreen === 'gallery') {
+      document.getElementById('btnGallerySlowMo')?.click();
+      flashRingHud('BTN 2: TOGGLE SLOW-MO (0.5x)');
+      return;
+    }
+
+    // Live Mode: Cycle through 3 discrete modes
+    modeIndex = (modeIndex + 1) % REMOTE_MODES.length;
+    const nextMode = REMOTE_MODES[modeIndex];
+    flashRingHud(getModeHint(nextMode));
+  }
+
+  function executeCenter() {
+    // In Gallery
+    if (appState.currentScreen === 'gallery') {
+      document.getElementById('btnGalleryPlayPause')?.click();
+      flashRingHud('● PLAY / PAUSE');
+      return;
+    }
+
+    // In Instant Replay
+    if (appState.replayActive) {
+      document.getElementById('btnReplayPlayPause')?.click();
+      flashRingHud('● REPLAY PLAY / PAUSE');
+      return;
+    }
+
+    // In Live Mode: Contextual behavior depending on current remote mode
+    const mode = REMOTE_MODES[modeIndex];
+
+    if (mode === 'PAN VIEW') {
+      // Re-center pan coordinates to dead center (0,0)
+      updateState({ mainPanX: 0, mainPanY: 0 });
+      flashRingHud('● PAN RE-CENTERED (0, 0)');
+      return;
+    }
+
+    if (mode === 'ZOOM VIEW') {
+      // Reset whole-image zoom to 1.0x native view
+      updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
+      flashRingHud('● ZOOM RESET (1.0x)');
+      return;
+    }
+
+    if (mode === 'RETICLE CAL') {
+      // Toggle First Focal Plane (FFP) Lock
+      const nextFfp = !appState.reticleFfpMode;
+      updateState({ reticleFfpMode: nextFfp });
+      saveSettings(appState);
+      flashRingHud(nextFfp ? '● FFP LOCKED 🔒 (AUTO-SYNC)' : '● RETICLE MANUAL 🔓 (SFP)');
+      return;
+    }
+  }
+
   function executeDirectionalAction(act) {
-    // A. When in Fullscreen Saved Video Gallery Player
+    // A. Fullscreen Saved Video Gallery Player
     if (appState.currentScreen === 'gallery') {
       if (act === 'LEFT') {
         const scrubber = document.getElementById('galleryScrubber');
         scrubRangeElement(scrubber, -1);
         flashRingHud('◀ REWIND');
       } else if (act === 'RIGHT') {
-        const btnStep = document.getElementById('btnGalleryStep');
-        btnStep?.click();
+        document.getElementById('btnGalleryStep')?.click();
         flashRingHud('▶ STEP +1 FRAME');
       } else if (act === 'UP') {
-        const btnSlowMo = document.getElementById('btnGallerySlowMo');
-        btnSlowMo?.click();
+        document.getElementById('btnGallerySlowMo')?.click();
         flashRingHud('▲ TOGGLE 0.5x SLOW-MO');
       } else if (act === 'DOWN') {
-        const btnDrawer = document.getElementById('btnToggleGalleryDrawer');
-        btnDrawer?.click();
+        document.getElementById('btnToggleGalleryDrawer')?.click();
         flashRingHud('▼ TOGGLE CLIPS LIST');
       }
       return;
     }
 
-    // B. When Instant Replay Modal is active on Live Screen
+    // B. Instant Replay Active on Live Screen
     if (appState.replayActive) {
       const scrubber = document.getElementById('replayScrubber');
       if (act === 'LEFT') {
         scrubRangeElement(scrubber, -1);
-        flashRingHud('◀ REPLAY BACK');
+        flashRingHud('◀ STEP BACK (-1 FRAME)');
       } else if (act === 'RIGHT') {
         scrubRangeElement(scrubber, 1);
-        flashRingHud('▶ REPLAY FWD');
+        flashRingHud('▶ STEP FORWARD (+1 FRAME)');
       } else if (act === 'UP') {
         if (scrubber) {
           scrubber.value = '0';
@@ -199,94 +301,90 @@ export function initRingController() {
       return;
     }
 
-    // C. Live Camera Feed — Act according to current Ring Mode
-    const mode = RING_MODES[modeIndex];
+    // C. Live Camera Feed — Execute based on current Remote Mode
+    const mode = REMOTE_MODES[modeIndex];
 
-    if (mode === 'AIM ROI') {
-      const step = 0.035;
-      let nx = appState.roiX;
-      let ny = appState.roiY;
-      if (act === 'UP') ny = Math.max(0.05, ny - step);
-      if (act === 'DOWN') ny = Math.min(0.95, ny + step);
-      if (act === 'LEFT') nx = Math.max(0.05, nx - step);
-      if (act === 'RIGHT') nx = Math.min(0.95, nx + step);
+    // 1. PAN VIEW (Move live feed across magnified viewport)
+    if (mode === 'PAN VIEW') {
+      let zoom = appState.mainZoom || 1.0;
+      // If at 1.0x native view, gently bump to 1.25x so pan has visual effect
+      if (zoom <= 1.01) {
+        zoom = 1.25;
+        updateState({ mainZoom: zoom });
+      }
 
-      updateState({
-        pipEnabled: true,
-        roiTargetVisible: true,
-        roiX: nx,
-        roiY: ny
-      });
-      flashRingHud(`ROI TARGET (${Math.round(nx * 100)}%, ${Math.round(ny * 100)}%)`);
+      const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
+      const panStep = Math.max(0.015, 0.05 / zoom);
+
+      let nx = appState.mainPanX || 0;
+      let ny = appState.mainPanY || 0;
+
+      if (act === 'UP') ny = Math.max(-maxPan, ny - panStep);
+      if (act === 'DOWN') ny = Math.min(maxPan, ny + panStep);
+      if (act === 'LEFT') nx = Math.max(-maxPan, nx - panStep);
+      if (act === 'RIGHT') nx = Math.min(maxPan, nx + panStep);
+
+      updateState({ mainPanX: nx, mainPanY: ny });
+      flashRingHud(`PAN (${Math.round(nx * 100)}, ${Math.round(ny * 100)}) [${zoom.toFixed(1)}x]`);
       return;
     }
 
-    if (mode === 'ZOOM') {
+    // 2. ZOOM VIEW (Adjust main camera digital zoom)
+    if (mode === 'ZOOM VIEW') {
+      const curZoom = appState.mainZoom || 1.0;
       if (act === 'UP') {
-        document.getElementById('pipZoomPlus')?.click();
-        flashRingHud(`▲ WIN ZOOM ${appState.pipZoom.toFixed(1)}x`);
+        const nextZoom = Math.min(5.0, Math.round((curZoom + 0.25) * 100) / 100);
+        updateState({ mainZoom: nextZoom });
+        flashRingHud(`▲ ZOOM ${nextZoom.toFixed(2)}x ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`);
       } else if (act === 'DOWN') {
-        document.getElementById('pipZoomMinus')?.click();
-        flashRingHud(`▼ WIN ZOOM ${appState.pipZoom.toFixed(1)}x`);
-      } else if (act === 'RIGHT') {
-        document.getElementById('mainZoomPlus')?.click();
-        flashRingHud(`▶ MAIN ZOOM ${appState.mainZoom.toFixed(1)}x`);
+        const nextZoom = Math.max(1.0, Math.round((curZoom - 0.25) * 100) / 100);
+        const maxPan = Math.max(0, (1 - 1 / nextZoom) / 2);
+        const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX || 0));
+        const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY || 0));
+        updateState({ mainZoom: nextZoom, mainPanX: nx, mainPanY: ny });
+        flashRingHud(`▼ ZOOM ${nextZoom.toFixed(2)}x ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`);
       } else if (act === 'LEFT') {
-        document.getElementById('mainZoomMinus')?.click();
-        flashRingHud(`◀ MAIN ZOOM ${appState.mainZoom.toFixed(1)}x`);
+        // Step zoom down coarser (-0.5x)
+        const nextZoom = Math.max(1.0, Math.round((curZoom - 0.5) * 100) / 100);
+        updateState({ mainZoom: nextZoom });
+        flashRingHud(`◀ ZOOM ${nextZoom.toFixed(2)}x`);
+      } else if (act === 'RIGHT') {
+        // Step zoom up coarser (+0.5x)
+        const nextZoom = Math.min(5.0, Math.round((curZoom + 0.5) * 100) / 100);
+        updateState({ mainZoom: nextZoom });
+        flashRingHud(`▶ ZOOM ${nextZoom.toFixed(2)}x`);
       }
       return;
     }
 
-    if (mode === 'TOOLS') {
+    // 3. RETICLE CAL (Adjust crosshair hashmark spacing & scale)
+    if (mode === 'RETICLE CAL') {
+      const cfg = appState.reticleConfig || {};
+      const curSpacing = cfg.clickSpacing || 32;
+
       if (act === 'UP') {
-        document.getElementById('btnToggleHeatmap')?.click();
-        flashRingHud(`▲ HEATMAP: ${appState.heatmapEnabled ? 'ON' : 'OFF'}`);
+        const nextSpacing = Math.min(100, curSpacing + 1);
+        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
+        saveSettings(appState);
+        flashRingHud(`▲ RETICLE SPACING: ${nextSpacing}px (+1)`);
       } else if (act === 'DOWN') {
-        document.getElementById('btnToggleOverlay')?.click();
-        flashRingHud(`▼ CROSSHAIR: ${appState.overlayEnabled ? 'ON' : 'OFF'}`);
+        const nextSpacing = Math.max(8, curSpacing - 1);
+        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
+        saveSettings(appState);
+        flashRingHud(`▼ RETICLE SPACING: ${nextSpacing}px (-1)`);
       } else if (act === 'LEFT') {
-        document.getElementById('btnToggleOptions')?.click();
-        flashRingHud(`◀ SETTINGS: ${appState.optionsOpen ? 'OPEN' : 'HIDDEN'}`);
+        const nextSpacing = Math.max(8, curSpacing - 5);
+        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
+        saveSettings(appState);
+        flashRingHud(`◀ RETICLE SPACING: ${nextSpacing}px (-5)`);
       } else if (act === 'RIGHT') {
-        document.getElementById('btnReplay20s')?.click();
-        flashRingHud('▶ INSTANT REPLAY');
-      }
-    }
-  }
-
-  function executeCenterPress(isDoublePress) {
-    if (isDoublePress) {
-      // Double-press CENTER (●●):
-      // - In Gallery: Return to Live Feed
-      // - In Live Feed / Replay: Toggle Instant Replay (& Auto-Save)
-      if (appState.currentScreen === 'gallery') {
-        document.getElementById('btnBackToLive')?.click();
-        flashRingHud('●● BACK TO LIVE FEED');
-      } else {
-        document.getElementById('btnReplay20s')?.click();
-        flashRingHud(appState.replayActive ? '●● INSTANT REPLAY' : '●● LIVE FEED');
+        const nextSpacing = Math.min(100, curSpacing + 5);
+        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
+        saveSettings(appState);
+        flashRingHud(`▶ RETICLE SPACING: ${nextSpacing}px (+5)`);
       }
       return;
     }
-
-    // Single-press CENTER (●):
-    if (appState.currentScreen === 'gallery') {
-      document.getElementById('btnGalleryPlayPause')?.click();
-      flashRingHud('● PLAY / PAUSE');
-      return;
-    }
-
-    if (appState.replayActive) {
-      document.getElementById('btnReplayPlayPause')?.click();
-      flashRingHud('● REPLAY PLAY / PAUSE');
-      return;
-    }
-
-    // Cycle Ring Mode on Live Feed: AIM ROI -> ZOOM -> TOOLS
-    modeIndex = (modeIndex + 1) % RING_MODES.length;
-    const nextMode = RING_MODES[modeIndex];
-    flashRingHud(getModeHint(nextMode));
   }
 
   function handleRingSignal(signalCode) {
@@ -294,7 +392,7 @@ export function initRingController() {
       ringLastSignalEl.textContent = `SIGNAL: ${signalCode}`;
     }
 
-    // If user is currently calibrating/learning a ring button in Settings
+    // If user is currently calibrating/learning a button in Controller Screen or Settings
     if (learningAction) {
       customMap[learningAction] = signalCode;
       updateState({ ringKeyMap: { ...customMap } });
@@ -302,31 +400,42 @@ export function initRingController() {
       if (ringLastSignalEl) {
         ringLastSignalEl.textContent = `BOUND [${learningAction}] → ${signalCode}`;
       }
+      const actLearned = learningAction;
       learningAction = null;
       updateLearnButtonsUI();
+
+      // Dispatch event so UI can flash success
+      window.dispatchEvent(
+        new CustomEvent('spotr-remote-button', {
+          detail: { action: actLearned, signalCode, isLearned: true }
+        })
+      );
       return true;
     }
 
     const action = resolveRingAction(signalCode);
+
+    // Notify any listening UI (such as the Remote Configurator tab in Screen 5)
+    window.dispatchEvent(
+      new CustomEvent('spotr-remote-button', {
+        detail: { action, signalCode, isLearned: false }
+      })
+    );
+
     if (!action) return false;
 
+    if (action === 'BTN1') {
+      executeBtn1();
+      return true;
+    }
+
+    if (action === 'BTN2') {
+      executeBtn2();
+      return true;
+    }
+
     if (action === 'CENTER') {
-      const now = performance.now();
-      if (now - lastCenterClickMs < 340) {
-        // Double-press detected!
-        if (centerClickTimer) {
-          clearTimeout(centerClickTimer);
-          centerClickTimer = null;
-        }
-        lastCenterClickMs = 0;
-        executeCenterPress(true);
-      } else {
-        lastCenterClickMs = now;
-        centerClickTimer = setTimeout(() => {
-          centerClickTimer = null;
-          executeCenterPress(false);
-        }, 280);
-      }
+      executeCenter();
       return true;
     }
 
@@ -366,11 +475,10 @@ export function initRingController() {
     { capture: true }
   );
 
-  // 2. Listen for Bluetooth Ring Scroll-Wheel ticks (some rings emit wheel ticks for Up/Down)
+  // 2. Listen for Bluetooth Ring Scroll-Wheel ticks
   window.addEventListener(
     'wheel',
     (e) => {
-      // Ignore scrolling inside the Settings panel or Clips list
       if (
         !learningAction &&
         (e.target.closest('#optionsPanel') || e.target.closest('#galleryDrawer'))
@@ -392,7 +500,6 @@ export function initRingController() {
 
       if (!wheelCode) return;
 
-      // Map WheelUp/Down/Left/Right to UP/DOWN/LEFT/RIGHT by default if not overridden
       if (!learningAction && !resolveRingAction(wheelCode)) {
         const dir = wheelCode.replace('Wheel', '').toUpperCase();
         if (ringLastSignalEl) ringLastSignalEl.textContent = `SIGNAL: ${wheelCode}`;
@@ -405,10 +512,10 @@ export function initRingController() {
     { passive: true }
   );
 
-  // Sync HUD label whenever screen or replay state changes
+  // Sync HUD label whenever screen, replay, or FFP state changes
   subscribeState(() => {
     if (ringModeBadge) {
-      ringModeBadge.textContent = `RING: ${getActiveModeName()}`;
+      ringModeBadge.textContent = `REMOTE: ${getActiveRemoteMode()}`;
     }
   });
 
