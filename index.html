@@ -76,64 +76,60 @@
           <!-- Logo Brand Text -->
           <text
               x="225"
-              y="102"
+              y="108"
               fill="#F8FAFC"
               font-family="Arial, Helvetica, sans-serif"
-              font-size="68"
+              font-size="80"
               font-weight="700"
-              letter-spacing="4">
+              letter-spacing="4.65">
               SPOTR
           </text>
 
-          <!-- Trademark (Positioned top-right next to the name) -->
+          <!-- Trademark (Positioned closely at top-right shoulder of 'R') -->
           <text
-              x="495"
-              y="60"
+              x="528"
+              y="64"
               fill="#FFD166"
               font-family="Arial, Helvetica, sans-serif"
-              font-size="17"
+              font-size="15"
               font-weight="700">
               ™
           </text>
 
-          <!-- Tagline -->
+          <!-- Tagline with individual soft loading words -->
           <text
+              class="splash-tagline"
               x="225"
-              y="145"
-              fill="#9CA3AF"
+              y="152"
+              fill="#E2E8F0"
               font-family="Arial, Helvetica, sans-serif"
               font-size="19"
-              font-weight="500"
-              letter-spacing="2.8">
-              RECON • DETECT • ALERT
+              font-weight="600"
+              letter-spacing="2.6">
+              <tspan class="splash-word-1">RECON</tspan>
+              <tspan class="splash-word-2"> • DETECT</tspan>
+              <tspan class="splash-word-3"> • ALERT</tspan>
           </text>
 
-          <!-- Loading Progress Track (Inside Logo Perimeter) -->
+          <!-- Loading Progress Track (Aligned flush to Brand & Tagline width: 299px) -->
           <rect
               class="splash-line-track"
               x="225"
-              y="166"
-              width="290"
+              y="170"
+              width="299"
               height="4"
               rx="2"
               fill="rgba(255, 255, 255, 0.12)"/>
 
-          <!-- Loading Progress Bar (Inside Logo Perimeter) -->
+          <!-- Loading Progress Bar (Animates left to right for 2s after last word loads) -->
           <rect
               class="splash-line-progress"
               x="225"
-              y="166"
+              y="170"
               width="0"
               height="4"
               rx="2"
-              fill="#FF6B00">
-            <animate
-                attributeName="width"
-                from="0"
-                to="290"
-                dur="3.5s"
-                fill="freeze"/>
-          </rect>
+              fill="#FF6B00"/>
         </svg>
       </div>
     </div>

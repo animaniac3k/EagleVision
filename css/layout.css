@@ -723,14 +723,39 @@
   height: auto;
 }
 
-/* Loading Line Progress inside Logo Badge Perimeter */
+/* Tagline Soft Sequential Word Loading */
+.splash-word-1 {
+  opacity: 0;
+  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+}
+
+.splash-word-2 {
+  opacity: 0;
+  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards;
+}
+
+.splash-word-3 {
+  opacity: 0;
+  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 1.35s forwards;
+}
+
+@keyframes splashWordFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Loading Line Progress inside Logo Badge Perimeter (Flush width: 299px) */
 .splash-line-track {
   opacity: 0.85;
 }
 
 .splash-line-progress {
   filter: drop-shadow(0 0 6px rgba(255, 107, 0, 0.85));
-  animation: splashFillInside 3.5s linear forwards;
+  animation: splashFillInside 2s cubic-bezier(0.25, 1, 0.5, 1) 1.8s both;
 }
 
 @keyframes splashFillInside {
@@ -738,7 +763,7 @@
     width: 0px;
   }
   to {
-    width: 290px;
+    width: 299px;
   }
 }
 

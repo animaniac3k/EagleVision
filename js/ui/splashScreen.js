@@ -2,7 +2,8 @@
  * SPOTR Tactical Splash Screen Controller
  *
  * Displays the SPOTR brand logo & identification screen on app launch.
- * Automatically dismisses 2 seconds after the loading animation completes (5.5s total)
+ * Sequences soft word loading (RECON • DETECT • ALERT), followed by a 2s loading bar fill.
+ * Automatically dismisses 3 seconds after tagline load completes (4.8s total)
  * or immediately when skipped silently via Space, Gamepad / Controller button, Ring click, or Tap.
  */
 
@@ -21,7 +22,7 @@ export function initSplashScreen() {
     return;
   }
 
-  // 1. Auto-dismiss 2 seconds after the 3.5s loading animation completes (5.5s total)
+  // 1. Auto-dismiss: tagline words complete at 1.8s + 2.0s bar fill + 1.0s completion hold (4.8s total)
   if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nosplash')) {
     splashEl.style.display = 'none';
     splashEl.classList.add('splash-hidden');
@@ -30,7 +31,7 @@ export function initSplashScreen() {
   }
   dismissTimer = setTimeout(() => {
     dismissSplashScreen('timeout');
-  }, 5500);
+  }, 4800);
 
   // 2. Skip on tap / click anywhere on splash screen
   splashEl.addEventListener('pointerdown', (e) => {
