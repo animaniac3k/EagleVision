@@ -9,7 +9,10 @@ const DB_NAME = 'EagleVisionVideoDB';
 const DB_VERSION = 3;
 const STORE_NAME = 'clips';
 
+let cachedDbInstance = null;
+
 function openDB() {
+  if (cachedDbInstance) return Promise.resolve(cachedDbInstance);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -20,7 +23,15 @@ function openDB() {
       const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       store.createIndex('createdAt', 'createdAt', { unique: false });
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      cachedDbInstance = req.result;
+      cachedDbInstance.onclose = () => { cachedDbInstance = null; };
+      cachedDbInstance.onversionchange = () => {
+        if (cachedDbInstance) cachedDbInstance.close();
+        cachedDbInstance = null;
+      };
+      resolve(cachedDbInstance);
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -55,12 +66,43 @@ export async function listVideoClips() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () => {
-      const items = (req.result || []).filter((item) => Array.isArray(item.jpegFrames) && item.jpegFrames.length > 0);
-      items.sort((a, b) => b.createdAt - a.createdAt);
-      resolve(items);
+    const store = tx.objectStore(STORE_NAME);
+    const items = [];
+    const req = store.openCursor();
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor) {
+        const item = cursor.value;
+        const frameCount = Array.isArray(item.jpegFrames) ? item.jpegFrames.length : 0;
+        if (frameCount > 0) {
+          items.push({
+            id: item.id,
+            name: item.name,
+            createdAt: item.createdAt,
+            fps: item.fps || 15,
+            durationSec: item.durationSec,
+            sizeBytes: item.sizeBytes,
+            width: item.width || 1920,
+            height: item.height || 1080,
+            frameCount
+          });
+        }
+        cursor.continue();
+      } else {
+        items.sort((a, b) => b.createdAt - a.createdAt);
+        resolve(items);
+      }
     };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getVideoClip(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const req = tx.objectStore(STORE_NAME).get(id);
+    req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }

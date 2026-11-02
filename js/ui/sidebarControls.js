@@ -17,10 +17,13 @@ import { speakDetectionAnnouncement } from '../renderer/compositor.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
-  const clean = (hex || '#2dd4bf').replace('#', '');
-  const r = parseInt(clean.substring(0, 2), 16) / 255;
-  const g = parseInt(clean.substring(2, 4), 16) / 255;
-  const b = parseInt(clean.substring(4, 6), 16) / 255;
+  let clean = (hex || '#2dd4bf').replace('#', '').trim();
+  if (clean.length === 3) {
+    clean = clean.split('').map((c) => c + c).join('');
+  }
+  const r = (parseInt(clean.substring(0, 2), 16) || 45) / 255;
+  const g = (parseInt(clean.substring(2, 4), 16) || 212) / 255;
+  const b = (parseInt(clean.substring(4, 6), 16) || 191) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);

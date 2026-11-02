@@ -117,6 +117,7 @@ export function initCompositor(videoEl) {
   const heatImgData = heatOverlayCtx.createImageData(HEAT_W, HEAT_H);
 
   const refLuma = new Float32Array(HEAT_CELLS);
+  const currentLuma = new Float32Array(HEAT_CELLS);
   const heatAccum = new Float32Array(HEAT_CELLS);
   let refInitialized = false;
   let lastHeatTimeMs = performance.now();
@@ -210,7 +211,6 @@ export function initCompositor(videoEl) {
 
     // Pass 1: Measure how many cells changed above threshold to detect global camera motion
     let changedCells = 0;
-    const currentLuma = new Float32Array(HEAT_CELLS);
     for (let i = 0; i < HEAT_CELLS; i++) {
       const p = i * 4;
       const luma = 0.299 * src[p] + 0.587 * src[p + 1] + 0.114 * src[p + 2];

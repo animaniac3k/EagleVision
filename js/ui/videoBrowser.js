@@ -5,7 +5,7 @@
  * with a collapsible left clip drawer and floating bottom transport bar.
  */
 import { appState, updateState } from '../state.js';
-import { listVideoClips, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
+import { listVideoClips, getVideoClip, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
 
 let cachedClips = [];
 let selectedClipId = null;
@@ -167,7 +167,7 @@ function renderClipList() {
   });
 }
 
-function selectClip(clip, autoPlay = true) {
+async function selectClip(clip, autoPlay = true) {
   stopPlayerLoop();
   releaseFrameUrls();
 
@@ -180,10 +180,6 @@ function selectClip(clip, autoPlay = true) {
   canvasEl.width = clip.width || 1920;
   canvasEl.height = clip.height || 1080;
 
-  frameUrls = clip.jpegFrames.map((buf) =>
-    URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }))
-  );
-
   clipDuration = Math.max(0.5, clip.durationSec);
   playheadSec = 0;
   isPlaying = autoPlay;
@@ -195,6 +191,15 @@ function selectClip(clip, autoPlay = true) {
   const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
   titleEl.textContent = clip.name;
   metaEl.textContent = `${clip.width}×${clip.height} @ ${clip.fps || 15} FPS • ${clip.durationSec}s • ${mb} MB`;
+
+  const fullClip = await getVideoClip(clip.id);
+  if (!fullClip || !Array.isArray(fullClip.jpegFrames) || selectedClipId !== clip.id) {
+    return;
+  }
+
+  frameUrls = fullClip.jpegFrames.map((buf) =>
+    URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }))
+  );
 
   renderGalleryFrame();
   rafId = requestAnimationFrame(galleryTickLoop);
@@ -309,6 +314,7 @@ export function initVideoBrowser() {
   btnBackToLive.addEventListener('click', () => {
     isPlaying = false;
     stopPlayerLoop();
+    releaseFrameUrls();
     screenGallery.classList.add('hidden');
     screenLive.classList.remove('hidden');
     updateState({ currentScreen: 'live' });
@@ -356,7 +362,8 @@ export function initVideoBrowser() {
   });
 
   btnDownload.addEventListener('click', async () => {
-    const clip = cachedClips.find((c) => c.id === selectedClipId);
+    if (!selectedClipId) return;
+    const clip = await getVideoClip(selectedClipId);
     if (!clip) return;
     const orig = btnDownload.textContent;
     btnDownload.textContent = 'EXPORTING...';

@@ -4,7 +4,7 @@
 import { appState, updateState } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';
 import { startCameraStream } from './camera/streamManager.js';
-import { initCompositor, initVoiceSynthesis } from './renderer/compositor.js';
+import { initCompositor } from './renderer/compositor.js';
 import { initOverlayManager } from './renderer/overlayManager.js';
 import { initZoomWindow } from './renderer/zoomWindow.js';
 import { startMemoryBuffer } from './recorder/memoryRingBuffer.js';
