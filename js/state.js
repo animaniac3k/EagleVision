@@ -35,11 +35,14 @@ export const appState = {
   overlayType: 'crosshair',
   overlayOpacity: 75,
   overlayScale: 100,
+  reticleFfpMode: true,    // First Focal Plane: scales reticle in lockstep with image zoom
   customOverlayUrl: null,
+  activeQuickToolIndex: 0, // Cyclic Quick Tool index (0..6)
   reticleConfig: {
-    clickCount: 10,        // Number of clicks/indents per arm (3..20)
-    clickSpacing: 32,      // SVG units between clicks (16..64)
-    centerGap: 64,         // Unobstructed center gap (0..120)
+    clickCount: 10,        // Number of clicks/indents per arm (2..30)
+    clickSpacing: 32,      // SVG units between clicks (8..100)
+    centerGap: 64,         // Unobstructed center gap (0..140)
+    centerStyle: 'empty',  // Center point: 'empty' | 'dot' | 'cross' | 'chevron'
     innerBrackets: true,   // Bracket ticks marking center gap
     majorInterval: 5,      // Major tick every N clicks (0 for none)
     minorTickLen: 10,      // Minor tick length (4..16)
@@ -47,7 +50,7 @@ export const appState = {
     showLabels: true,      // Click numbers on arms (1, 2, 3... or 5, 10)
     concentricRings: false,// Concentric range circles
     ringInterval: 5,       // Circle every N clicks
-    strokeWidth: 1.8,      // Reticle stroke thickness (1.0..4.0)
+    strokeWidth: 1.8,      // Reticle stroke thickness (0.5..5.0)
     reticleColor: ''       // Empty string = dynamic radar theme color
   },
 
@@ -82,6 +85,12 @@ export const appState = {
   uiDecluttered: false,
   touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)
   reticleAimSpeed: 50,     // 15% to 150%, default 50% (50% max speed for pinpoint reticle positioning)
+  leftStickDeadzone: 16,   // 5% to 30% deadzone
+  rightStickDeadzone: 16,  // 5% to 30% deadzone
+  leftStickInvertY: false, // Invert left stick vertical axis
+  rightStickInvertY: false,// Invert right stick vertical axis
+  activeControllerProfile: 'default', // 'default' | 'simplified' | 'flight'
+  controllerBindings: null,// User-configured controller & key mappings
   ringKeyMap: {},
   gamepadConnected: false,
   gamepadName: '',

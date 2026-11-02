@@ -13,6 +13,7 @@ import { initHudController } from './ui/hudController.js';
 import { initSidebarAndTopControls } from './ui/sidebarControls.js';
 import { initVideoBrowser } from './ui/videoBrowser.js';
 import { initReticleScreen } from './ui/reticleScreen.js';
+import { initControllerScreen } from './ui/controllerScreen.js';
 import { initRingController } from './ui/ringController.js';
 import { initGamepadController } from './input/gamepadController.js';
 import { initSplashScreen } from './ui/splashScreen.js';
@@ -21,44 +22,62 @@ async function bootstrapApp() {
   // 0. Initialize SPOTR Tactical Splash Screen (dismisses after 3.5s or silently on Space/controller/tap)
   initSplashScreen();
 
-  // Pre-initialize voice synthesis to discover female system voices immediately
-  initVoiceSynthesis();
-
   // 1. Restore saved user settings
   const saved = loadSavedSettings();
   if (saved) {
     updateState(saved);
   }
 
-  // 2. Initialize Camera Stream (USB Camera or Test Signal fallback)
   const videoEl = document.getElementById('cameraVideoEl');
-  await startCameraStream(videoEl, 'auto');
 
-  // 3. Start 60fps Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
+  // 2. Start 60fps Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
   const mainCanvas = initCompositor(videoEl);
 
-  // 4. Initialize Overlays, Draggable ROI Target & Zoom Window, HUD, Controls, and 5-Button BT Ring
+  // 3. Initialize ALL UI screens, controllers & event listeners IMMEDIATELY (synchronously)
+  // so all buttons, sliders, screens and shortcuts are interactive from the first millisecond
   initOverlayManager();
   initZoomWindow();
   initHudController();
   initInstantReplay();
-  await initSidebarAndTopControls(videoEl, mainCanvas);
-  await initVideoBrowser();
   initReticleScreen();
+  initControllerScreen();
   initRingController();
   initGamepadController();
+  initSidebarAndTopControls(videoEl, mainCanvas);
+  initVideoBrowser();
 
-  // 5. Start 20-Second Rolling In-Memory Video Buffer if enabled
-  if (appState.bufferEnabled) {
-    startMemoryBuffer(videoEl);
+  // 4. Handle direct screen and testing query parameters if specified (after listeners are wired)
+  const params = new URLSearchParams(window.location.search);
+  const targetScreen = params.get('screen');
+  if (['controller', 'reticle', 'settings', 'gallery'].includes(targetScreen)) {
+    updateState({ currentScreen: targetScreen });
+  }
+  if (params.get('reticleClicks') || params.get('reticleCenter')) {
+    const patch = {};
+    if (params.get('reticleClicks')) {
+      patch.clickCount = Math.min(30, Math.max(2, parseInt(params.get('reticleClicks'), 10)));
+    }
+    if (params.get('reticleCenter')) {
+      patch.centerStyle = params.get('reticleCenter');
+    }
+    updateState({ reticleConfig: Object.assign({}, appState.reticleConfig, patch) });
   }
 
-  // 6. Request Screen WakeLock on Chromebook / Android so display doesn't dim
+  // 4. Initialize Camera Stream (USB Camera or Test Signal fallback) asynchronously in background
+  startCameraStream(videoEl, 'auto').then(() => {
+    if (appState.bufferEnabled) {
+      startMemoryBuffer(videoEl);
+    }
+  }).catch((err) => {
+    console.warn('Camera stream error, fallback active:', err);
+  });
+
+  // 5. Request Screen WakeLock on Chromebook / Android so display doesn't dim
   if ('wakeLock' in navigator) {
     navigator.wakeLock.request('screen').catch(() => {});
   }
 
-  // 7. Register PWA Service Worker
+  // 6. Register PWA Service Worker
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }

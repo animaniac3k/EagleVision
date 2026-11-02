@@ -200,7 +200,7 @@ function selectClip(clip, autoPlay = true) {
   rafId = requestAnimationFrame(galleryTickLoop);
 }
 
-export async function initVideoBrowser() {
+export function initVideoBrowser() {
   const screenLive = document.getElementById('screenLive');
   const screenGallery = document.getElementById('screenGallery');
   const btnSwitchScreen = document.getElementById('btnSwitchScreen');
@@ -371,5 +371,5 @@ export async function initVideoBrowser() {
     await refreshGalleryClips(true);
   });
 
-  await refreshGalleryClips(false);
+  refreshGalleryClips(false).catch((err) => console.warn('Gallery clips refresh deferred:', err));
 }

@@ -34,6 +34,8 @@ export function initReticleScreen() {
   const valSpacing = document.getElementById('valReticleSpacing');
   const sliderGap = document.getElementById('sliderReticleGap');
   const valGap = document.getElementById('valReticleGap');
+  const valCenter = document.getElementById('valReticleCenter');
+  const centerBtns = document.querySelectorAll('.center-style-btn');
   const btnBrackets = document.getElementById('btnToggleReticleBrackets');
   const sliderMajor = document.getElementById('sliderReticleMajor');
   const valMajor = document.getElementById('valReticleMajor');
@@ -49,19 +51,32 @@ export function initReticleScreen() {
     const cfg = appState.reticleConfig || {};
     previewSvg.innerHTML = buildGraduatedCrosshairSvg(cfg);
 
+    const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
+    const maxFittingStep = Math.max(8, Math.floor(240 / clicks));
+    const rawStep = Number(cfg.clickSpacing);
+    const effStep = (!rawStep || rawStep > maxFittingStep) ? maxFittingStep : Math.max(6, rawStep);
+
     // Sync input values
     if (sliderClicks && valClicks) {
-      sliderClicks.value = String(cfg.clickCount || 10);
-      valClicks.textContent = `${cfg.clickCount || 10} clicks`;
+      sliderClicks.value = String(clicks);
+      valClicks.textContent = `${clicks} clicks`;
     }
     if (sliderSpacing && valSpacing) {
-      sliderSpacing.value = String(cfg.clickSpacing || 32);
-      valSpacing.textContent = `${cfg.clickSpacing || 32} px`;
+      sliderSpacing.value = String(effStep);
+      valSpacing.textContent = `${effStep} px`;
     }
     if (sliderGap && valGap) {
       sliderGap.value = String(cfg.centerGap ?? 64);
       valGap.textContent = `${cfg.centerGap ?? 64} px`;
     }
+    const activeCenter = String(cfg.centerStyle || 'empty').toLowerCase();
+    if (valCenter) {
+      valCenter.textContent = activeCenter.toUpperCase();
+    }
+    document.querySelectorAll('.center-style-btn').forEach(btn => {
+      const isSel = (btn.dataset.center || '').toLowerCase() === activeCenter;
+      btn.classList.toggle('radar-btn-active', isSel);
+    });
     if (btnBrackets) {
       btnBrackets.textContent = cfg.innerBrackets ? 'ON' : 'OFF';
       btnBrackets.classList.toggle('radar-btn-active', Boolean(cfg.innerBrackets));
@@ -93,14 +108,15 @@ export function initReticleScreen() {
 
   // Exported Gamepad Control Definitions for Reticle Customizer
   const RETICLE_CONTROLS = [
-    { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 25, step: 1, elementId: 'sliderReticleClicks' },
-    { key: 'clickSpacing', label: 'Click Spacing', min: 10, max: 80, step: 2, elementId: 'sliderReticleSpacing' },
-    { key: 'centerGap', label: 'Center Gap', min: 0, max: 140, step: 4, elementId: 'sliderReticleGap' },
+    { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 30, step: 1, elementId: 'sliderReticleClicks' },
+    { key: 'clickSpacing', label: 'Click Spacing', min: 8, max: 100, step: 1, elementId: 'sliderReticleSpacing' },
+    { key: 'centerGap', label: 'Center Gap', min: 0, max: 140, step: 1, elementId: 'sliderReticleGap' },
+    { key: 'centerStyle', label: 'Center Point', isOption: true, options: ['empty', 'dot', 'cross', 'chevron'], elementId: 'valReticleCenter' },
     { key: 'innerBrackets', label: 'Center Brackets', isToggle: true, elementId: 'btnToggleReticleBrackets' },
     { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
     { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
     { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
-    { key: 'strokeWidth', label: 'Stroke Weight', min: 0.6, max: 5.0, step: 0.2, isFloat: true, elementId: 'sliderReticleStroke' }
+    { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, isFloat: true, elementId: 'sliderReticleStroke' }
   ];
 
   let focusedIndex = 0;
@@ -169,6 +185,14 @@ export function initReticleScreen() {
         const nextVal = !cfg[ctrl.key];
         updateReticleConfig({ [ctrl.key]: nextVal });
         return `${ctrl.label.toUpperCase()}: ${nextVal ? 'ON' : 'OFF'}`;
+      } else if (ctrl.isOption) {
+        const curOpt = (cfg[ctrl.key] || ctrl.options[0]).toLowerCase();
+        let idx = ctrl.options.indexOf(curOpt);
+        if (idx === -1) idx = 0;
+        idx = (idx + delta + ctrl.options.length) % ctrl.options.length;
+        const nextOpt = ctrl.options[idx];
+        updateReticleConfig({ [ctrl.key]: nextOpt });
+        return `${ctrl.label.toUpperCase()}: ${nextOpt.toUpperCase()}`;
       } else {
         const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : 10));
         let nextVal = cur + delta * ctrl.step;
@@ -187,7 +211,7 @@ export function initReticleScreen() {
       updateReticleControlHighlight();
       const ctrl = RETICLE_CONTROLS[focusedIndex];
       if (!ctrl) return 'READY';
-      if (ctrl.isToggle) {
+      if (ctrl.isToggle || ctrl.isOption) {
         return window.reticleGamepadAPI.adjust(1);
       } else {
         const testClicks = Math.min(3, appState.reticleConfig?.clickCount || 10);
@@ -201,13 +225,15 @@ export function initReticleScreen() {
     },
     quickAdjustClicks: (delta) => {
       const cfg = appState.reticleConfig || {};
-      const next = Math.max(2, Math.min(25, (cfg.clickCount || 10) + delta));
-      updateReticleConfig({ clickCount: next });
+      const next = Math.max(2, Math.min(30, (cfg.clickCount || 10) + delta));
+      const maxFittingStep = Math.max(8, Math.floor(240 / next));
+      const nextStep = Math.min(cfg.clickSpacing || maxFittingStep, maxFittingStep);
+      updateReticleConfig({ clickCount: next, clickSpacing: nextStep });
       return `CLICKS PER ARM: ${next}`;
     },
     quickAdjustSpacing: (delta) => {
       const cfg = appState.reticleConfig || {};
-      const next = Math.max(10, Math.min(80, (cfg.clickSpacing || 32) + delta));
+      const next = Math.max(4, Math.min(100, (cfg.clickSpacing || 8) + delta));
       updateReticleConfig({ clickSpacing: next });
       return `CLICK SPACING: ${next}px`;
     },
@@ -220,7 +246,7 @@ export function initReticleScreen() {
     quickAdjustStroke: (delta) => {
       const cfg = appState.reticleConfig || {};
       const cur = Number(cfg.strokeWidth || 1.8);
-      const next = Math.max(0.6, Math.min(5.0, Math.round((cur + delta) * 10) / 10));
+      const next = Math.max(0.5, Math.min(5.0, Math.round((cur + delta) * 10) / 10));
       updateReticleConfig({ strokeWidth: next });
       return `STROKE WEIGHT: ${next.toFixed(1)}px`;
     }
@@ -245,6 +271,7 @@ export function initReticleScreen() {
       clickCount: 10,
       clickSpacing: 32,
       centerGap: 64,
+      centerStyle: 'empty',
       innerBrackets: true,
       majorInterval: 5,
       minorTickLen: 10,
@@ -257,9 +284,21 @@ export function initReticleScreen() {
     });
   });
 
+  // Delegated Center Style Button Listener (guarantees instant, 100% reliable clicks across all screens)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.center-style-btn');
+    if (!btn) return;
+    const style = (btn.dataset.center || '').toLowerCase();
+    if (!style) return;
+    updateReticleConfig({ centerStyle: style });
+  });
+
   // Slider & Toggle Event Listeners
   sliderClicks?.addEventListener('input', (e) => {
-    updateReticleConfig({ clickCount: Number(e.target.value) || 10 });
+    const nextClicks = Number(e.target.value) || 10;
+    const maxFittingStep = Math.max(8, Math.floor(240 / nextClicks));
+    const nextStep = Math.min(appState.reticleConfig?.clickSpacing || maxFittingStep, maxFittingStep);
+    updateReticleConfig({ clickCount: nextClicks, clickSpacing: nextStep });
   });
 
   sliderSpacing?.addEventListener('input', (e) => {
@@ -317,11 +356,11 @@ export function initReticleScreen() {
     // Compute click distance on the preview stage (scaled to 800x500 viewBox)
     const baseScale = Math.min(svgRect.width / RETICLE_VIEWBOX_W, svgRect.height / RETICLE_VIEWBOX_H);
     const clickSpacingPx = Math.max(8, Number(appState.reticleConfig?.clickSpacing) || 32) * baseScale;
-    const gapHalfPx = Math.max(0, (Number(appState.reticleConfig?.centerGap) || 64) / 2) * baseScale;
 
+    // Clicks are calculated strictly from optical dead-center
     let clicks = 0;
-    if (distPx > gapHalfPx + clickSpacingPx * 0.35) {
-      clicks = Math.max(1, Math.round((distPx - gapHalfPx) / Math.max(1, clickSpacingPx)));
+    if (distPx >= clickSpacingPx * 0.4) {
+      clicks = Math.max(1, Math.round(distPx / Math.max(1, clickSpacingPx)));
     }
 
     const angleDeg = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
@@ -363,4 +402,5 @@ export function initReticleScreen() {
   });
 
   renderPreview();
+  window.__reticleScreenReady = true;
 }

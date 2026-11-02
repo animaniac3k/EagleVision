@@ -71,6 +71,7 @@ flowchart TD
         S_GALLERY["Screen 2: Stored Video Browser"]
         S_SETTINGS["Screen 3: Fullscreen Settings"]
         S_RETICLE["Screen 4: Reticle Customizer"]
+        S_CONTROLLER["Screen 5: Controller & Key Mapping"]
         V_MOUSE["Virtual Mouse Cursor Overlay"]
     end
 
@@ -137,12 +138,28 @@ flowchart TD
 
 ### 3.5 Parametric Reticle Engine (`js/renderer/overlayManager.js`)
 * Dynamically constructs scalable SVG graduated crosshairs with:
-  * Customizable clicks/indents per arm (2 to 25)
-  * Click distance in SVG/pixel spacing (10px to 80px)
-  * Center POI unobstructed gap (0px to 140px)
-  * Inner alignment brackets
-  * Major tick intervals (every 5 or 10 clicks) with numerical labels
-  * Concentric range rings
+  * **Extended Click Count**: Up to 30 clicks/indents per arm (2 to 30) on both vertical and horizontal axes for long-range elevation and BDC ladders.
+  * **Optical Dead-Center Measurement**: Turret click adjustments and voice callouts are computed strictly from true optical dead-center $(0, 0)$, unaffected by center gap width.
+  * **4 Selectable Center Aiming Symbols**:
+    * `empty`: Clean, unobstructed open center gap.
+    * `dot`: Sharp precision aiming dot centered at $(0, 0)$.
+    * `cross`: Fine center mini-crosshair meeting at the exact dead-center intersection.
+    * `chevron`: Tactical inverted-V caret ($\land$) whose sharp apex points directly to the exact center pixel from which click distances are measured.
+  * Click distance in SVG/pixel spacing (8px to 100px with 1-pixel precision).
+  * Center POI unobstructed gap (0px to 140px).
+  * Inner alignment brackets and major tick intervals with numerical labels (every 5 or 10 clicks).
+  * Concentric range circles corresponding directly to labeled click rings.
+
+### 3.7 Controller & Key Mapping Subsystem (`js/ui/controllerScreen.js`)
+* **Dedicated Fullscreen Configuration Matrix**: Provides visual representation of connected DualShock 4 / Gamepad with real-time input glowing and live action banner readout.
+* **Flexible Rebinding Pipeline**: Supports interactive capturing of gamepad buttons, triggers, stick-clicks, and keyboard keys with conflict resolution and profile presets (*Default DualShock 4*, *Simplified Field Mode*, *Flight / Arcade Stick*).
+* **Analog Fine-Tuning**: Real-time stick deadzone sliders (5% to 40%), Invert Y-Axis toggles for independent left/right thumbsticks, aim speed attenuation (10% to 100%), and capacitive touchpad sensitivity.
+* **Cyclic Quick-Tool Selector**: Ergonomic cycling dock on the live feed (D-Pad ◀ / ▶) enabling instant toggling (Cross ✕) of secondary operational tools (*Heatmap Detection*, *Voice Announcements*, *Reticle Overlay*, *FFP Zoom Lock*, *PiP Loupe*, *Declutter Sight*, *Telemetry HUD*) without screen navigation.
+
+### 3.8 First Focal Plane (FFP) Reticle Optical Engine (`js/renderer/overlayManager.js` & `compositor.js`)
+* **Proportional Subtension Scaling**: Matches optical scope First Focal Plane mechanics by automatically scaling reticle markings and hashmark spacing in lockstep with whole-image digital zoom: `scaleFactor = (overlayScale / 100) * (reticleFfpMode ? mainZoom : 1.0)`.
+* **Dynamic Click Distance Measurement**: Integrates FFP scaling directly into bullet impact / micro-motion distance computation (`getClickDistanceInPixels`), guaranteeing that angular measurements (mils/MOA) and directional voice announcements ("*3 clicks*", "*2 mils*") remain physically accurate across all magnification levels.
+* **Rapid Joypad Subtension Spacing**: Dedicated D-Pad ▲ (widen +5%) and D-Pad ▼ (tighten −5%) adjustments with tactical on-screen display (OSD) HUD feedback for instant field calibration to known target distances.
 
 ---
 
@@ -159,6 +176,10 @@ stateDiagram-v2
     SettingsScreen --> ReticleScreen: Tap "Customize Graduated Reticle"
     ReticleScreen --> LiveScreen: Tap "← Live Feed" / Controller Circle or Options
     ReticleScreen --> SettingsScreen: Tap "⚙ Settings"
+
+    SettingsScreen --> ControllerScreen: Tap "🎮 Configure Controller & Keys"
+    ControllerScreen --> SettingsScreen: Tap "← Settings" / Controller Circle Button
+    ControllerScreen --> LiveScreen: Tap "Exit to Live" / Controller Options Button
     
     LiveScreen --> GalleryScreen: Tap Stored Clips Icon / Ring Replay
     GalleryScreen --> LiveScreen: Tap "← Live Feed" / Controller Circle

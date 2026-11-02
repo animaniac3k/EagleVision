@@ -13,6 +13,14 @@
   <link rel="stylesheet" href="./css/viewport.css" />
   <link rel="stylesheet" href="./css/controls.css" />
   <link rel="stylesheet" href="./css/gallery.css" />
+  <script>
+    if (new URLSearchParams(window.location.search).has('nosplash')) {
+      document.documentElement.classList.add('no-splash');
+    }
+  </script>
+  <style>
+    html.no-splash #splashScreen { display: none !important; }
+  </style>
 </head>
 <body>
   <!-- Fullscreen Tactical Splash Screen (SPOTR Brand & Logo) -->
@@ -195,6 +203,11 @@
         </div>
       </div>
 
+      <!-- Real-Time Reticle FFP / Subtension Scale OSD Toast -->
+      <div id="reticleFfpToast" class="reticle-ffp-toast hidden">
+        <span id="reticleFfpText">RETICLE SUBTENSION: 100% (FFP SYNC)</span>
+      </div>
+
       <!-- SINGLE TOP-LEFT BUTTON SHOWN ONLY IN DECLUTTER MODE TO RESTORE UI -->
       <button id="btnRestoreUi" class="radar-btn btn-restore-ui hidden" title="Restore Interface Controls">
         <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -306,6 +319,13 @@
           <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
         </div>
 
+        <!-- Center-Left: Quick-Cycle Tool HUD Pill (D-Pad ◀/▶ to cycle tools, ✕ to toggle) -->
+        <div id="quickToolPill" class="quick-tool-pill hidden" title="Cyclic Quick Tool (D-Pad ◀ / ▶ to cycle, ✕ to toggle on/off)">
+          <span id="quickToolBadge" class="quick-tool-badge">HEATMAP</span>
+          <span id="quickToolStatus" class="quick-tool-status status-off">OFF</span>
+          <span class="quick-tool-hint">◀ ▶ CYCLE • ✕ TOGGLE</span>
+        </div>
+
         <!-- Center: Instant Replay Scrubber Bar -->
         <div id="replayBar" class="hidden">
           <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
@@ -414,9 +434,14 @@
           </svg>
           <span>SYSTEM & SENSOR SETTINGS</span>
         </span>
-        <button id="btnOpenReticleScreen" class="radar-btn radar-btn-active" title="Open Custom Reticle & Click Calibration">
-          <span>🎯 CUSTOM RETICLE</span>
-        </button>
+        <div style="display:flex; gap:10px;">
+          <button id="btnOpenControllerScreen" class="radar-btn radar-btn-active" title="Open Dedicated Controller & Key Mapping Screen">
+            <span>🎮 CONTROLLER MAPPING</span>
+          </button>
+          <button id="btnOpenReticleScreen" class="radar-btn radar-btn-active" title="Open Custom Reticle & Click Calibration">
+            <span>🎯 CUSTOM RETICLE</span>
+          </button>
+        </div>
       </header>
 
       <div class="settings-screen-body">
@@ -483,6 +508,26 @@
               <button id="btnOpenReticleScreenCard" class="radar-btn radar-btn-sm radar-btn-active" style="width:100%;" title="Open Graduated Reticle Customizer (Indents, Spacing, Gap, Rings)">🎯 CUSTOMIZE GRADUATED RETICLE</button>
             </div>
 
+            <div class="slider-group" style="margin-bottom:12px;">
+              <div class="slider-header">
+                <span>Center Point Style</span>
+                <span class="slider-val" id="valSettingsReticleCenter">EMPTY</span>
+              </div>
+              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-top:6px;">
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" title="Unobstructed open center gap">EMPTY</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" title="Sharp precision center aiming dot">DOT</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" title="Fine center intersection mini-crosshair">CROSS</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" title="Inverted caret pointing directly to dead-center pixel">CHEVRON</button>
+              </div>
+            </div>
+
+            <div class="slider-group" style="margin-bottom:10px;">
+              <div class="slider-header">
+                <span>First Focal Plane (FFP) Lock</span>
+                <button id="btnToggleReticleFfp" class="radar-btn radar-btn-sm radar-btn-active" style="min-width:110px;" title="Scale reticle in lockstep with whole-image digital zoom (FFP)">FFP: ON</button>
+              </div>
+            </div>
+
             <div class="slider-group">
               <div class="slider-header">
                 <span>Opacity</span>
@@ -496,7 +541,7 @@
                 <span>Reticle Scale</span>
                 <span id="valOvScale" class="slider-val">100%</span>
               </div>
-              <input id="sliderOvScale" type="range" min="25" max="200" value="100" class="radar-slider" />
+              <input id="sliderOvScale" type="range" min="25" max="200" step="1" value="100" class="radar-slider" />
             </div>
           </div>
 
@@ -572,85 +617,7 @@
             </div>
           </div>
 
-          <!-- 5. PS4 / Bluetooth Gamepad Controller -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">PS4 / BT Gamepad</span>
-              <div class="gamepad-status-row" style="gap:6px;">
-                <span id="gamepadStatusDot" class="gamepad-dot"></span>
-                <span id="gamepadStatusText">DISCONNECTED</span>
-                <button id="btnConnectWebHID" class="radar-btn radar-btn-sm radar-btn-active" style="height:26px; padding:0 10px; font-size:11px;" title="Connect Bluetooth PS4 Controller directly via Chrome WebHID">PAIR PS4 BT</button>
-                <button id="btnDetectGamepad" class="radar-btn radar-btn-sm" style="height:26px; padding:0 8px; font-size:11px;" title="Scan for USB / XInput Gamepads">SCAN</button>
-              </div>
-            </div>
-            <div id="gamepadActionText" class="ring-signal-readout">IDLE</div>
-
-            <!-- Live Controller Diagnostics -->
-            <div id="gamepadDiagRow" style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); display:flex; justify-content:space-between; margin-top:6px; padding:4px 8px; background:rgba(0,0,0,0.3); border-radius:3px;">
-              <span id="gamepadFocusStatus">PAGE FOCUS: ACTIVE ✓</span>
-              <span id="gamepadSlotStatus">BACKEND: WEBHID + GAMEPAD API</span>
-            </div>
-
-            <!-- Touchpad Virtual Mouse Sensitivity Slider -->
-            <div class="slider-group" style="margin-top:8px;">
-              <div class="slider-header">
-                <span>Touchpad Sensitivity</span>
-                <span id="valTouchpadSensitivity" class="slider-val">50%</span>
-              </div>
-              <input id="sliderTouchpadSensitivity" type="range" min="15" max="150" step="5" value="50" class="radar-slider" title="Adjust DualShock 4 Touchpad Virtual Mouse cursor speed (50% is half speed)" />
-            </div>
-
-            <!-- Reticle Aim Speed (Joystick Max Speed) Slider -->
-            <div class="slider-group" style="margin-top:8px;">
-              <div class="slider-header">
-                <span>Reticle Aim Speed (Joystick)</span>
-                <span id="valReticleAimSpeed" class="slider-val">50%</span>
-              </div>
-              <input id="sliderReticleAimSpeed" type="range" min="15" max="150" step="5" value="50" class="radar-slider" title="Adjust joystick movement speed for the main reticle (50% is half-speed for pinpoint aiming)" />
-            </div>
-
-            <!-- Live Controller Button & Stick Monitor -->
-            <div id="gamepadMonitor" class="gamepad-monitor-grid">
-              <div class="gp-badge" data-gp="cross">✕ CROSS</div>
-              <div class="gp-badge" data-gp="circle">◯ CIRCLE</div>
-              <div class="gp-badge" data-gp="square">▢ SQUARE</div>
-              <div class="gp-badge" data-gp="triangle">△ TRI</div>
-              <div class="gp-badge" data-gp="l1">L1</div>
-              <div class="gp-badge" data-gp="r1">R1</div>
-              <div class="gp-badge" data-gp="l2">L2</div>
-              <div class="gp-badge" data-gp="r2">R2</div>
-              <div class="gp-badge" data-gp="dpad-up">▲ UP</div>
-              <div class="gp-badge" data-gp="dpad-down">▼ DOWN</div>
-              <div class="gp-badge" data-gp="dpad-left">◀ LEFT</div>
-              <div class="gp-badge" data-gp="dpad-right">▶ RIGHT</div>
-              <div class="gp-badge" data-gp="share">SHARE</div>
-              <div class="gp-badge" data-gp="options">OPTIONS</div>
-              <div class="gp-badge" data-gp="l3">L3</div>
-              <div class="gp-badge" data-gp="r3">R3</div>
-              <div class="gp-badge" data-gp="ps">PS</div>
-              <div class="gp-badge" data-gp="touchpad" style="grid-column: span 3;">TOUCHPAD (VIRTUAL MOUSE)</div>
-            </div>
-
-            <div class="gamepad-mapping-table" style="font-size:12px; font-family:var(--font-mono); color:var(--radar-text-secondary); margin-top:8px; line-height:1.6;">
-              <div style="color:#2dd4bf; margin-bottom:6px; font-size:11px;">🎮 <b>Direct Chrome Bluetooth:</b> Click <b>PAIR PS4 BT</b> to select your <i>Wireless Controller</i> in Chrome's permission prompt for driverless Bluetooth input.</div>
-              <div>• <b>Touchpad:</b> Virtual Mouse Trackpad + Click (Slide & Drag Sliders/UI)</div>
-              <div>• <b>Options:</b> Open / Close Settings (Options) Screen</div>
-              <div>• <b>Share:</b> 20s Instant Replay (Auto-Save)</div>
-              <div>• <b>L-Stick:</b> Aim ROI Crosshair (Speed proportional)</div>
-              <div>• <b>R-Stick:</b> Pan Stream when Main Zoom &gt; 1.0x</div>
-              <div>• <b>L3 / R3 (Press Sticks In):</b> GUI Color Scheme (◀ Prev / ▶ Next)</div>
-              <div>• <b>D-Pad:</b> Zoom Window (▲/▼), Main Zoom/Step (◀/▶)</div>
-              <div>• <b>L1 / R1:</b> Main Stream Zoom Out / In</div>
-              <div>• <b>L2 / R2:</b> Left Mouse Click / Drag (L2) & Right Mouse Click (R2)</div>
-              <div>• <b>✕ Cross:</b> Play/Pause or Cycle Mode</div>
-              <div>• <b>○ Circle:</b> Return to Live Screen</div>
-              <div>• <b>□ Square:</b> Reticle Guide On/Off</div>
-              <div>• <b>△ Triangle:</b> Heatmap On/Off</div>
-              <div>• <b>PS Button:</b> Declutter HUD On/Off</div>
-            </div>
-          </div>
-
-          <!-- 6. Image Manipulation -->
+          <!-- 5. Image Manipulation -->
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Image Adjust</span>
@@ -794,7 +761,7 @@
                 <span>Clicks Per Arm</span>
                 <span id="valReticleClicks" class="slider-val">10 clicks</span>
               </div>
-              <input id="sliderReticleClicks" type="range" min="2" max="25" step="1" value="10" class="radar-slider" />
+              <input id="sliderReticleClicks" type="range" min="2" max="30" step="1" value="10" class="radar-slider" />
             </div>
 
             <div class="slider-group">
@@ -802,7 +769,7 @@
                 <span>Click Spacing</span>
                 <span id="valReticleSpacing" class="slider-val">32 px</span>
               </div>
-              <input id="sliderReticleSpacing" type="range" min="10" max="80" step="2" value="32" class="radar-slider" />
+              <input id="sliderReticleSpacing" type="range" min="4" max="100" step="1" value="8" class="radar-slider" />
             </div>
 
             <div class="slider-group">
@@ -810,7 +777,20 @@
                 <span>Center Gap (POI View)</span>
                 <span id="valReticleGap" class="slider-val">64 px</span>
               </div>
-              <input id="sliderReticleGap" type="range" min="0" max="140" step="4" value="64" class="radar-slider" />
+              <input id="sliderReticleGap" type="range" min="0" max="140" step="1" value="64" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Point Style</span>
+                <span id="valReticleCenter" class="slider-val">EMPTY</span>
+              </div>
+              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-top:6px;">
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" title="Unobstructed open center gap">EMPTY</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" title="Sharp precision center aiming dot">DOT</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" title="Fine center intersection mini-crosshair">CROSS</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" title="Inverted caret pointing directly to dead-center pixel">CHEVRON</button>
+              </div>
             </div>
           </div>
 
@@ -853,10 +833,239 @@
                 <span>Stroke Weight</span>
                 <span id="valReticleStroke" class="slider-val">1.8 px</span>
               </div>
-              <input id="sliderReticleStroke" type="range" min="0.5" max="5.0" step="0.2" value="1.8" class="radar-slider" />
+              <input id="sliderReticleStroke" type="range" min="0.5" max="5.0" step="0.1" value="1.8" class="radar-slider" />
             </div>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 5: FULLSCREEN CONTROLLER & KEY MAPPING CONFIGURATOR          -->
+    <!-- =================================================================== -->
+    <section id="screenController" class="screen-view hidden">
+      <header class="controller-screen-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button id="btnControllerBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+            <span>← LIVE FEED</span>
+          </button>
+          <button id="btnControllerBackToSettings" class="radar-btn" title="Return to General Settings Screen">
+            <span>⚙ SETTINGS</span>
+          </button>
+        </div>
+
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="6" width="20" height="12" rx="4"/>
+            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
+          </svg>
+          <span>CONTROLLER & KEY MAPPING CONFIGURATOR</span>
+        </span>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <label style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">PROFILE:</label>
+          <select id="selectControllerProfile" class="radar-select" style="min-width:160px; height:30px; font-size:12px;">
+            <option value="default">Default DualShock 4</option>
+            <option value="simplified">Simplified Field Mode</option>
+            <option value="flight">Flight / Arcade Stick</option>
+          </select>
+          <button id="btnResetControllerBindings" class="radar-btn radar-btn-sm" title="Reset all mappings and stick calibration to factory default">RESET DEFAULTS</button>
+        </div>
+      </header>
+
+      <!-- Feedback Toast Banner -->
+      <div id="cmToastBanner" class="cm-toast-banner hidden">READY</div>
+
+      <!-- Real-Time Hardware Signal & Action Readout -->
+      <div id="cmLiveActionBanner" class="cm-live-banner">READY (PRESS ANY CONTROLLER BUTTON, TRIGGER, STICK OR KEY TO TEST)</div>
+
+      <div class="controller-screen-body">
+        <div class="controller-workspace-grid">
+          <!-- Left Column: Visual Controller Representation & Stick Calibration -->
+          <div class="cm-hardware-col">
+            <!-- 1. Interactive Visual Controller Diagram & Live Monitoring -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <span class="settings-label">Live Controller Monitor</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span id="gamepadStatusDot" class="gamepad-dot"></span>
+                  <span id="gamepadStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">DISCONNECTED</span>
+                  <button id="btnConnectWebHID" class="radar-btn radar-btn-sm radar-btn-active" style="height:24px; padding:0 8px; font-size:11px;" title="Connect Bluetooth PS4 Controller directly via Chrome WebHID">PAIR PS4 BT</button>
+                  <button id="btnDetectGamepad" class="radar-btn radar-btn-sm" style="height:24px; padding:0 6px; font-size:11px;" title="Scan for USB / XInput Gamepads">SCAN</button>
+                </div>
+              </div>
+
+              <!-- Controller Hardware Schematic Box -->
+              <div class="cm-controller-box">
+                <!-- Top Shoulders & Triggers -->
+                <div class="cm-row-triggers">
+                  <div class="cm-visual-btn cm-btn-trigger" data-gp="l2"><span class="cm-badge-lbl">L2 TRIGGER</span></div>
+                  <div class="cm-visual-btn cm-btn-bumper" data-gp="l1"><span class="cm-badge-lbl">L1</span></div>
+                  <div style="flex:1;"></div>
+                  <div class="cm-visual-btn cm-btn-bumper" data-gp="r1"><span class="cm-badge-lbl">R1</span></div>
+                  <div class="cm-visual-btn cm-btn-trigger" data-gp="r2"><span class="cm-badge-lbl">R2 TRIGGER</span></div>
+                </div>
+
+                <!-- Main Controller Body: D-Pad, Touchpad & Action Buttons -->
+                <div class="cm-row-middle">
+                  <!-- D-Pad Cluster -->
+                  <div class="cm-dpad-cluster">
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-up">▲</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-left">◀</div>
+                    <div class="cm-dpad-center"></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-right">▶</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-down">▼</div>
+                    <div></div>
+                  </div>
+
+                  <!-- Center Touchpad & System Buttons -->
+                  <div class="cm-center-cluster">
+                    <div class="cm-row-system">
+                      <div class="cm-visual-btn cm-btn-system" data-gp="share">SHARE</div>
+                      <div class="cm-visual-btn cm-btn-touchpad" data-gp="touchpad">
+                        <span>TOUCHPAD (VIRTUAL MOUSE)</span>
+                      </div>
+                      <div class="cm-visual-btn cm-btn-system" data-gp="options">OPTIONS</div>
+                    </div>
+                    <div class="cm-row-ps">
+                      <div class="cm-visual-btn cm-btn-ps" data-gp="ps">PS</div>
+                    </div>
+                  </div>
+
+                  <!-- Face Action Buttons Cluster -->
+                  <div class="cm-face-cluster">
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="triangle">△</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="square">▢</div>
+                    <div class="cm-face-center"></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="circle">◯</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="cross">✕</div>
+                    <div></div>
+                  </div>
+                </div>
+
+                <!-- Dual Analog Sticks (L3 / R3) -->
+                <div class="cm-row-sticks">
+                  <div class="cm-stick-pod">
+                    <div class="cm-visual-btn cm-stick-ring" data-gp="l3">
+                      <div class="cm-stick-thumb" id="cmLeftThumb">L3</div>
+                    </div>
+                    <span class="cm-stick-lbl">LEFT STICK (AIM)</span>
+                  </div>
+                  <div class="cm-stick-pod">
+                    <div class="cm-visual-btn cm-stick-ring" data-gp="r3">
+                      <div class="cm-stick-thumb" id="cmRightThumb">R3</div>
+                    </div>
+                    <span class="cm-stick-lbl">RIGHT STICK (PAN/ZOOM)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Stick & Touchpad Fine Calibration -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <span class="settings-label">Analog Stick & Touchpad Tuning</span>
+                <span class="slider-val" style="font-size:11px;">PRECISION CURVE</span>
+              </div>
+
+              <!-- Reticle Aim Speed -->
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Reticle Aim Speed (Left Stick)</span>
+                  <span id="valControllerAimSpeed" class="slider-val">50%</span>
+                </div>
+                <input id="sliderControllerAimSpeed" type="range" min="15" max="150" step="5" value="50" class="radar-slider" title="Adjust joystick movement speed for the primary reticle (50% is default precision speed)" />
+              </div>
+
+              <!-- Left Stick Deadzone & Invert -->
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Left Stick Deadzone</span>
+                  <span id="valLeftStickDeadzone" class="slider-val">16%</span>
+                </div>
+                <input id="sliderLeftStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" title="Adjust stick center deadzone to prevent stick drift" />
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Left Stick Y-Axis</span>
+                  <button id="btnToggleInvertLeftY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
+                </div>
+              </div>
+
+              <!-- Right Stick Deadzone & Invert -->
+              <div class="slider-group" style="margin-top:10px;">
+                <div class="slider-header">
+                  <span>Right Stick Deadzone</span>
+                  <span id="valRightStickDeadzone" class="slider-val">16%</span>
+                </div>
+                <input id="sliderRightStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" />
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Right Stick Y-Axis</span>
+                  <button id="btnToggleInvertRightY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
+                </div>
+              </div>
+
+              <!-- Touchpad Sensitivity -->
+              <div class="slider-group" style="margin-top:10px;">
+                <div class="slider-header">
+                  <span>Touchpad Virtual Mouse Sensitivity</span>
+                  <span id="valControllerTouchpadSens" class="slider-val">50%</span>
+                </div>
+                <input id="sliderControllerTouchpadSens" type="range" min="15" max="150" step="5" value="50" class="radar-slider" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Interactive Key & Controller Mapping Matrix -->
+          <div class="cm-mapping-col">
+            <div class="settings-card" style="display:flex; flex-direction:column; height:100%;">
+              <div class="settings-card-header">
+                <span class="settings-label">Action Mapping Matrix</span>
+                <span style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">CLICK REBIND TO CHANGE</span>
+              </div>
+
+              <!-- Functional Category Filter Bar -->
+              <div class="cm-category-bar">
+                <button class="radar-btn radar-btn-sm mapping-cat-btn radar-btn-active" data-cat="all">ALL ACTIONS</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="optics">OPTICS & SIGHT</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="vision">VISION & HEATMAP</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="recording">RECORDING & REPLAY</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="system">SYSTEM & MOUSE</button>
+              </div>
+
+              <!-- Mapping Table Container with Sticky Header -->
+              <div class="cm-table-wrap">
+                <table class="cm-mapping-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 44%;">APPLICATION ACTION</th>
+                      <th style="width: 28%;">CONTROLLER BINDING</th>
+                      <th style="width: 20%;">KEYBOARD KEY</th>
+                      <th style="width: 8%; text-align:center;">RESET</th>
+                    </tr>
+                  </thead>
+                  <tbody id="controllerMappingTableBody">
+                    <!-- Dynamically populated by controllerScreen.js -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="cm-table-footer-hint">
+                💡 <b>TIP:</b> Click any <b>BINDING</b> button, then press any button, trigger, or stick on your controller to rebind. Press <kbd>ESC</kbd> to cancel.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -868,6 +1077,6 @@
     <div class="vm-dot"></div>
   </div>
 
-  <script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js?v=41"></script>
 </body>
 </html>

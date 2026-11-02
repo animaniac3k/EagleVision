@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v31';
+const CACHE_NAME = 'spotr-v41';
 const ASSETS = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const ASSETS = [
   './js/ui/sidebarControls.js',
   './js/ui/videoBrowser.js',
   './js/ui/reticleScreen.js',
+  './js/ui/controllerScreen.js',
   './js/ui/ringController.js',
   './js/ui/splashScreen.js',
   './js/input/gamepadController.js',

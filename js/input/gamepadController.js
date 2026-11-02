@@ -15,6 +15,7 @@ import { appState, updateState } from '../state.js';
 import { isSplashScreenActive, dismissSplashScreen } from '../ui/splashScreen.js';
 import { applyThemeColor } from '../ui/sidebarControls.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { getActiveBindings, ACTION_DEFINITIONS, executeMappedAction } from '../ui/controllerScreen.js';
 
 let activeHIDDevice = null;
 let webHIDConnected = false;
@@ -362,10 +363,10 @@ function handleWebHIDInputReport(event) {
   const rawRx = data.getUint8(offset + 2);
   const rawRy = data.getUint8(offset + 3);
 
-  const lx = applyDeadzone((rawLx - 128) / 128);
-  const ly = applyDeadzone((rawLy - 128) / 128);
-  const rx = applyDeadzone((rawRx - 128) / 128);
-  const ry = applyDeadzone((rawRy - 128) / 128);
+  const lx = applyDeadzone((rawLx - 128) / 128, false);
+  const ly = applyDeadzone((rawLy - 128) / 128, false);
+  const rx = applyDeadzone((rawRx - 128) / 128, true);
+  const ry = applyDeadzone((rawRy - 128) / 128, true);
   latestAxes = { lx, ly, rx, ry };
 
   // Dispatch continuous analog stick movement immediately on each report
@@ -888,13 +889,28 @@ function applyStickCurve(v) {
  * Applies smooth thumbstick movement frame by frame
  */
 function applyStickMotion(lx, ly, rx, ry) {
+  const effLy = appState.leftStickInvertY ? -ly : ly;
+  const effRy = appState.rightStickInvertY ? -ry : ry;
+
+  // Visual thumbstick feedback in Controller Configuration screen
+  if (appState.currentScreen === 'controller') {
+    const leftThumb = document.getElementById('cmLeftThumb');
+    if (leftThumb) {
+      leftThumb.style.transform = `translate3d(${lx * 14}px, ${ly * 14}px, 0)`;
+    }
+    const rightThumb = document.getElementById('cmRightThumb');
+    if (rightThumb) {
+      rightThumb.style.transform = `translate3d(${rx * 14}px, ${ry * 14}px, 0)`;
+    }
+  }
+
   // Left Stick: Moves ROI Target Crosshair (roiX, roiY) in live mode
   // Maximum speed reduced by ~50% (scaled by reticleAimSpeed, default 50%) to allow pinpoint positioning
-  if (appState.currentScreen === 'live' && (lx !== 0 || ly !== 0)) {
+  if (appState.currentScreen === 'live' && (lx !== 0 || effLy !== 0)) {
     const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
     const currentRoiSpeed = BASE_ROI_SPEED * aimRatio;
     const clx = applyStickCurve(lx);
-    const cly = applyStickCurve(ly);
+    const cly = applyStickCurve(effLy);
     let nx = Math.max(0.04, Math.min(0.96, appState.roiX + clx * currentRoiSpeed));
     let ny = Math.max(0.04, Math.min(0.96, appState.roiY + cly * currentRoiSpeed));
     updateState({
@@ -906,11 +922,11 @@ function applyStickMotion(lx, ly, rx, ry) {
   }
 
   // Right Stick: Pans Main View when zoomed in (>1.0x) in live mode
-  if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || ry !== 0)) {
+  if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || effRy !== 0)) {
     const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
     const currentPanSpeed = BASE_PAN_SPEED * aimRatio;
     const crx = applyStickCurve(rx);
-    const cry = applyStickCurve(ry);
+    const cry = applyStickCurve(effRy);
     const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
     const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX + crx * currentPanSpeed));
     const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY + cry * currentPanSpeed));
@@ -953,7 +969,7 @@ function applyStickMotion(lx, ly, rx, ry) {
       const interval = Math.abs(rx) > 0.50 ? 75 : 150;
       if (now - reticleStickRightXTime > interval) {
         reticleStickRightXTime = now;
-        const dir = rx > 0 ? 4 : -4;
+        const dir = rx > 0 ? 1 : -1;
         const res = window.reticleGamepadAPI?.quickAdjustGap(dir);
         window.reticleGamepadAPI?.showToast(res, 'rstick');
         updateState({ lastGamepadAction: `RETICLE: ${res}` });
@@ -965,7 +981,7 @@ function applyStickMotion(lx, ly, rx, ry) {
       const interval = Math.abs(ry) > 0.50 ? 75 : 150;
       if (now - reticleStickRightYTime > interval) {
         reticleStickRightYTime = now;
-        const dir = -ry > 0 ? 0.2 : -0.2;
+        const dir = -ry > 0 ? 0.1 : -0.1;
         const res = window.reticleGamepadAPI?.quickAdjustStroke(dir);
         window.reticleGamepadAPI?.showToast(res, 'rstick');
         updateState({ lastGamepadAction: `RETICLE: ${res}` });
@@ -1021,9 +1037,11 @@ function pollGamepadAPI() {
 
   // 2. Analog Sticks
   const axes = pad.axes || [];
-  const lx = axes.length >= 1 ? applyDeadzone(axes[0]) : 0;
-  const ly = axes.length >= 2 ? applyDeadzone(axes[1]) : 0;
-  const { rx, ry } = getGamepadApiRightStick(pad);
+  const lx = axes.length >= 1 ? applyDeadzone(axes[0], false) : 0;
+  const ly = axes.length >= 2 ? applyDeadzone(axes[1], false) : 0;
+  const { rx: rawRx, ry: rawRy } = getGamepadApiRightStick(pad);
+  const rx = applyDeadzone(rawRx, true);
+  const ry = applyDeadzone(rawRy, true);
   latestAxes = { lx, ly, rx, ry };
 
   applyStickMotion(lx, ly, rx, ry);
@@ -1061,6 +1079,13 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
+  // 2b. Live visual monitor on Controller Configurator screen
+  if (appState.currentScreen === 'controller') {
+    ROLES.forEach((r) => {
+      window.controllerMappingAPI?.highlightGamepadInput(r, Boolean(actionState[r]));
+    });
+  }
+
   // Edge-trigger helper
   function isJustPressed(role) {
     const isDown = Boolean(actionState[role]);
@@ -1068,7 +1093,47 @@ function dispatchControllerInputs(actionState) {
     return isDown && !wasDown;
   }
 
+  // Check if Rebinding Mode is active in Controller Configurator
+  if (window.controllerMappingAPI?.isRebinding?.()) {
+    for (const r of ROLES) {
+      if (isJustPressed(r)) {
+        const captured = window.controllerMappingAPI.captureGamepadButton(r);
+        if (captured) {
+          prevButtonStates = Object.assign({}, actionState);
+          return;
+        }
+      }
+    }
+  }
+
+  // Live action readout on Controller screen
+  if (appState.currentScreen === 'controller') {
+    for (const r of ROLES) {
+      if (isJustPressed(r)) {
+        const bindings = getActiveBindings();
+        const entry = Object.entries(bindings).find(([actId, b]) => b.gamepad === r);
+        const actDef = entry ? ACTION_DEFINITIONS.find(a => a.id === entry[0]) : null;
+        window.controllerMappingAPI?.updateLiveActionBanner(r, actDef ? actDef.name : 'UNASSIGNED');
+        if (r === 'circle') {
+          document.getElementById('btnControllerBackToSettings')?.click();
+          prevButtonStates = Object.assign({}, actionState);
+          return;
+        }
+      }
+    }
+  }
+
   const screen = appState.currentScreen;
+
+  function getBoundAction(role) {
+    try {
+      const bindings = getActiveBindings();
+      for (const [actionId, binding] of Object.entries(bindings)) {
+        if (binding.gamepad === role) return actionId;
+      }
+    } catch (_) {}
+    return null;
+  }
 
   // Cross (✕)
   if (isJustPressed('cross')) {
@@ -1090,8 +1155,9 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('btnReplayPlayPause')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CROSS (PLAY/PAUSE)' });
     } else {
-      document.getElementById('ringHudPill')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: CROSS (MODE CYCLE)' });
+      const act = getBoundAction('cross') || 'quick_tool_toggle';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: 'BUTTON: CROSS (QUICK TOOL TOGGLE)' });
     }
   }
 
@@ -1105,6 +1171,9 @@ function dispatchControllerInputs(actionState) {
       updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
     } else if (screen === 'reticle') {
       document.getElementById('btnReticleBackToLive')?.click();
+      updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
+    } else if (screen === 'controller') {
+      document.getElementById('btnControllerBackToLive')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
     } else if (appState.replayActive) {
       document.getElementById('btnCloseReplay')?.click();
@@ -1128,7 +1197,8 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('btnGallerySlowMo')?.click();
       updateState({ lastGamepadAction: 'BUTTON: SQUARE (0.5x SLOW-MO)' });
     } else {
-      document.getElementById('btnToggleOverlayTop')?.click();
+      const act = getBoundAction('square') || 'toggle_overlay';
+      executeMappedAction(act);
       updateState({ lastGamepadAction: 'BUTTON: SQUARE (OVERLAY TOGGLE)' });
     }
   }
@@ -1144,7 +1214,8 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('btnToggleGalleryDrawer')?.click();
       updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (CLIPS DRAWER)' });
     } else {
-      document.getElementById('btnToggleHeatmap')?.click();
+      const act = getBoundAction('triangle') || 'toggle_heatmap';
+      executeMappedAction(act);
       updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (HEATMAP TOGGLE)' });
     }
   }
@@ -1159,7 +1230,8 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('galleryZoomMinus')?.click();
       updateState({ lastGamepadAction: 'BUTTON: L1 (VIDEO ZOOM -)' });
     } else {
-      document.getElementById('mainZoomMinus')?.click();
+      const act = getBoundAction('l1') || 'zoom_out';
+      executeMappedAction(act);
       updateState({ lastGamepadAction: 'BUTTON: L1 (MAIN ZOOM -)' });
     }
   }
@@ -1174,7 +1246,8 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('galleryZoomPlus')?.click();
       updateState({ lastGamepadAction: 'BUTTON: R1 (VIDEO ZOOM +)' });
     } else {
-      document.getElementById('mainZoomPlus')?.click();
+      const act = getBoundAction('r1') || 'zoom_in';
+      executeMappedAction(act);
       updateState({ lastGamepadAction: 'BUTTON: R1 (MAIN ZOOM +)' });
     }
   }
@@ -1249,7 +1322,7 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // D-Pad Up
+  // D-Pad Up - Reticle FFP Subtension Spacing Wider (+)
   if (isJustPressed('dpad-up')) {
     if (screen === 'reticle') {
       const ctrl = window.reticleGamepadAPI?.cycleFocus(-1);
@@ -1257,12 +1330,13 @@ function dispatchControllerInputs(actionState) {
       window.reticleGamepadAPI?.showToast(`SELECTED: ${label}`, 'dpad');
       updateState({ lastGamepadAction: `SELECT: ${label}` });
     } else if (screen === 'live') {
-      document.getElementById('pipZoomPlus')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: UP (WIN ZOOM +)' });
+      const act = getBoundAction('dpad-up') || 'reticle_scale_up';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: 'D-PAD: UP (RETICLE SUBTENSION +)' });
     }
   }
 
-  // D-Pad Down
+  // D-Pad Down - Reticle FFP Subtension Spacing Tighter (−)
   if (isJustPressed('dpad-down')) {
     if (screen === 'reticle') {
       const ctrl = window.reticleGamepadAPI?.cycleFocus(1);
@@ -1270,12 +1344,13 @@ function dispatchControllerInputs(actionState) {
       window.reticleGamepadAPI?.showToast(`SELECTED: ${label}`, 'dpad');
       updateState({ lastGamepadAction: `SELECT: ${label}` });
     } else if (screen === 'live') {
-      document.getElementById('pipZoomMinus')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: DOWN (WIN ZOOM -)' });
+      const act = getBoundAction('dpad-down') || 'reticle_scale_down';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: 'D-PAD: DOWN (RETICLE SUBTENSION -)' });
     }
   }
 
-  // D-Pad Left
+  // D-Pad Left - Step Replay Backward or Cycle Prev Quick Tool
   if (isJustPressed('dpad-left')) {
     if (screen === 'reticle') {
       const res = window.reticleGamepadAPI?.adjust(-1);
@@ -1288,12 +1363,13 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('btnReplayStepBack')?.click();
       updateState({ lastGamepadAction: 'D-PAD: LEFT (STEP -1)' });
     } else {
-      document.getElementById('mainZoomMinus')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: LEFT (MAIN ZOOM -)' });
+      const act = getBoundAction('dpad-left') || 'quick_tool_cycle_prev';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: 'D-PAD: LEFT (QUICK TOOL ◀)' });
     }
   }
 
-  // D-Pad Right
+  // D-Pad Right - Step Replay Forward or Cycle Next Quick Tool
   if (isJustPressed('dpad-right')) {
     if (screen === 'reticle') {
       const res = window.reticleGamepadAPI?.adjust(1);
@@ -1306,8 +1382,9 @@ function dispatchControllerInputs(actionState) {
       document.getElementById('btnReplayStep')?.click();
       updateState({ lastGamepadAction: 'D-PAD: RIGHT (STEP +1)' });
     } else {
-      document.getElementById('mainZoomPlus')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: RIGHT (MAIN ZOOM +)' });
+      const act = getBoundAction('dpad-right') || 'quick_tool_cycle_next';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: 'D-PAD: RIGHT (QUICK TOOL ▶)' });
     }
   }
 
@@ -1363,9 +1440,11 @@ function formatControllerName(id) {
   return id.split('(')[0].trim() || 'Controller';
 }
 
-function applyDeadzone(v) {
-  if (Math.abs(v) < DEADZONE) return 0;
-  return v > 0 ? (v - DEADZONE) / (1 - DEADZONE) : (v + DEADZONE) / (1 - DEADZONE);
+function applyDeadzone(v, isRight = false) {
+  const dzPercent = isRight ? (appState.rightStickDeadzone ?? 16) : (appState.leftStickDeadzone ?? 16);
+  const dz = dzPercent / 100;
+  if (Math.abs(v) < dz) return 0;
+  return v > 0 ? (v - dz) / (1 - dz) : (v + dz) / (1 - dz);
 }
 
 function isDirectInputDS4(pad) {

@@ -454,37 +454,73 @@
             <td><span class="key">Left Joystick</span></td>
             <td>Primary Reticle Aim (Precision 50% Speed)</td>
             <td>—</td>
-            <td>Sculpt Crosshair Thickness &amp; Line Size</td>
+            <td>Navigate Menu Items (Up/Down) &amp; Adjust Values (Left/Right)</td>
           </tr>
           <tr>
             <td><span class="key">Right Joystick</span></td>
-            <td>Digital Zoom Loupe (PiP) Target Pan</td>
+            <td>Viewport Pan (when Zoom &gt; 1.0x)</td>
             <td>—</td>
-            <td>Sculpt Reticle Ring Diameter &amp; Center Gap</td>
+            <td>Sculpt Concentric Rings &amp; Center Gap Diameter</td>
           </tr>
           <tr>
-            <td><span class="key">Circle (B)</span></td>
-            <td>Trigger Instant Replay (Auto-Saves Clip)</td>
+            <td><span class="key">L1 / R1 Bumpers</span></td>
+            <td>Main Viewport Digital Zoom (− / +)</td>
+            <td>Playback Video Zoom (− / +)</td>
+            <td>Quick Step Click Indents (−1 / +1)</td>
+          </tr>
+          <tr>
+            <td><span class="key">D-Pad ▲ / ▼</span></td>
+            <td>Reticle FFP Subtension Spacing (Wider +5% / Tighter −5%)</td>
+            <td>—</td>
+            <td>Cycle Selected Setting / Drawer Focus</td>
+          </tr>
+          <tr>
+            <td><span class="key">D-Pad ◄ / ►</span></td>
+            <td>Cyclic Quick-Tool Selector (Step Prev / Next Tool)</td>
+            <td>Step Backward / Forward (1 Frame Forensic Review)</td>
+            <td>Decrease / Increase Active Value Slider</td>
+          </tr>
+          <tr>
+            <td><span class="key">Cross (✕)</span></td>
+            <td>Toggle Active Cyclic Quick Tool (ON / OFF)</td>
+            <td>Play / Pause Video Playback</td>
+            <td>Toggle Numbered Subtension Hashmark Labels</td>
+          </tr>
+          <tr>
+            <td><span class="key">Circle (◯)</span></td>
+            <td>Declutter Screen / Universal Back to Live Feed</td>
             <td>Close Replay &amp; Return to Live Stream</td>
             <td>Exit Customizer Screen</td>
           </tr>
           <tr>
-            <td><span class="key">Cross (A)</span></td>
-            <td>Cycle HUD Visibility</td>
-            <td>Play / Pause Video Playback</td>
-            <td>Toggle Concentric Rings</td>
+            <td><span class="key">Square (▢)</span></td>
+            <td>Toggle Scope Reticle Overlay (ON / OFF)</td>
+            <td>Toggle 0.5x Slow-Motion Playback</td>
+            <td>Toggle Concentric Range Rings</td>
           </tr>
           <tr>
-            <td><span class="key">D-Pad ◄ / ►</span></td>
-            <td>Fine Reticle Step (Windage)</td>
-            <td>Step Backward / Forward (1 Frame)</td>
-            <td>Adjust Open Center Gap (Fine)</td>
+            <td><span class="key">Triangle (△)</span></td>
+            <td>Toggle Thermal Micro-Motion Heatmap Engine</td>
+            <td>Toggle Saved Clips Drawer Panel</td>
+            <td>Toggle Center Bounding Brackets</td>
+          </tr>
+          <tr>
+            <td><span class="key">Share Button</span></td>
+            <td>Instant 20s Replay (Auto-Saves to Local Storage)</td>
+            <td>Export Video Clip</td>
+            <td>Reset Reticle to Preset Defaults</td>
+          </tr>
+          <tr>
+            <td><span class="key">Options Button</span></td>
+            <td>Open / Close Settings &amp; Controller Configurator</td>
+            <td>Exit to Live Stream</td>
+            <td>Exit to Live Stream</td>
           </tr>
           <tr>
             <td><span class="key">L3 / R3 Stick Clicks</span></td>
-            <td>L3: Tactical Color Theme | R3: Declutter UI</td>
+            <td>L3 / R3: Cycle Night-Vision Color Schemes (◀ Prev / Next ▶)</td>
             <td>—</td>
-            <td>L3: Switch Color Swatch</td>
+            <td>L3: Audition Preset | R3: Reset Preset</td>
           </tr>
         </tbody>
       </table>
@@ -514,7 +550,7 @@
     <div class="grid-4" style="margin-bottom: 4mm;">
       <div class="card card-teal">
         <div class="card-title"><span class="pill pill-teal">VIEW 1</span> Live Feed</div>
-        <p style="font-size: 8pt;">60 FPS live video, micro-change thermal heatmap, floating draggable PiP loupe, customizable crosshairs, and voice announcements.</p>
+        <p style="font-size: 8pt;">60 FPS live video, micro-change thermal heatmap, floating draggable PiP loupe, customizable crosshairs, FFP subtension scaling, and cyclic quick-tool dock.</p>
       </div>
       <div class="card card-blue">
         <div class="card-title"><span class="pill pill-blue">VIEW 2</span> Instant Replay</div>
@@ -525,8 +561,8 @@
         <p style="font-size: 8pt;">Permanent local storage library in IndexedDB. Organize shot clips, review high-speed impacts, and export directly as standalone .webm.</p>
       </div>
       <div class="card card-purple">
-        <div class="card-title"><span class="pill pill-purple">VIEW 4</span> Reticle Studio</div>
-        <p style="font-size: 8pt;">Dedicated parametric design canvas. Sculpt crosshair thickness, center gaps, mil-dot markings, and compute scope turret click corrections.</p>
+        <div class="card-title"><span class="pill pill-purple">VIEW 4 &amp; 5</span> Reticle &amp; Controller</div>
+        <p style="font-size: 8pt;">Parametric reticle studio (mils/MOA click corrections) &amp; full-screen Controller &amp; Key Rebinding Matrix with live input glow diagnostics.</p>
       </div>
     </div>
 
@@ -785,20 +821,21 @@
       <!-- Reticle Studio & Stick Sculpting -->
       <div class="card card-purple">
         <div class="card-title">
-          <span class="pill pill-purple">RETICLE</span> Parametric Reticle Studio &amp; Stick Sculpting
+          <span class="pill pill-purple">RETICLE</span> Parametric Reticle Studio (Up to 30 Clicks) &amp; Center Point Styles
         </div>
         <p>Craft the ideal sighting overlay for any optics magnification or target geometry in View 4 (#screenReticle):</p>
         <ul>
-          <li><strong>Parametric Geometry:</strong> Adjust Outer Ring Diameter, Inner Ring, Center Open Gap, Crosshair Line Thickness, and Hash Mark Spacing.</li>
-          <li><strong>Direct Controller Stick Sculpting:</strong> While in Reticle Customizer mode, you can sculpt the crosshair geometry live using the gamepad joysticks:
+          <li><strong>Extended 30-Click Elevation/Windage Ladder:</strong> Display up to 30 clicks/indents per arm with major graduation labels (every 5 clicks) across vertical and horizontal axes for extreme long-range holdovers.</li>
+          <li><strong>Optical Dead-Center Measurement:</strong> All click distances and voice callout turret adjustments are calculated strictly from true optical dead-center (0, 0), completely independent of visual center gap diameter.</li>
+          <li><strong>4 Selectable Center Aiming Symbols:</strong>
             <ul>
-              <li><strong>Left Stick Up/Down:</strong> Increase / decrease crosshair line thickness.</li>
-              <li><strong>Left Stick Left/Right:</strong> Expand / contract reticle diameter.</li>
-              <li><strong>Right Stick Up/Down:</strong> Expand / shrink the open-center sight gap.</li>
+              <li><strong>EMPTY:</strong> Open unobstructed center viewing window.</li>
+              <li><strong>DOT:</strong> Precision center aiming dot at the optical origin.</li>
+              <li><strong>CROSS:</strong> Fine mini-crosshair intersection at dead-center.</li>
+              <li><strong>CHEVRON:</strong> Tactical inverted caret (&Lambda;) whose sharp apex points directly to the exact measurement pixel (0, 0).</li>
             </ul>
           </li>
-          <li><strong>Concentric Circles &amp; Mil-Dots:</strong> Toggle dual concentric ranging rings and calibrated mil-dot hash lines with <span class="key">Cross (A)</span>.</li>
-          <li><strong>Custom Image Overlays:</strong> Load external PNG/SVG reticle artwork via the custom reticle loader.</li>
+          <li><strong>Direct Controller Sculpting &amp; Cycle:</strong> Adjust click count, spacing, gap, stroke weight, or press <span class="key">Key C</span> / Quick Tool dock to cycle center point styles live.</li>
         </ul>
       </div>
 
@@ -822,7 +859,7 @@
       <div class="card-title">
         <span class="pill pill-teal">DEPLOYMENT</span> Progressive Web App (PWA) Offline Installation Guide
       </div>
-      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App with zero external runtime dependencies. Precached by Service Worker <span style="font-family: monospace;">spotr-v31</span>:</p>
+      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App with zero external runtime dependencies. Precached by Service Worker <span style="font-family: monospace;">spotr-v36</span>:</p>
 
       <div class="grid-4" style="margin-top: 2mm;">
         <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">

@@ -14,6 +14,7 @@ import {
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { speakDetectionAnnouncement } from '../renderer/compositor.js';
+import { initControllerScreen, toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
   const clean = (hex || '#2dd4bf').replace('#', '');
@@ -57,10 +58,11 @@ export function applyThemeColor(hex) {
   root.setProperty('--shadow-glow', `0 0 14px hsla(${h}, ${sat}%, 55%, 0.4)`);
 }
 
-export async function initSidebarAndTopControls(videoEl) {
+export function initSidebarAndTopControls(videoEl) {
   const screenLive = document.getElementById('screenLive');
   const screenSettings = document.getElementById('screenSettings');
   const screenReticle = document.getElementById('screenReticle');
+  const screenController = document.getElementById('screenController');
 
   const btnDeclutterUi = document.getElementById('btnDeclutterUi');
   const btnRestoreUi = document.getElementById('btnRestoreUi');
@@ -68,6 +70,8 @@ export async function initSidebarAndTopControls(videoEl) {
   const btnSettingsBackToLive = document.getElementById('btnSettingsBackToLive');
   const btnOpenReticleScreen = document.getElementById('btnOpenReticleScreen');
   const btnOpenReticleScreenCard = document.getElementById('btnOpenReticleScreenCard');
+  const btnOpenControllerScreen = document.getElementById('btnOpenControllerScreen');
+  const btnOpenControllerScreenCard = document.getElementById('btnOpenControllerScreenCard');
 
   const btnTogglePip = document.getElementById('btnTogglePip');
   const btnToggleOverlayTop = document.getElementById('btnToggleOverlayTop');
@@ -106,11 +110,33 @@ export async function initSidebarAndTopControls(videoEl) {
   const openReticleScreen = () => {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.add('hidden');
+    screenController?.classList.add('hidden');
     screenReticle?.classList.remove('hidden');
     updateState({ currentScreen: 'reticle', replayActive: false });
   };
   btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
   btnOpenReticleScreenCard?.addEventListener('click', openReticleScreen);
+
+  const openControllerScreen = () => {
+    screenLive?.classList.add('hidden');
+    screenSettings?.classList.add('hidden');
+    screenReticle?.classList.add('hidden');
+    screenController?.classList.remove('hidden');
+    updateState({ currentScreen: 'controller', replayActive: false });
+  };
+  btnOpenControllerScreen?.addEventListener('click', openControllerScreen);
+  btnOpenControllerScreenCard?.addEventListener('click', openControllerScreen);
+
+  initControllerScreen();
+
+  if (appState.currentScreen === 'controller') {
+    openControllerScreen();
+  } else if (appState.currentScreen === 'reticle') {
+    openReticleScreen();
+  } else if (appState.currentScreen === 'settings') {
+    screenLive?.classList.add('hidden');
+    screenSettings?.classList.remove('hidden');
+  }
 
   // 2. Show/Hide Digital Zoom Window
   btnTogglePip.addEventListener('click', () => {
@@ -125,6 +151,20 @@ export async function initSidebarAndTopControls(videoEl) {
       saveSettings(appState);
     });
   }
+
+  // 2c. First Focal Plane (FFP) Zoom Lock Toggle
+  const btnToggleReticleFfp = document.getElementById('btnToggleReticleFfp');
+  btnToggleReticleFfp?.addEventListener('click', () => {
+    const next = !appState.reticleFfpMode;
+    updateState({ reticleFfpMode: next });
+    saveSettings(appState);
+  });
+
+  // 2d. Cyclic Quick Tool HUD Pill Tap-to-Toggle
+  const quickToolPill = document.getElementById('quickToolPill');
+  quickToolPill?.addEventListener('click', () => {
+    toggleQuickTool();
+  });
 
   // 3. Toggle Localized Micro-Change Heatmap from Main Interface
   btnToggleHeatmap.addEventListener('click', () => {
@@ -191,14 +231,14 @@ export async function initSidebarAndTopControls(videoEl) {
     }
   }
 
-  await populateCameraDropdown();
+  populateCameraDropdown().catch((err) => console.warn('Camera enum deferred:', err));
 
   cameraSelect.addEventListener('change', async (e) => {
     await startCameraStream(videoEl, e.target.value);
     if (appState.bufferEnabled) {
       startMemoryBuffer(videoEl);
     }
-    await populateCameraDropdown();
+    populateCameraDropdown().catch((err) => console.warn('Camera enum deferred:', err));
   });
 
   btnRefreshCameras.addEventListener('click', populateCameraDropdown);
@@ -213,7 +253,7 @@ export async function initSidebarAndTopControls(videoEl) {
   const mainZoomBadge = document.getElementById('mainZoomBadge');
 
   mainZoomMinus.addEventListener('click', () => {
-    const next = Math.max(1.0, Math.round((appState.mainZoom - 0.5) * 10) / 10);
+    const next = Math.max(1.0, Math.round((appState.mainZoom - 0.5) * 2) / 2);
     updateState({
       mainZoom: next,
       mainPanX: next <= 1.01 ? 0 : appState.mainPanX,
@@ -222,7 +262,7 @@ export async function initSidebarAndTopControls(videoEl) {
   });
 
   mainZoomPlus.addEventListener('click', () => {
-    const next = Math.min(8.0, Math.round((appState.mainZoom + 0.5) * 10) / 10);
+    const next = Math.min(8.0, Math.round((appState.mainZoom + 0.5) * 2) / 2);
     updateState({ mainZoom: next });
   });
 
@@ -620,9 +660,16 @@ export async function initSidebarAndTopControls(videoEl) {
     }
 
     // Fullscreen view visibility sync
-    if (screenSettings && screenLive) {
+    if (screenLive) {
       const isSettings = state.currentScreen === 'settings';
-      screenSettings.classList.toggle('hidden', !isSettings);
+      const isReticle = state.currentScreen === 'reticle';
+      const isController = state.currentScreen === 'controller';
+      const isLive = state.currentScreen === 'live';
+
+      screenLive.classList.toggle('hidden', !isLive);
+      if (screenSettings) screenSettings.classList.toggle('hidden', !isSettings);
+      if (screenReticle) screenReticle.classList.toggle('hidden', !isReticle);
+      if (screenController) screenController.classList.toggle('hidden', !isController);
       btnToggleOptions?.classList.toggle('radar-btn-active', isSettings);
     }
     btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
@@ -658,6 +705,16 @@ export async function initSidebarAndTopControls(videoEl) {
     btnToggleOverlay.textContent = state.overlayEnabled ? 'ON' : 'OFF';
     btnToggleOverlay.classList.toggle('radar-btn-active', state.overlayEnabled);
 
+    if (btnToggleReticleFfp) {
+      const ffpActive = state.reticleFfpMode !== false;
+      btnToggleReticleFfp.textContent = ffpActive ? 'FFP: ON' : 'FFP: OFF';
+      btnToggleReticleFfp.classList.toggle('radar-btn-active', ffpActive);
+    }
+    const valOvScale = document.getElementById('valOvScale');
+    const sliderOvScale = document.getElementById('sliderOvScale');
+    if (valOvScale) valOvScale.textContent = `${Math.round(state.overlayScale || 100)}%`;
+    if (sliderOvScale) sliderOvScale.value = String(Math.round(state.overlayScale || 100));
+
     ovButtons.forEach((b) => {
       b.classList.toggle('radar-btn-active', b.dataset.ov === state.overlayType);
     });
@@ -678,5 +735,15 @@ export async function initSidebarAndTopControls(videoEl) {
     if (gamepadActionText && state.lastGamepadAction) {
       gamepadActionText.textContent = state.lastGamepadAction;
     }
+
+    // Sync Center Point Style buttons and text across screens
+    const activeCenterStyle = String(state.reticleConfig?.centerStyle || 'empty').toLowerCase();
+    const valSettingsCenter = document.getElementById('valSettingsReticleCenter');
+    if (valSettingsCenter) {
+      valSettingsCenter.textContent = activeCenterStyle.toUpperCase();
+    }
+    document.querySelectorAll('.center-style-btn').forEach(btn => {
+      btn.classList.toggle('radar-btn-active', (btn.dataset.center || '').toLowerCase() === activeCenterStyle);
+    });
   });
 }

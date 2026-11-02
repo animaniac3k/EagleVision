@@ -22,6 +22,12 @@ export function initSplashScreen() {
   }
 
   // 1. Auto-dismiss 2 seconds after the 3.5s loading animation completes (5.5s total)
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nosplash')) {
+    splashEl.style.display = 'none';
+    splashEl.classList.add('splash-hidden');
+    isSplashActive = false;
+    return;
+  }
   dismissTimer = setTimeout(() => {
     dismissSplashScreen('timeout');
   }, 5500);

@@ -14,6 +14,7 @@ export function loadSavedSettings() {
           clickCount: 10,
           clickSpacing: 32,
           centerGap: 64,
+          centerStyle: 'empty',
           innerBrackets: true,
           majorInterval: 5,
           minorTickLen: 10,
@@ -42,6 +43,7 @@ export function saveSettings(state) {
       overlayType: state.overlayType === 'custom' ? 'crosshair' : 'crosshair',
       overlayOpacity: state.overlayOpacity,
       overlayScale: state.overlayScale,
+      reticleFfpMode: state.reticleFfpMode !== false,
       reticleConfig: state.reticleConfig || {},
       heatmapSensitivity: state.heatmapSensitivity,
       heatmapDuration: state.heatmapDuration || 30.0,
@@ -57,6 +59,12 @@ export function saveSettings(state) {
       uiOpacity: state.uiOpacity ?? 100,
       touchpadSensitivity: state.touchpadSensitivity ?? 50,
       reticleAimSpeed: state.reticleAimSpeed ?? 50,
+      leftStickDeadzone: state.leftStickDeadzone ?? 16,
+      rightStickDeadzone: state.rightStickDeadzone ?? 16,
+      leftStickInvertY: Boolean(state.leftStickInvertY),
+      rightStickInvertY: Boolean(state.rightStickInvertY),
+      activeControllerProfile: state.activeControllerProfile || 'default',
+      controllerBindings: state.controllerBindings || null,
       ringKeyMap: state.ringKeyMap || {}
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));

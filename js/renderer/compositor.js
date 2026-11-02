@@ -135,18 +135,20 @@ export function initCompositor(videoEl) {
     // Ignore if detection is outside the currently visible main viewport
     if (detViewX < 0 || detViewX > 1 || detViewY < 0 || detViewY > 1) return;
 
-    // Center of main reticle (center of screen viewport: 0.5, 0.5)
-    const dx = (detViewX - 0.5) * cw;
-    const dy = (detViewY - 0.5) * ch;
+    // Calculate offset relative to active POI Crosshair (roiX, roiY) or screen center
+    const refX = (appState.pipEnabled && appState.roiTargetVisible) ? (appState.roiX ?? 0.5) : 0.5;
+    const refY = (appState.pipEnabled && appState.roiTargetVisible) ? (appState.roiY ?? 0.5) : 0.5;
+    const dx = (detViewX - refX) * cw;
+    const dy = (detViewY - refY) * ch;
     const distPx = Math.hypot(dx, dy);
 
-    // Dynamic pixel distance of 1 click/indent & center gap based on reticle config & overlay scale
+    // Dynamic pixel distance of 1 click/indent based on reticle config, scale & FFP zoom
     const clickPx = getClickDistanceInPixels(cw, ch, appState.overlayScale);
-    const gapHalfPx = getCenterGapDistanceInPixels(cw, ch, appState.overlayScale);
 
+    // Clicks are calculated strictly from optical dead-center (refX, refY)
     let clicks = 0;
-    if (distPx > gapHalfPx + clickPx * 0.35) {
-      clicks = Math.max(1, Math.round((distPx - gapHalfPx) / Math.max(1, clickPx)));
+    if (distPx >= clickPx * 0.4) {
+      clicks = Math.max(1, Math.round(distPx / Math.max(1, clickPx)));
     }
 
     // Clock angle from center: 0 deg = 12 o'clock (-dy), 90 deg = 3 o'clock (+dx)

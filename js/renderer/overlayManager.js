@@ -17,14 +17,20 @@ export const RETICLE_VIEWBOX_H = 500;
  */
 export function getClickDistanceInPixels(viewportW, viewportH, overlayScalePercent = 100) {
   const cfg = appState.reticleConfig || {};
-  const clickSpacingSvgUnits = Math.max(8, Number(cfg.clickSpacing) || 32);
+  const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
+  const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
+  const rawStep = Number(cfg.clickSpacing);
+  const clickSpacingSvgUnits = Number.isFinite(rawStep) && rawStep >= 4 ? rawStep : defaultFittingStep;
 
   // SVG viewBox is 800x500 with preserveAspectRatio="xMidYMid meet"
   const baseScale = Math.min(
     Math.max(1, viewportW) / RETICLE_VIEWBOX_W,
     Math.max(1, viewportH) / RETICLE_VIEWBOX_H
   );
-  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100);
+
+  // First Focal Plane (FFP): scales spacing proportionally with whole-image digital zoom
+  const ffpFactor = appState.reticleFfpMode ? Math.max(1.0, Number(appState.mainZoom) || 1.0) : 1.0;
+  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100) * ffpFactor;
   return clickSpacingSvgUnits * baseScale * scaleMultiplier;
 }
 
@@ -33,13 +39,20 @@ export function getClickDistanceInPixels(viewportW, viewportH, overlayScalePerce
  */
 export function getCenterGapDistanceInPixels(viewportW, viewportH, overlayScalePercent = 100) {
   const cfg = appState.reticleConfig || {};
-  const gapHalfSvgUnits = Math.max(0, (Number(cfg.centerGap) || 64) / 2);
+  const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
+  const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
+  const rawStep = Number(cfg.clickSpacing);
+  const step = Number.isFinite(rawStep) && rawStep >= 4 ? rawStep : defaultFittingStep;
+  const rawGapHalf = Math.max(0, (Number(cfg.centerGap) ?? 64) / 2);
+  const gapHalfSvgUnits = Math.min(rawGapHalf, Math.max(8, step * 1.5));
 
   const baseScale = Math.min(
     Math.max(1, viewportW) / RETICLE_VIEWBOX_W,
     Math.max(1, viewportH) / RETICLE_VIEWBOX_H
   );
-  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100);
+
+  const ffpFactor = appState.reticleFfpMode ? Math.max(1.0, Number(appState.mainZoom) || 1.0) : 1.0;
+  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100) * ffpFactor;
   return gapHalfSvgUnits * baseScale * scaleMultiplier;
 }
 
@@ -53,6 +66,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       clickCount: 10,
       clickSpacing: 32,
       centerGap: 64,
+      centerStyle: 'empty', // 'empty' | 'dot' | 'cross' | 'chevron'
       innerBrackets: true,
       majorInterval: 5,
       minorTickLen: 10,
@@ -69,22 +83,53 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
 
   const cx = RETICLE_VIEWBOX_W / 2; // 400
   const cy = RETICLE_VIEWBOX_H / 2; // 250
-  const step = Math.max(8, Number(cfg.clickSpacing) || 32);
-  const clicks = Math.max(2, Math.min(25, Number(cfg.clickCount) || 10));
-  const gapHalf = Math.max(0, (Number(cfg.centerGap) || 64) / 2);
+  const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
+  // Guarantee all configured clicks (up to 30) fit cleanly inside the 500-unit vertical view (240 units from center)
+  const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
+  const rawStep = Number(cfg.clickSpacing);
+  const step = Number.isFinite(rawStep) && rawStep >= 4 ? rawStep : defaultFittingStep;
+  const rawGapHalf = Math.max(0, (Number(cfg.centerGap) ?? 64) / 2);
+  const gapHalf = Math.min(rawGapHalf, Math.max(8, step * 1.5));
   const sw = Number(cfg.strokeWidth) || 1.8;
   const strokeColor = cfg.reticleColor ? cfg.reticleColor : 'var(--radar-accent)';
   const majorInt = Math.max(0, Number(cfg.majorInterval) || 5);
-  const minorLen = Math.max(3, Number(cfg.minorTickLen) || 10);
-  const majorLen = Math.max(6, Number(cfg.majorTickLen) || 18);
+  const minorLen = Math.min(Math.max(3, Number(cfg.minorTickLen) || 10), Math.max(5, step * 0.9));
+  const majorLen = Math.min(Math.max(6, Number(cfg.majorTickLen) || 18), Math.max(8, step * 1.6));
   const showLabels = Boolean(cfg.showLabels);
 
   const lines = [];
   const armLen = clicks * step;
+  const maxArmOffset = Math.max(gapHalf + 10, armLen, 380);
 
-  // Main Arms - Horizontal (Left & Right extending from gap outward)
-  const xArmStart = Math.max(8, cx - gapHalf - armLen);
-  const xArmEnd = Math.min(RETICLE_VIEWBOX_W - 8, cx + gapHalf + armLen);
+  // Center Aiming Point: 'empty' | 'dot' | 'cross' | 'chevron'
+  // Placed at the exact optical dead-center pixel (cx, cy) where clicks are measured from
+  // Sized and weighted to strictly match the crosshair stroke weight (sw)
+  const centerStyle = String(cfg.centerStyle || 'empty').toLowerCase();
+  if (centerStyle === 'dot') {
+    // Sharp precision center aiming dot at (cx, cy) with diameter harmonized to line weight sw
+    const dotR = Math.max(0.75, sw * 0.6);
+    lines.push(
+      `<circle cx="${cx}" cy="${cy}" r="${dotR.toFixed(2)}" fill="${strokeColor}" />`
+    );
+  } else if (centerStyle === 'cross') {
+    // Fine precision center mini-crosshair centered at (cx, cy) matching crosshair stroke weight sw
+    const crossLen = gapHalf > 0 ? Math.min(12, Math.max(6, gapHalf * 0.45)) : 8;
+    lines.push(
+      `<line x1="${(cx - crossLen).toFixed(1)}" y1="${cy}" x2="${(cx + crossLen).toFixed(1)}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`,
+      `<line x1="${cx}" y1="${(cy - crossLen).toFixed(1)}" x2="${cx}" y2="${(cy + crossLen).toFixed(1)}" stroke="${strokeColor}" stroke-width="${sw}" />`
+    );
+  } else if (centerStyle === 'chevron') {
+    // Tactical inverted-V / chevron caret pointing directly to the exact measurement dead-center pixel (cx, cy) matching crosshair stroke weight sw
+    const chW = 8;
+    const chH = 10;
+    lines.push(
+      `<path d="M ${(cx - chW).toFixed(1)} ${(cy + chH).toFixed(1)} L ${cx} ${cy} L ${(cx + chW).toFixed(1)} ${(cy + chH).toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="miter" />`
+    );
+  }
+
+  // Main Arms - Horizontal (Left & Right extending from gap outward to maxArmOffset)
+  const xArmStart = cx - maxArmOffset;
+  const xArmEnd = cx + maxArmOffset;
   if (gapHalf > 0) {
     lines.push(
       `<line x1="${xArmStart}" y1="${cy}" x2="${cx - gapHalf}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`,
@@ -96,9 +141,9 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     );
   }
 
-  // Main Arms - Vertical (Top & Bottom extending from gap outward)
-  const yArmStart = Math.max(8, cy - gapHalf - armLen);
-  const yArmEnd = Math.min(RETICLE_VIEWBOX_H - 8, cy + gapHalf + armLen);
+  // Main Arms - Vertical (Top & Bottom extending from gap outward to maxArmOffset)
+  const yArmStart = cy - maxArmOffset;
+  const yArmEnd = cy + maxArmOffset;
   if (gapHalf > 0) {
     lines.push(
       `<line x1="${cx}" y1="${yArmStart}" x2="${cx}" y2="${cy - gapHalf}" stroke="${strokeColor}" stroke-width="${sw}" />`,
@@ -125,82 +170,78 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   if (cfg.concentricRings) {
     const ringInt = Math.max(1, Number(cfg.ringInterval) || 5);
     for (let t = ringInt; t <= clicks; t += ringInt) {
-      const radius = gapHalf + t * step;
-      lines.push(
-        `<circle cx="${cx}" cy="${cy}" r="${radius}" stroke="${strokeColor}" stroke-width="1.2" stroke-dasharray="6 4" fill="none" opacity="0.45" />`
-      );
+      const radius = t * step;
+      if (radius > gapHalf) {
+        lines.push(
+          `<circle cx="${cx}" cy="${cy}" r="${radius}" stroke="${strokeColor}" stroke-width="1.2" stroke-dasharray="6 4" fill="none" opacity="0.45" />`
+        );
+      }
     }
   }
 
-  // Horizontal Indents / Tick Marks (Left & Right - 1 to clicks)
+  // Horizontal Indents / Tick Marks (Left & Right - 1 to clicks, measured from dead center)
   for (let t = 1; t <= clicks; t++) {
-    const offset = gapHalf + t * step;
+    const offset = t * step;
+    if (offset <= gapHalf) continue; // inside the open center gap
     const isMajor = majorInt > 0 && t % majorInt === 0;
     const tickLen = isMajor ? majorLen : minorLen;
-    const tickW = isMajor ? Math.min(sw * 1.2, 3.2) : Math.max(sw * 0.8, 1.2);
+    const tickW = sw; // All ticks share the exact same thinness sw; major ticks differentiated by length
     const half = tickLen / 2;
 
     const xL = cx - offset;
     const xR = cx + offset;
 
     // Left tick
-    if (xL >= 6) {
+    lines.push(
+      `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+    );
+    if (showLabels && isMajor) {
       lines.push(
-        `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+        `<text x="${xL}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
       );
-      if (showLabels && isMajor) {
-        lines.push(
-          `<text x="${xL}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
-        );
-      }
     }
 
     // Right tick
-    if (xR <= RETICLE_VIEWBOX_W - 6) {
+    lines.push(
+      `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+    );
+    if (showLabels && isMajor) {
       lines.push(
-        `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+        `<text x="${xR}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
       );
-      if (showLabels && isMajor) {
-        lines.push(
-          `<text x="${xR}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
-        );
-      }
     }
   }
 
-  // Vertical Indents / Tick Marks (Top & Bottom - 1 to clicks)
+  // Vertical Indents / Tick Marks (Top & Bottom - 1 to clicks up to 30, measured from dead center)
   for (let t = 1; t <= clicks; t++) {
-    const offset = gapHalf + t * step;
+    const offset = t * step;
+    if (offset <= gapHalf) continue; // inside the open center gap
     const isMajor = majorInt > 0 && t % majorInt === 0;
     const tickLen = isMajor ? majorLen : minorLen;
-    const tickW = isMajor ? Math.min(sw * 1.2, 3.2) : Math.max(sw * 0.8, 1.2);
+    const tickW = sw; // All ticks share the exact same thinness sw; major ticks differentiated by length
     const half = tickLen / 2;
 
     const yT = cy - offset;
     const yB = cy + offset;
 
     // Top tick
-    if (yT >= 6) {
+    lines.push(
+      `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+    );
+    if (showLabels && isMajor) {
       lines.push(
-        `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+        `<text x="${cx + half + 4}" y="${yT + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
       );
-      if (showLabels && isMajor) {
-        lines.push(
-          `<text x="${cx + half + 4}" y="${yT + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
-        );
-      }
     }
 
     // Bottom tick
-    if (yB <= RETICLE_VIEWBOX_H - 6) {
+    lines.push(
+      `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+    );
+    if (showLabels && isMajor) {
       lines.push(
-        `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
+        `<text x="${cx + half + 4}" y="${yB + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
       );
-      if (showLabels && isMajor) {
-        lines.push(
-          `<text x="${cx + half + 4}" y="${yB + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
-        );
-      }
     }
   }
 
@@ -216,7 +257,10 @@ export function initOverlayManager() {
     if (!overlayLayer || !svgOverlay) return;
     overlayLayer.classList.toggle('hidden', !state.overlayEnabled);
     overlayLayer.style.opacity = String(state.overlayOpacity / 100);
-    const scaleVal = state.overlayScale / 100;
+
+    // In First Focal Plane (FFP) mode, scale overlay in lockstep with main image digital zoom
+    const ffpFactor = state.reticleFfpMode ? Math.max(1.0, Number(state.mainZoom) || 1.0) : 1.0;
+    const scaleVal = (state.overlayScale / 100) * ffpFactor;
     svgOverlay.style.transform = `scale(${scaleVal})`;
     if (customImg) customImg.style.transform = `scale(${scaleVal})`;
 
