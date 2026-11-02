@@ -15,6 +15,7 @@ let captureCanvas = null;
 let captureCtx = null;
 let encodingInProgress = false;
 let currentVideoEl = null;
+let lastBufferStateUpdateTime = 0;
 
 /**
  * Estimates the maximum safe RAM budget (in MB) for in-memory video buffering
@@ -119,10 +120,14 @@ export function startMemoryBuffer(videoEl) {
                   ? Number((1 / targetFps).toFixed(1))
                   : 0;
 
-            updateState({
-              bufferedSeconds: Number(spanSec.toFixed(1)),
-              bufferBytes: totalBytes
-            });
+            const now = capturedAt;
+            if (now - lastBufferStateUpdateTime >= 500) {
+              lastBufferStateUpdateTime = now;
+              updateState({
+                bufferedSeconds: Number(spanSec.toFixed(1)),
+                bufferBytes: totalBytes
+              });
+            }
           } finally {
             encodingInProgress = false;
           }
@@ -154,6 +159,7 @@ export function stopMemoryBuffer() {
   frameRing = [];
   totalBytes = 0;
   encodingInProgress = false;
+  lastBufferStateUpdateTime = 0;
   updateState({ bufferedSeconds: 0, bufferBytes: 0 });
 }
 

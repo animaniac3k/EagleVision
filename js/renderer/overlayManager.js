@@ -252,6 +252,7 @@ export function initOverlayManager() {
   const overlayLayer = document.getElementById('overlayLayer');
   const svgOverlay = document.getElementById('svgOverlay');
   const customImg = document.getElementById('customOverlayImg');
+  let lastReticleMarkupKey = '';
 
   function renderOverlay(state) {
     if (!overlayLayer || !svgOverlay) return;
@@ -273,7 +274,11 @@ export function initOverlayManager() {
     } else {
       if (customImg) customImg.classList.add('hidden');
       svgOverlay.classList.remove('hidden');
-      svgOverlay.innerHTML = buildGraduatedCrosshairSvg(state.reticleConfig);
+      const reticleKey = `${state.overlayType}_${state.themeColor}_${JSON.stringify(state.reticleConfig || {})}`;
+      if (reticleKey !== lastReticleMarkupKey) {
+        lastReticleMarkupKey = reticleKey;
+        svgOverlay.innerHTML = buildGraduatedCrosshairSvg(state.reticleConfig);
+      }
     }
   }
 

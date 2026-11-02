@@ -85,10 +85,6 @@ export async function exportClipToDisk(clip) {
   canvas.height = clip.height || 1080;
   const ctx = canvas.getContext('2d');
 
-  const bitmaps = await Promise.all(
-    clip.jpegFrames.map((buf) => createImageBitmap(new Blob([buf], { type: 'image/jpeg' })))
-  );
-
   const stream = canvas.captureStream(clip.fps || 15);
   const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
     ? 'video/webm;codecs=vp8'
@@ -105,13 +101,14 @@ export async function exportClipToDisk(clip) {
 
   recorder.start();
   const frameIntervalMs = Math.round(1000 / (clip.fps || 15));
-  for (const bmp of bitmaps) {
+  for (const buf of clip.jpegFrames) {
+    const bmp = await createImageBitmap(new Blob([buf], { type: 'image/jpeg' }));
     ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    if (bmp.close) bmp.close();
     await new Promise((r) => setTimeout(r, frameIntervalMs));
   }
   recorder.stop();
   const webmBlob = await blobPromise;
-  bitmaps.forEach((b) => b.close && b.close());
 
   if ('showSaveFilePicker' in window) {
     try {

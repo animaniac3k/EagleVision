@@ -346,9 +346,15 @@ export function initRingController() {
         return;
       }
 
-      // Do not hijack typing if focus is inside a select or text input
-      const tag = document.activeElement?.tagName;
-      if (tag === 'SELECT' && !learningAction) return;
+      // Do not hijack typing if focus is inside an input, textarea, select, or editable element
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName;
+      if (
+        !learningAction &&
+        (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || activeEl?.isContentEditable)
+      ) {
+        return;
+      }
 
       const code = e.code || e.key;
       const handled = handleRingSignal(code);

@@ -351,8 +351,12 @@ export function getActiveBindings() {
 let activeRebindActionId = null;
 let activeRebindType = null; // 'gamepad' | 'key'
 let rebindTimeout = null;
+let isControllerScreenInitialized = false;
 
 export function initControllerScreen() {
+  if (isControllerScreenInitialized) return;
+  isControllerScreenInitialized = true;
+
   const screenController = document.getElementById('screenController');
   const screenSettings = document.getElementById('screenSettings');
   const screenLive = document.getElementById('screenLive');

@@ -54,7 +54,7 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto') {
       audio: false
     });
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Camera acquisition timeout')), 1800)
+      setTimeout(() => reject(new Error('Camera acquisition timeout')), 10000)
     );
 
     const stream = await Promise.race([getUserMediaPromise, timeoutPromise]);

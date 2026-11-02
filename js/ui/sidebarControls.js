@@ -14,7 +14,7 @@ import {
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { speakDetectionAnnouncement } from '../renderer/compositor.js';
-import { initControllerScreen, toggleQuickTool } from './controllerScreen.js';
+import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
   const clean = (hex || '#2dd4bf').replace('#', '');
@@ -126,8 +126,6 @@ export function initSidebarAndTopControls(videoEl) {
   };
   btnOpenControllerScreen?.addEventListener('click', openControllerScreen);
   btnOpenControllerScreenCard?.addEventListener('click', openControllerScreen);
-
-  initControllerScreen();
 
   if (appState.currentScreen === 'controller') {
     openControllerScreen();
