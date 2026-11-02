@@ -47,10 +47,10 @@ export function initInstantReplay() {
     const z = Math.max(1.0, appState.mainZoom || 1.0);
     const cropW = imgW / z;
     const cropH = imgH / z;
-    const panLimitX = (imgW - cropW) / 2;
-    const panLimitY = (imgH - cropH) / 2;
-    const sx = (imgW - cropW) / 2 + (appState.mainPanX || 0) * panLimitX;
-    const sy = (imgH - cropH) / 2 + (appState.mainPanY || 0) * panLimitY;
+    const centerX = imgW * (0.5 + (appState.mainPanX || 0));
+    const centerY = imgH * (0.5 + (appState.mainPanY || 0));
+    const sx = Math.max(0, Math.min(imgW - cropW, centerX - cropW / 2));
+    const sy = Math.max(0, Math.min(imgH - cropH, centerY - cropH / 2));
 
     ctx.drawImage(decoderImg, sx, sy, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
   }

@@ -366,6 +366,11 @@ export function initVideoBrowser() {
 
   btnDelete.addEventListener('click', async () => {
     if (!selectedClipId) return;
+    const clip = cachedClips.find((c) => c.id === selectedClipId);
+    const clipName = clip ? clip.name : 'this recording';
+    if (!window.confirm(`Permanently delete "${clipName}" from the video archive?`)) {
+      return;
+    }
     await deleteVideoClip(selectedClipId);
     selectedClipId = null;
     await refreshGalleryClips(true);

@@ -11,6 +11,7 @@
 
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { cycleTheme } from '../input/gamepadController.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [
@@ -849,7 +850,7 @@ export function executeMappedAction(actionId) {
       break;
 
     case 'theme_cycle':
-      // Handled via stick click cycle in gamepadController
+      cycleTheme(1);
       break;
 
     case 'reticle_scale_up': {

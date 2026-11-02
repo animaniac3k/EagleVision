@@ -71,7 +71,6 @@ export function initSidebarAndTopControls(videoEl) {
   const btnOpenReticleScreen = document.getElementById('btnOpenReticleScreen');
   const btnOpenReticleScreenCard = document.getElementById('btnOpenReticleScreenCard');
   const btnOpenControllerScreen = document.getElementById('btnOpenControllerScreen');
-  const btnOpenControllerScreenCard = document.getElementById('btnOpenControllerScreenCard');
 
   const btnTogglePip = document.getElementById('btnTogglePip');
   const btnToggleOverlayTop = document.getElementById('btnToggleOverlayTop');
@@ -125,7 +124,6 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ currentScreen: 'controller', replayActive: false });
   };
   btnOpenControllerScreen?.addEventListener('click', openControllerScreen);
-  btnOpenControllerScreenCard?.addEventListener('click', openControllerScreen);
 
   if (appState.currentScreen === 'controller') {
     openControllerScreen();
@@ -509,36 +507,6 @@ export function initSidebarAndTopControls(videoEl) {
     speakDetectionAnnouncement(`${prefix}! 11 o'clock, 3 ${unit}`);
   });
 
-  // Touchpad Virtual Mouse Sensitivity Slider in Settings
-  const sliderTouchSens = document.getElementById('sliderTouchpadSensitivity');
-  const valTouchSens = document.getElementById('valTouchpadSensitivity');
-  if (sliderTouchSens) {
-    const s = Number(appState.touchpadSensitivity ?? 50);
-    sliderTouchSens.value = String(s);
-    if (valTouchSens) valTouchSens.textContent = `${s}%`;
-    sliderTouchSens.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10) || 50;
-      if (valTouchSens) valTouchSens.textContent = `${val}%`;
-      updateState({ touchpadSensitivity: val, lastGamepadAction: `TOUCHPAD SENSITIVITY: ${val}%` });
-      saveSettings(appState);
-    });
-  }
-
-  // Reticle Aim Speed (Joystick Max Speed) Slider in Settings
-  const sliderAimSpeed = document.getElementById('sliderReticleAimSpeed');
-  const valAimSpeed = document.getElementById('valReticleAimSpeed');
-  if (sliderAimSpeed) {
-    const s = Number(appState.reticleAimSpeed ?? 50);
-    sliderAimSpeed.value = String(s);
-    if (valAimSpeed) valAimSpeed.textContent = `${s}%`;
-    sliderAimSpeed.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10) || 50;
-      if (valAimSpeed) valAimSpeed.textContent = `${val}%`;
-      updateState({ reticleAimSpeed: val, lastGamepadAction: `RETICLE AIM SPEED: ${val}%` });
-      saveSettings(appState);
-    });
-  }
-
   sliderHeatmapSens.addEventListener('input', (e) => {
     const sens = Number(e.target.value) || 60;
     valHeatmapSens.textContent = `${sens}%`;
@@ -557,30 +525,48 @@ export function initSidebarAndTopControls(videoEl) {
   const btnFilterGrayscale = document.getElementById('btnFilterGrayscale');
   const btnResetFilters = document.getElementById('btnResetFilters');
 
+  if (sliderBrightness && valBrightness) {
+    sliderBrightness.value = String(appState.brightness ?? 100);
+    valBrightness.textContent = `${appState.brightness ?? 100}%`;
+  }
+  if (sliderContrast && valContrast) {
+    sliderContrast.value = String(appState.contrast ?? 100);
+    valContrast.textContent = `${appState.contrast ?? 100}%`;
+  }
+  if (sliderSaturation && valSaturation) {
+    sliderSaturation.value = String(appState.saturation ?? 100);
+    valSaturation.textContent = `${appState.saturation ?? 100}%`;
+  }
+
   sliderBrightness.addEventListener('input', (e) => {
     const v = Number(e.target.value);
     valBrightness.textContent = `${v}%`;
     updateState({ brightness: v });
+    saveSettings(appState);
   });
 
   sliderContrast.addEventListener('input', (e) => {
     const v = Number(e.target.value);
     valContrast.textContent = `${v}%`;
     updateState({ contrast: v });
+    saveSettings(appState);
   });
 
   sliderSaturation.addEventListener('input', (e) => {
     const v = Number(e.target.value);
     valSaturation.textContent = `${v}%`;
     updateState({ saturation: v });
+    saveSettings(appState);
   });
 
   btnFilterInvert.addEventListener('click', () => {
     updateState({ invert: !appState.invert });
+    saveSettings(appState);
   });
 
   btnFilterGrayscale.addEventListener('click', () => {
     updateState({ grayscale: !appState.grayscale });
+    saveSettings(appState);
   });
 
   btnResetFilters.addEventListener('click', () => {
@@ -597,6 +583,7 @@ export function initSidebarAndTopControls(videoEl) {
       invert: false,
       grayscale: false
     });
+    saveSettings(appState);
   });
 
   // 12. Interface Color Swatches & 2D Color Picker
@@ -720,18 +707,18 @@ export function initSidebarAndTopControls(videoEl) {
     btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
     btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
 
-    // Live Gamepad Connection & Action Telemetry in Settings
+    // Live Gamepad Connection & Action Telemetry
     const gamepadStatusDot = document.getElementById('gamepadStatusDot');
     const gamepadStatusText = document.getElementById('gamepadStatusText');
-    const gamepadActionText = document.getElementById('gamepadActionText');
+    const liveActionBanner = document.getElementById('cmLiveActionBanner');
     if (gamepadStatusDot && gamepadStatusText) {
       gamepadStatusDot.classList.toggle('connected', Boolean(state.gamepadConnected));
       gamepadStatusText.textContent = state.gamepadConnected
         ? (state.gamepadName.split('(')[0].trim() || 'Controller Connected')
         : 'DISCONNECTED (PRESS ANY BUTTON)';
     }
-    if (gamepadActionText && state.lastGamepadAction) {
-      gamepadActionText.textContent = state.lastGamepadAction;
+    if (liveActionBanner && state.lastGamepadAction) {
+      liveActionBanner.textContent = state.lastGamepadAction;
     }
 
     // Sync Center Point Style buttons and text across screens

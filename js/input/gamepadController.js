@@ -106,6 +106,11 @@ function updateGamepadUI(connected, text) {
   if (status) status.textContent = text;
 }
 
+function updateGamepadActionBanner(text) {
+  const banner = document.getElementById('cmLiveActionBanner');
+  if (banner) banner.textContent = text;
+}
+
 export function initGamepadController() {
   startFrameLoop();
   autoReconnectWebHID();
@@ -181,10 +186,9 @@ export function initGamepadController() {
         });
         updateGamepadUI(true, formatted);
       } else {
-        const actionEl = document.getElementById('gamepadActionText');
         const hint = 'FOR BT PS4: CLICK "PAIR PS4 BT" TO CONNECT DIRECTLY';
         updateState({ lastGamepadAction: hint });
-        if (actionEl) actionEl.textContent = hint;
+        updateGamepadActionBanner(hint);
       }
     });
   }
@@ -202,23 +206,21 @@ export async function requestWebHIDDualShock4() {
   }
 
   try {
-    const actionEl = document.getElementById('gamepadActionText');
-    if (actionEl) actionEl.textContent = 'CHOOSE "WIRELESS CONTROLLER" IN CHROME PROMPT...';
+    updateGamepadActionBanner('CHOOSE "WIRELESS CONTROLLER" IN CHROME PROMPT...');
 
     const devices = await navigator.hid.requestDevice({
       filters: SONY_DS4_FILTERS
     });
 
     if (!devices || devices.length === 0) {
-      if (actionEl) actionEl.textContent = 'PAIRING CANCELLED';
+      updateGamepadActionBanner('PAIRING CANCELLED');
       return;
     }
 
     await setupWebHIDDevice(devices[0]);
   } catch (err) {
     console.error('[WebHID Request Error]', err);
-    const actionEl = document.getElementById('gamepadActionText');
-    if (actionEl) actionEl.textContent = `WEBHID ERROR: ${err.message || 'FAILED'}`;
+    updateGamepadActionBanner(`WEBHID ERROR: ${err.message || 'FAILED'}`);
   }
 }
 
@@ -328,8 +330,7 @@ async function setupWebHIDDevice(device) {
   } catch (err) {
     console.error('[WebHID Setup Error]', err);
     updateGamepadUI(false, 'DEVICE BUSY (CLOSE JOY.CPL & RETRY)');
-    const actionEl = document.getElementById('gamepadActionText');
-    if (actionEl) actionEl.textContent = 'DEVICE BUSY: CLOSE JOY.CPL & CLICK "PAIR PS4 BT" AGAIN';
+    updateGamepadActionBanner('DEVICE BUSY: CLOSE JOY.CPL & CLICK "PAIR PS4 BT" AGAIN');
   }
 }
 
@@ -817,7 +818,7 @@ function updateRangeSliderFromX(slider, clientX) {
 /**
  * Cycles GUI color theme backward (-1) or forward (+1)
  */
-function cycleTheme(direction) {
+export function cycleTheme(direction = 1) {
   const current = (appState.themeColor || '#2dd4bf').toLowerCase();
   let idx = GUI_THEMES.findIndex((t) => t.color.toLowerCase() === current);
   if (idx < 0) idx = 0;
@@ -840,8 +841,7 @@ function cycleTheme(direction) {
   const colorPicker = document.getElementById('colorPickerCustom');
   if (colorPicker) colorPicker.value = newTheme.color;
 
-  const actionEl = document.getElementById('gamepadActionText');
-  if (actionEl) actionEl.textContent = `GUI COLOR: ${newTheme.name.toUpperCase()}`;
+  updateGamepadActionBanner(`GUI COLOR: ${newTheme.name.toUpperCase()}`);
 }
 
 /**
@@ -1074,8 +1074,7 @@ function dispatchControllerInputs(actionState) {
 
     const activeRoles = ROLES.filter((r) => actionState[r]).map((r) => r.toUpperCase()).join(' + ');
     if (activeRoles) {
-      const actionEl = document.getElementById('gamepadActionText');
-      if (actionEl) actionEl.textContent = `ACTIVE: ${activeRoles}`;
+      updateGamepadActionBanner(`ACTIVE: ${activeRoles}`);
     }
   }
 
@@ -1402,32 +1401,8 @@ function dispatchControllerInputs(actionState) {
   });
 }
 
-function updateSettingsDiagnostics(backend, count) {
-  if (appState.currentScreen !== 'settings') return;
-
-  const focusEl = document.getElementById('gamepadFocusStatus');
-  const slotEl = document.getElementById('gamepadSlotStatus');
-
-  if (focusEl) {
-    const isFocused = document.hasFocus();
-    focusEl.textContent = isFocused ? 'PAGE FOCUS: ACTIVE ✓' : 'PAGE FOCUS: LOST ⚠ (CLICK PAGE)';
-    focusEl.style.color = isFocused ? '#22c55e' : '#f59e0b';
-  }
-
-  if (slotEl) {
-    if (backend === 'webhid') {
-      const info = `0x${lastReportId.toString(16).toUpperCase()} (${lastReportLen}B)`;
-      const touchStr = latestTouchInfo.active ? `TOUCH [${latestTouchInfo.x}, ${latestTouchInfo.y}]` : `TOUCH IDLE`;
-      slotEl.textContent = `BACKEND: WEBHID BT [${info}] ✓ | ${touchStr}`;
-      slotEl.style.color = lastReportLen >= 64 ? '#22c55e' : '#f59e0b';
-    } else if (count > 0) {
-      slotEl.textContent = `BACKEND: GAMEPAD API (${count} CONNECTED ✓)`;
-      slotEl.style.color = '#22c55e';
-    } else {
-      slotEl.textContent = 'SLOTS: 0 DETECTED (CLICK "PAIR PS4 BT")';
-      slotEl.style.color = '#94a3b8';
-    }
-  }
+function updateSettingsDiagnostics() {
+  // Legacy diagnostic indicators were migrated to the dedicated Controller screen
 }
 
 // Helpers for HTML5 Gamepad API fallback
