@@ -1,5 +1,7 @@
 # EagleVision — USB Camera & Overlay System
 
+## Debug
+
 An installable Progressive Web App (PWA) designed for the **Lenovo IdeaPad Duet 3** (ChromeOS / Android) and desktop/laptop systems to view, magnify, superimpose open-center reticles or custom guides, highlight localized micro-changes via a shake-rejecting heatmap, record a configurable native-resolution in-memory video buffer, and control the entire interface hands-free with a **5-Button Bluetooth Scrolling Ring**.
 
 ## Key Features
