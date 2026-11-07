@@ -2,9 +2,9 @@
  * SPOTR Tactical Splash Screen Controller
  *
  * Displays the SPOTR brand logo & identification screen on app launch.
- * Sequences soft word loading (RECON • DETECT • ALERT), followed by a 2s loading bar fill.
- * Automatically dismisses 3 seconds after tagline load completes (4.8s total)
- * or immediately when skipped silently via Space, Gamepad / Controller button, Ring click, or Tap.
+ * Sequences soft word loading (RECON • DETECT • ALERT), followed by loading bar fill.
+ * Automatically dismisses at 2.5s (smooth 2.2s sequence + fade),
+ * or immediately when skipped via any Tap, Click, Keypress, Gamepad, or Ring input.
  */
 
 let isSplashActive = true;
@@ -13,42 +13,6 @@ let splashEl = null;
 
 export function isSplashScreenActive() {
   return isSplashActive;
-}
-
-export function initSplashScreen() {
-  splashEl = document.getElementById('splashScreen');
-  if (!splashEl) {
-    isSplashActive = false;
-    return;
-  }
-
-  // 1. Auto-dismiss: tagline words complete at 1.8s + 2.0s bar fill + 1.0s completion hold (4.8s total)
-  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nosplash')) {
-    splashEl.style.display = 'none';
-    splashEl.classList.add('splash-hidden');
-    isSplashActive = false;
-    return;
-  }
-  dismissTimer = setTimeout(() => {
-    dismissSplashScreen('timeout');
-  }, 4800);
-
-  // 2. Skip on tap / click anywhere on splash screen
-  splashEl.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    dismissSplashScreen('pointer');
-  });
-
-  // 3. Skip on Space / Enter / Escape key
-  const onKeyDown = (e) => {
-    if (!isSplashActive) return;
-    if (e.code === 'Space' || e.key === ' ' || e.code === 'Enter' || e.code === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      dismissSplashScreen('keyboard');
-    }
-  };
-  window.addEventListener('keydown', onKeyDown, { capture: true });
 }
 
 export function dismissSplashScreen(source = 'unknown') {
@@ -62,9 +26,47 @@ export function dismissSplashScreen(source = 'unknown') {
 
   if (splashEl) {
     splashEl.classList.add('splash-hidden');
-    // Remove element from layout once fade-out transition completes
+    splashEl.style.pointerEvents = 'none';
+    splashEl.style.opacity = '0';
     setTimeout(() => {
       splashEl.style.display = 'none';
-    }, 480);
+    }, 350);
   }
+}
+
+export function initSplashScreen() {
+  splashEl = document.getElementById('splashScreen');
+  if (!splashEl) {
+    isSplashActive = false;
+    return;
+  }
+
+  // Check URL query override (?nosplash)
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('nosplash')) {
+    splashEl.style.display = 'none';
+    splashEl.classList.add('splash-hidden');
+    isSplashActive = false;
+    return;
+  }
+
+  // 1. Auto-dismiss after 2.5s (tagline & progress complete cleanly in 2.2s)
+  dismissTimer = setTimeout(() => {
+    dismissSplashScreen('timeout');
+  }, 2500);
+
+  // 2. Immediate dismissal handlers on any user interaction
+  const onDismissEvent = () => {
+    if (!isSplashActive) return;
+    dismissSplashScreen('user-action');
+  };
+
+  // Attach to splash element
+  splashEl.addEventListener('click', onDismissEvent);
+  splashEl.addEventListener('pointerdown', onDismissEvent);
+  splashEl.addEventListener('touchstart', onDismissEvent, { passive: true });
+
+  // Attach global capturing listeners to window for instant response
+  window.addEventListener('click', onDismissEvent, { capture: true, once: true });
+  window.addEventListener('pointerdown', onDismissEvent, { capture: true, once: true });
+  window.addEventListener('keydown', onDismissEvent, { capture: true, once: true });
 }

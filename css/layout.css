@@ -727,17 +727,17 @@
 /* Tagline Soft Sequential Word Loading */
 .splash-word-1 {
   opacity: 0;
-  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+  animation: splashWordFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
 }
 
 .splash-word-2 {
   opacity: 0;
-  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.85s forwards;
+  animation: splashWordFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
 }
 
 .splash-word-3 {
   opacity: 0;
-  animation: splashWordFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 1.35s forwards;
+  animation: splashWordFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.75s forwards;
 }
 
 @keyframes splashWordFade {
@@ -756,7 +756,7 @@
 
 .splash-line-progress {
   filter: drop-shadow(0 0 6px rgba(255, 107, 0, 0.85));
-  animation: splashFillInside 2s cubic-bezier(0.25, 1, 0.5, 1) 1.8s both;
+  animation: splashFillInside 1.2s cubic-bezier(0.25, 1, 0.5, 1) 1.0s both;
 }
 
 @keyframes splashFillInside {

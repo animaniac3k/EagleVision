@@ -1,7 +1,7 @@
 /**
  * USB Camera Enumeration, Stream Acquisition & Simulated Inspection Signal Fallback
  */
-import { updateState } from '../state.js';
+import { appState, updateState } from '../state.js';
 
 let activeMediaStream = null;
 let simCanvas = null;
