@@ -1,1350 +1,1350 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#18181B" />
-  <title>SPOTR — Recon • Detect • Alert</title>
-  <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
-  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
-  <link rel="stylesheet" href="./css/variables.css" />
-  <link rel="stylesheet" href="./css/layout.css" />
-  <link rel="stylesheet" href="./css/viewport.css" />
-  <link rel="stylesheet" href="./css/controls.css" />
-  <link rel="stylesheet" href="./css/gallery.css" />
-  <script>
-    if (new URLSearchParams(window.location.search).has('nosplash')) {
-      document.documentElement.classList.add('no-splash');
-    }
-  </script>
-  <style>
-    html.no-splash #splashScreen { display: none !important; }
-  </style>
-</head>
-<body>
-  <!-- Fullscreen Tactical Splash Screen (SPOTR Brand & Logo) -->
-  <aside id="splashScreen" class="splash-screen" role="dialog" aria-modal="true" aria-label="SPOTR Splash Screen">
-    <div class="splash-content">
-      <div class="splash-logo-wrap">
-        <svg class="splash-logo-svg" viewBox="0 0 580 220" xmlns="http://www.w3.org/2000/svg">
-          <!-- Background -->
-          <rect width="580" height="220" rx="24" fill="#18181B"/>
-
-          <!-- Icon (Static) -->
-          <g transform="translate(30,30)">
-            <!-- Tile -->
-            <rect width="160" height="160" rx="28" fill="#202024"/>
-
-            <!-- Scope Ring -->
-            <circle
-              cx="80"
-              cy="80"
-              r="34"
-              fill="none"
-              stroke="#FF6B00"
-              stroke-width="10"/>
-
-            <!-- Crosshairs -->
-            <line x1="80" y1="22" x2="80" y2="46"
-                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
-
-            <line x1="80" y1="114" x2="80" y2="138"
-                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
-
-            <line x1="22" y1="80" x2="46" y2="80"
-                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
-
-            <line x1="114" y1="80" x2="138" y2="80"
-                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
-
-            <!-- Centre Dot -->
-            <circle
-              cx="80"
-              cy="80"
-              r="7"
-              fill="#FF6B00"/>
-
-            <!-- Detection Indicator (Static) -->
-            <circle
-              cx="118"
-              cy="42"
-              r="9"
-              fill="#FFD166"/>
-          </g>
-
-          <!-- Logo Brand Text -->
-          <text
-              x="225"
-              y="108"
-              fill="#F8FAFC"
-              font-family="Arial, Helvetica, sans-serif"
-              font-size="80"
-              font-weight="700"
-              letter-spacing="4.65">
-              SPOTR
-          </text>
-
-          <!-- Trademark (Positioned closely at top-right shoulder of 'R') -->
-          <text
-              x="528"
-              y="64"
-              fill="#FFD166"
-              font-family="Arial, Helvetica, sans-serif"
-              font-size="15"
-              font-weight="700">
-              ™
-          </text>
-
-          <!-- Tagline with individual soft loading words -->
-          <text
-              class="splash-tagline"
-              x="225"
-              y="152"
-              fill="#E2E8F0"
-              font-family="Arial, Helvetica, sans-serif"
-              font-size="19"
-              font-weight="600"
-              letter-spacing="2.6">
-              <tspan class="splash-word-1">RECON</tspan>
-              <tspan class="splash-word-2"> • DETECT</tspan>
-              <tspan class="splash-word-3"> • ALERT</tspan>
-          </text>
-
-          <!-- Loading Progress Track (Aligned flush to Brand & Tagline width: 299px) -->
-          <rect
-              class="splash-line-track"
-              x="225"
-              y="170"
-              width="299"
-              height="4"
-              rx="2"
-              fill="rgba(255, 255, 255, 0.12)"/>
-
-          <!-- Loading Progress Bar (Animates left to right for 2s after last word loads) -->
-          <rect
-              class="splash-line-progress"
-              x="225"
-              y="170"
-              width="0"
-              height="4"
-              rx="2"
-              fill="#FF6B00"/>
-        </svg>
-      </div>
-    </div>
-  </aside>
-
-  <div id="appRoot">
-
-    <!-- =================================================================== -->
-    <!-- SCREEN 1: 100% FULL-SCREEN LIVE CAMERA WORKSPACE                    -->
-    <!-- =================================================================== -->
-    <main id="screenLive" class="screen-view">
-      <div id="viewportContainer">
-        <!-- Hidden Video Source Element -->
-        <video id="cameraVideoEl" playsinline muted style="display:none;"></video>
-
-        <!-- Primary Full-Screen Stream Canvas -->
-        <canvas id="mainCanvas"></canvas>
-
-        <!-- Superimposed Guide Overlay Layer -->
-        <div id="overlayLayer" style="opacity: 0.75;">
-          <svg id="svgOverlay" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
-          <img id="customOverlayImg" class="hidden" alt="Custom Overlay" />
-        </div>
-
-        <!-- Draggable ROI Target Crosshair (Toggled from Zoom Window Header) -->
-        <div id="zoomTargetCrosshair" title="Drag to position Zoom Window target">
-          <svg viewBox="0 0 96 96">
-            <circle cx="48" cy="48" r="28" stroke="var(--radar-text-muted)" stroke-width="2" stroke-dasharray="5 4" fill="rgba(45, 212, 191, 0.08)" />
-            <line x1="6" y1="48" x2="35" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
-            <line x1="61" y1="48" x2="90" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
-            <line x1="48" y1="6" x2="48" y2="35" stroke="var(--radar-text-muted)" stroke-width="2.5" />
-            <line x1="48" y1="61" x2="48" y2="90" stroke="var(--radar-text-muted)" stroke-width="2.5" />
-            <circle cx="48" cy="48" r="2.5" fill="var(--radar-text)" />
-          </svg>
-        </div>
-
-        <!-- Movable & Corner-Resizable Digital Zoom Window (PiP Magnifier) -->
-        <section id="pipZoomWindow">
-          <header id="pipHeader">
-            <span id="pipZoomBadge">3.0x</span>
-            <div class="pip-controls">
-              <!-- Single ROI Crosshair Show/Hide Toggle inside Zoom Window Header -->
-              <button id="btnPipToggleRoi" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide ROI Target Crosshair on Feed">
-                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
-                </svg>
-              </button>
-              <button id="pipZoomMinus" class="radar-btn radar-btn-sm" title="Decrease Window Zoom">−</button>
-              <button id="pipZoomPlus" class="radar-btn radar-btn-sm" title="Increase Window Zoom">+</button>
-            </div>
-          </header>
-          <div id="pipViewport">
-            <canvas id="pipCanvas" width="340" height="210"></canvas>
-            <div class="pip-center-reticle"></div>
-            <div id="pipResizeSW" class="pip-resize-handle pip-resize-sw" title="Drag corner to resize Zoom Window"></div>
-            <div id="pipResizeSE" class="pip-resize-handle pip-resize-se" title="Drag corner to resize Zoom Window"></div>
-          </div>
-        </section>
-
-        <!-- Instant Replay Video Modal (Full-screen native-resolution playback) -->
-        <div id="instantReplayModal" class="hidden">
-          <div class="replay-status-banner">
-            <span class="replay-pulse-dot"></span>
-            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED CLIP</span>
-          </div>
-          <canvas id="replayCanvas" width="1920" height="1080"></canvas>
-        </div>
-      </div>
-
-      <!-- Real-Time Reticle FFP / Subtension Scale OSD Toast -->
-      <div id="reticleFfpToast" class="reticle-ffp-toast hidden">
-        <span id="reticleFfpText">RETICLE SUBTENSION: 100% (FFP SYNC)</span>
-      </div>
-
-      <!-- SINGLE TOP-LEFT BUTTON SHOWN ONLY IN DECLUTTER MODE TO RESTORE UI -->
-      <button id="btnRestoreUi" class="radar-btn btn-restore-ui hidden" title="Restore Interface Controls">
-        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-      </button>
-
-      <!-- TOP-LEFT FLOATING ICON STRIP (Declutter, Settings, PiP Window, Overlay Guide, Heatmap, HUD, Whole-Image Zoom) -->
-      <nav class="floating-strip strip-top-left">
-        <!-- Declutter / Hide Entire Interface Button -->
-        <button id="btnDeclutterUi" class="radar-btn" title="Declutter Screen (Hide All Interface Controls)">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>
-          </svg>
-        </button>
-
-        <button id="btnToggleOptions" class="radar-btn" title="Open System & Settings Screen">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
-
-        <!-- PiP Digital Zoom Window Toggle (Uses POI Target Icon) -->
-        <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Show / Hide Digital Zoom Window">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
-          </svg>
-        </button>
-
-        <!-- Overlay Guide On/Off Toggle on Top-Left Main Interface -->
-        <button id="btnToggleOverlayTop" class="radar-btn radar-btn-active" title="Toggle Superimposed Overlay Guide On / Off">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" d="M12 2v7M12 15v7M2 12h7M15 12h7M9 10v4M15 10v4M10 9h4M10 15h4"/>
-          </svg>
-        </button>
-
-        <!-- Micro-Change Heatmap Toggle on Main Interface -->
-        <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Localized Micro-Change Heatmap (Ignores Camera Shake)">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-          </svg>
-        </button>
-
-        <!-- Voice Announcements (Audio Callouts) On/Off Toggle -->
-        <button id="btnToggleVoiceAnnounce" class="radar-btn radar-btn-muted" title="Voice Announcements: MUTED (Click to Enable)">
-          <!-- Voice Active Icon (Speaker with Radiating Sound Waves) -->
-          <svg id="iconVoiceOn" class="voice-icon hidden" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
-          </svg>
-          <!-- Voice Muted Icon (Speaker with Red Diagonal Slash) -->
-          <svg id="iconVoiceMuted" class="voice-icon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
-            <line x1="22" y1="2" x2="2" y2="22" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-
-        <button id="btnToggleHud" class="radar-btn" title="Show / Hide Stream Info HUD">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
-          </svg>
-        </button>
-
-        <!-- Whole-Image Zoom Tool at the end of the Top-Left Icons -->
-        <div class="control-pod control-pod-top">
-          <button id="mainZoomMinus" class="radar-btn" title="Zoom Out Whole Image">−</button>
-          <span id="mainZoomBadge" class="zoom-readout">1.0x</span>
-          <button id="mainZoomPlus" class="radar-btn" title="Zoom In Whole Image">+</button>
-          <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan & Zoom">1:1</button>
-        </div>
-      </nav>
-
-      <!-- TOP-RIGHT FLOATING ICON STRIP (RAM Buffer Toggle + Saved Recordings Screen) -->
-      <nav class="floating-strip strip-top-right">
-        <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable In-Memory Video Buffer">
-          <span id="bufferDot" class="status-dot"></span>
-          <span id="bufferText">20s RAM</span>
-        </button>
-
-        <button id="btnSwitchScreen" class="radar-btn" title="Open Fullscreen Stored Video Browser">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
-          </svg>
-          <span id="clipCountBadge">0</span>
-        </button>
-      </nav>
-
-      <!-- STREAM TELEMETRY HUD OVERLAY -->
-      <aside id="hudOverlay" class="hidden">
-        <div class="hud-header">
-          <span>STREAM TELEMETRY</span>
-          <span id="hudFps">60 FPS</span>
-        </div>
-        <div class="hud-row"><span class="hud-key">SOURCE:</span><span id="hudSource" class="hud-val">USB CAM</span></div>
-        <div class="hud-row"><span class="hud-key">RES:</span><span id="hudResolution" class="hud-val">1920×1080</span></div>
-        <div class="hud-row"><span class="hud-key">MAIN ZOOM:</span><span id="hudMainZoom" class="hud-val">1.0x</span></div>
-        <div class="hud-row"><span class="hud-key">WIN ZOOM:</span><span id="hudPipZoom" class="hud-val">3.0x</span></div>
-        <div class="hud-row"><span class="hud-key">RAM BUFFER:</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
-      </aside>
-
-      <!-- BOTTOM CONTROL STRIP -->
-      <footer class="strip-bottom">
-        <!-- Left: 5-Button Bluetooth Ring Mode Pill -->
-        <div id="ringHudPill" class="ring-hud-pill" title="5-Button Bluetooth Ring Mode (Tap or press Ring Center button to cycle)">
-          <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
-          <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
-        </div>
-
-        <!-- Center-Left: Quick-Cycle Tool HUD Pill (D-Pad ◀/▶ to cycle tools, ✕ to toggle) -->
-        <div id="quickToolPill" class="quick-tool-pill hidden" title="Cyclic Quick Tool (D-Pad ◀ / ▶ to cycle, ✕ to toggle on/off)">
-          <span id="quickToolBadge" class="quick-tool-badge">HEATMAP</span>
-          <span id="quickToolStatus" class="quick-tool-status status-off">OFF</span>
-          <span class="quick-tool-hint">◀ ▶ CYCLE • ✕ TOGGLE</span>
-        </div>
-
-        <!-- Center: Instant Replay Scrubber Bar -->
-        <div id="replayBar" class="hidden">
-          <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
-          <button id="btnReplayStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
-          <button id="btnReplayStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
-          <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" />
-          <span id="replayTimeText" class="slider-val">0.0s / 20.0s</span>
-          <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
-        </div>
-
-        <!-- Right: Instant Replay (Automatically saves the clip to Archive) -->
-        <div id="replayTriggerPod" class="control-pod" style="margin-left:auto;">
-          <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Memory Buffer">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
-            </svg>
-            <span id="replayBtnLabel">REPLAY</span>
-          </button>
-        </div>
-      </footer>
-    </main>
-
-    <!-- =================================================================== -->
-    <!-- SCREEN 2: FULLSCREEN STORED VIDEO PLAYER (GUI FLOATING ON TOP)      -->
-    <!-- =================================================================== -->
-    <section id="screenGallery" class="screen-view hidden">
-      <!-- 100% Fullscreen Playback Canvas -->
-      <div class="gallery-fullscreen-stage">
-        <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
-      </div>
-
-      <!-- Top-Left Floating Navigation, Clips Drawer Toggle & Video Playback Zoom Tool -->
-      <nav class="floating-strip strip-top-left">
-        <button id="btnBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
-          <span>← LIVE FEED</span>
-        </button>
-
-        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-active" title="Show / Hide Saved Clips List">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-          <span>CLIPS</span>
-        </button>
-
-        <!-- Video Playback Zoom Tool (Zoom & Pan Saved Recordings) -->
-        <div class="control-pod control-pod-top">
-          <button id="galleryZoomMinus" class="radar-btn" title="Zoom Out Recorded Video">−</button>
-          <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
-          <button id="galleryZoomPlus" class="radar-btn" title="Zoom In Recorded Video">+</button>
-          <button id="galleryZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Video Pan & Zoom">1:1</button>
-        </div>
-      </nav>
-
-      <!-- Top-Right Floating Active Clip Telemetry Pill -->
-      <div class="floating-strip strip-top-right">
-        <div class="gallery-info-pill">
-          <span id="activeClipTitle" class="clip-name">NO CLIP SELECTED</span>
-          <span id="activeClipMeta" class="clip-meta">—</span>
-        </div>
-      </div>
-
-      <!-- Collapsible Floating Left Drawer for Saved Clips List -->
-      <aside id="galleryDrawer" class="gallery-floating-drawer">
-        <header class="panel-header" style="cursor:default;">
-          <span class="panel-title">SAVED RECORDINGS</span>
-          <button id="btnCloseGalleryDrawer" class="radar-btn radar-btn-sm" title="Hide Clips List so video is unobstructed">✕</button>
-        </header>
-        <div id="clipsList" class="clips-list-container"></div>
-      </aside>
-
-      <!-- Bottom Floating Full-Width Transport & Export Bar over the Video -->
-      <footer class="strip-bottom">
-        <div class="gallery-transport-bar">
-          <div class="player-btn-group">
-            <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-active">PAUSE ⏸</button>
-            <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
-            <button id="btnGalleryStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
-            <button id="btnGalleryStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
-          </div>
-
-          <div class="gallery-scrubber-wrap">
-            <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
-            <span id="galleryTimeReadout" class="slider-val" style="min-width:110px; text-align:right;">0.0s / 0.0s</span>
-          </div>
-
-          <div class="player-btn-group">
-            <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video at Native Resolution (.webm)">EXPORT</button>
-            <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Recording">DELETE</button>
-          </div>
-        </div>
-      </footer>
-    </section>
-
-    <!-- =================================================================== -->
-    <!-- SCREEN 3: FULLSCREEN SETTINGS SCREEN                                -->
-    <!-- =================================================================== -->
-    <section id="screenSettings" class="screen-view hidden">
-      <header class="settings-screen-header">
-        <button id="btnSettingsBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
-          <span>← LIVE FEED</span>
-        </button>
-        <span class="settings-screen-title">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
-          <span>SYSTEM & SENSOR SETTINGS</span>
-        </span>
-        <div style="display:flex; gap:10px;">
-          <button id="btnOpenControllerScreen" class="radar-btn radar-btn-active" title="Open Dedicated Controller & Key Mapping Screen">
-            <span>🎮 CONTROLLER MAPPING</span>
-          </button>
-          <button id="btnOpenReticleScreen" class="radar-btn radar-btn-active" title="Open Custom Reticle & Click Calibration">
-            <span>🎯 CUSTOM RETICLE</span>
-          </button>
-        </div>
-      </header>
-
-      <div class="settings-screen-body">
-        <div class="settings-screen-grid">
-          <!-- 1. Video Source Selection (USB Webcams & Network RTSP Streams) -->
-          <div class="settings-card" id="cardCameraSource">
-            <div class="settings-card-header">
-              <span class="settings-label">Video Source</span>
-              <div style="display:flex; gap:6px; align-items:center;">
-                <button type="button" id="btnSourceModeUsb" class="radar-btn radar-btn-sm radar-btn-active" style="height:26px; font-size:11px; padding:0 8px;">USB CAM</button>
-                <button type="button" id="btnSourceModeRtsp" class="radar-btn radar-btn-sm" style="height:26px; font-size:11px; padding:0 8px;">NETWORK (RTSP)</button>
-                <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" style="height:26px; min-width:28px; padding:0 6px;" title="Rescan Cameras">↻</button>
-              </div>
-            </div>
-
-            <!-- USB Webcam Selection Sub-Panel -->
-            <div id="panelSourceUsb">
-              <select id="cameraSelect" class="radar-select" style="width:100%;"></select>
-            </div>
-
-            <!-- Network RTSP Selection Sub-Panel -->
-            <div id="panelSourceRtsp" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
-              <!-- RTSP Device Preset Tabs -->
-              <div style="display:flex; gap:4px;">
-                <button type="button" id="btnPresetBresser" class="radar-btn radar-btn-sm radar-btn-active" style="flex:1; height:26px; font-size:11px; padding:0 6px;">BRESSER HD CAM</button>
-                <button type="button" id="btnPresetOnvif" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">ONVIF IP CAM</button>
-                <button type="button" id="btnPresetCustom" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">CUSTOM URL</button>
-              </div>
-
-              <!-- Bresser Eyepiece HD Configuration -->
-              <div id="secBresserConfig" style="display:flex; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">BRESSER WI-FI CAMERA</span>
-                  <span id="badgeRtspWake" style="font-family:var(--font-mono); font-size:10px; color:var(--radar-text-muted);">STANDBY</span>
-                </div>
-                <div style="display:flex; gap:6px;">
-                  <input id="inputBresserIp" type="text" value="192.168.0.1" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="192.168.0.1" title="Bresser Eyepiece Camera IP Address" />
-                  <button type="button" id="btnBresserWake" class="radar-btn radar-btn-sm" style="height:30px; padding:0 10px; font-size:11px; font-weight:700;" title="Wake camera DSP media pipeline and connect">⚡ WAKE & CONNECT</button>
-                </div>
-
-                <!-- Stream Resolution Channel Switcher (ch0 Full HD default) -->
-                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
-                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">STREAM RESOLUTION / CHANNEL</label>
-                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px;">
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel radar-btn-active" data-channel="ch0" data-label="Bresser (1080p Main)" style="height:26px; font-size:10px; padding:0 4px;">● 1080p (ch0)</button>
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch1" data-label="Bresser (540p Sub)" style="height:26px; font-size:10px; padding:0 4px;">○ 540p (ch1)</button>
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch2" data-label="Bresser (270p Fast)" style="height:26px; font-size:10px; padding:0 4px;">○ 270p (ch2)</button>
-                  </div>
-                </div>
-
-                <!-- Direct / Editable RTSP Stream URL or Endpoint -->
-                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
-                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">RTSP STREAM URL / ENDPOINT</label>
-                  <div style="display:flex; gap:6px;">
-                    <input id="inputBresserRtspUrl" type="text" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:11px; height:28px;" value="rtsp://192.168.0.1/live/tcp/ch0" placeholder="rtsp://192.168.0.1/live/tcp/ch0" title="Direct RTSP Stream URL or Endpoint (editable for any device)" />
-                    <button type="button" id="btnConnectBresserEndpoint" class="radar-btn radar-btn-sm" style="height:28px; padding:0 8px; font-size:10px; font-weight:700;" title="Connect directly to this RTSP stream URL">CONNECT</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ONVIF IP Camera Configuration -->
-              <div id="secOnvifConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
-                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">ONVIF / CCTV STREAM SETTINGS</div>
-                <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px;">
-                  <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Camera IP" />
-                  <input id="inputOnvifPort" type="number" value="554" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="554" />
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                  <input id="inputOnvifUser" type="text" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Username (opt)" />
-                  <input id="inputOnvifPass" type="password" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Password (opt)" />
-                </div>
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">ONVIF PROFILE / CHANNEL</label>
-                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel radar-btn-active" data-path="/onvif1" data-label="ONVIF (Profile 1 - 1080p)" style="height:26px; font-size:10px; padding:0 6px;">● PROFILE 1 (1080p)</button>
-                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel" data-path="/onvif2" data-label="ONVIF (Profile 2 - Sub)" style="height:26px; font-size:10px; padding:0 6px;">○ PROFILE 2 (Sub)</button>
-                  </div>
-                </div>
-                <button type="button" id="btnOnvifConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT ONVIF STREAM</button>
-              </div>
-
-              <!-- Custom RTSP URL Configuration -->
-              <div id="secCustomRtspConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
-                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">MANUAL RTSP URL</div>
-                <input id="inputCustomRtspUrl" type="text" value="" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="rtsp://192.168.0.1:554/live/ch0" />
-                <button type="button" id="btnCustomRtspConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT CUSTOM RTSP</button>
-              </div>
-
-              <!-- Connection Status & Gateway Telemetry -->
-              <div id="statusRtspBanner" style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); display:flex; justify-content:space-between; align-items:center; padding:4px 2px;">
-                <span id="textRtspStatus">RTSP GATEWAY: STANDBY</span>
-                <span id="textRtspFps"></span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Memory Recording</span>
-              <span id="valBufferResolution" class="slider-val" style="font-size:13px;">1920×1080</span>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Buffer Duration</span>
-                <span id="valBufferDuration" class="slider-val">20s</span>
-              </div>
-              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Frame Rate</span>
-                <span id="valBufferFps" class="slider-val">15 FPS</span>
-              </div>
-              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
-            </div>
-
-            <!-- Live Memory Availability & Requirement Meter -->
-            <div class="memory-meter-box">
-              <div class="memory-meter-labels">
-                <span id="memUsedLabel">USED: 0.0 MB</span>
-                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
-              </div>
-              <div class="memory-bar-track">
-                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
-                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. Superimpose Overlay Guide & Reticle Customizer Shortcut -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Overlay & Reticle</span>
-              <button id="btnToggleOverlayQuick" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-            </div>
-            <p style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); margin: 6px 0 12px 0; line-height:1.4;">
-              Graduated reticles, custom optics overlay, FFP lock, opacity, click scale, and geometry are managed in the Reticle Customizer.
-            </p>
-            <button id="btnOpenReticleScreenCard" class="radar-btn radar-btn-sm radar-btn-active" style="width:100%; height:34px; font-weight:700;" title="Open Reticle Customizer">🎯 OPEN RETICLE CUSTOMIZER</button>
-          </div>
-
-          <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration & Female Voice Callout -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Heatmap & Voice</span>
-              <button id="btnToggleHeatmapSpeech" class="radar-btn radar-btn-sm" title="Announce Heatmap Detections via Speech (Clock Direction & Ticks from ROI Target)">VOICE: OFF</button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Sensitivity</span>
-                <span id="valHeatmapSens" class="slider-val">60%</span>
-              </div>
-              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Display Duration</span>
-                <div class="duration-custom-controls">
-                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Enter Custom Heatmap Duration in Seconds" />
-                  <span id="valHeatmapDuration" class="slider-val" style="min-width:22px;">s</span>
-                  <button id="btnHeatmapInfinite" class="radar-btn radar-btn-sm" style="height:28px; min-width:34px; padding:0 6px; font-size:14px;" title="Toggle Infinite Heatmap Persistence (∞)">∞</button>
-                </div>
-              </div>
-              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" title="Drag right to 125 for Infinite (∞) or enter any custom seconds above" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Voice Pitch (Female Tone)</span>
-                <span id="valVoicePitch" class="slider-val">1.25x</span>
-              </div>
-              <input id="sliderVoicePitch" type="range" min="0.8" max="1.8" step="0.05" value="1.25" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Voice Speed</span>
-                <span id="valVoiceRate" class="slider-val">1.10x</span>
-              </div>
-              <input id="sliderVoiceRate" type="range" min="0.8" max="1.6" step="0.05" value="1.1" class="radar-slider" />
-            </div>
-
-            <!-- Voice Custom Keywords -->
-            <div class="voice-keywords-container" style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
-              <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-                <span>CUSTOM VOICE KEYWORDS</span>
-                <span style="font-size:10px; color:var(--radar-primary);">EDITABLE</span>
-              </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <div>
-                  <label style="display:block; font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted); margin-bottom:2px;">ALERT PREFIX</label>
-                  <input id="inputVoiceAlertKeyword" type="text" value="Detection" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:28px;" placeholder="e.g. Detection, Contact" title="Word spoken at the beginning of an alert" />
-                </div>
-                <div>
-                  <label style="display:block; font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted); margin-bottom:2px;">UNIT / DISTANCE</label>
-                  <input id="inputVoiceUnitKeyword" type="text" value="clicks" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:28px;" placeholder="e.g. clicks, mils, marks" title="Word spoken after the distance count" />
-                </div>
-              </div>
-              <div style="display:flex; gap:4px; margin-top:8px; flex-wrap:wrap;">
-                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Detection" data-unit="clicks" style="font-size:10px; height:22px; padding:0 6px;">Detection • clicks</button>
-                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Contact" data-unit="mils" style="font-size:10px; height:22px; padding:0 6px;">Contact • mils</button>
-                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Target" data-unit="marks" style="font-size:10px; height:22px; padding:0 6px;">Target • marks</button>
-                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Warning" data-unit="units" style="font-size:10px; height:22px; padding:0 6px;">Warning • units</button>
-              </div>
-            </div>
-
-            <div style="margin-top:10px;">
-              <button id="btnTestVoiceSettings" class="radar-btn radar-btn-sm" style="width:100%;" title="Audition female detection announcement">AUDITION: "Detection! 11 o'clock, 3 clicks"</button>
-            </div>
-          </div>
-
-          <!-- 5. Image Manipulation -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Image Adjust</span>
-              <button id="btnResetFilters" class="radar-btn radar-btn-sm">RESET</button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Brightness</span>
-                <span id="valBrightness" class="slider-val">100%</span>
-              </div>
-              <input id="sliderBrightness" type="range" min="40" max="200" value="100" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Contrast</span>
-                <span id="valContrast" class="slider-val">100%</span>
-              </div>
-              <input id="sliderContrast" type="range" min="40" max="220" value="100" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Saturation</span>
-                <span id="valSaturation" class="slider-val">100%</span>
-              </div>
-              <input id="sliderSaturation" type="range" min="0" max="200" value="100" class="radar-slider" />
-            </div>
-
-            <div class="overlay-grid">
-              <button id="btnFilterInvert" class="radar-btn radar-btn-sm">INVERT</button>
-              <button id="btnFilterGrayscale" class="radar-btn radar-btn-sm">MONO</button>
-            </div>
-          </div>
-
-          <!-- 7. Interface Theme Color & Global UI Opacity -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Interface Appearance</span>
-              <input id="colorPickerCustom" type="color" value="#f97316" class="theme-color-input" title="Pick Custom Interface Color" />
-            </div>
-            <div class="swatch-row">
-              <button class="theme-swatch active" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
-              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
-              <button class="theme-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
-              <button class="theme-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
-              <button class="theme-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #94a3b8;" title="White"></button>
-              <button class="theme-swatch" data-color="#000000" style="background:#000000; border:1px solid #475569;" title="Black"></button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Interface Opacity</span>
-                <span id="valUiOpacity" class="slider-val">100%</span>
-              </div>
-              <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
-            </div>
-          </div>
-
-          <!-- 8. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">BT Ring Remote</span>
-              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
-            </div>
-            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
-            <div class="ring-dpad-grid">
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
-              <div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- =================================================================== -->
-    <!-- SCREEN 4: FULLSCREEN RETICLE CUSTOMIZER & CALIBRATION SCREEN        -->
-    <!-- =================================================================== -->
-    <section id="screenReticle" class="screen-view hidden">
-      <header class="reticle-screen-header">
-        <button id="btnReticleBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
-          <span>← LIVE FEED</span>
-        </button>
-        <span class="settings-screen-title">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="9"/>
-            <path stroke-linecap="round" d="M12 3v4M12 17v4M3 12h4M17 12h4"/>
-          </svg>
-          <span>RETICLE CUSTOMIZER & CLICK CALIBRATION</span>
-        </span>
-        <div style="display:flex; gap:10px;">
-          <button id="btnResetReticle" class="radar-btn radar-btn-sm" title="Reset Reticle to Default 10-Click Preset">RESET PRESET</button>
-          <button id="btnReticleToSettings" class="radar-btn radar-btn-active" title="Return to Settings Screen">⚙ SETTINGS</button>
-        </div>
-      </header>
-
-      <div class="reticle-workspace">
-        <!-- Interactive Full Reticle Preview Stage -->
-        <div id="reticlePreviewStage" class="reticle-stage-area" title="Click anywhere on the preview to test speech announcement">
-          <!-- Real-Time Gamepad Action Toast / OSD Pill -->
-          <div id="reticleGamepadToast" class="reticle-gamepad-toast hidden">
-            <span id="reticleToastText">CLICKS PER ARM: 10</span>
-          </div>
-
-          <svg id="reticlePreviewSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
-          <img id="reticlePreviewImg" class="hidden" alt="Custom Reticle Preview" style="max-width:90%; max-height:90%; object-fit:contain; pointer-events:none;" />
-
-          <!-- Interactive Controller Legend Strip -->
-          <div class="reticle-gamepad-legend">
-            <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK / D-PAD</kbd> SELECT & ADJUST</span>
-            <span class="gp-leg-pill" data-leg="rstick"><kbd>R-STICK</kbd> GAP / WEIGHT</span>
-            <span class="gp-leg-pill" data-leg="square"><kbd>▢</kbd> RINGS</span>
-            <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
-            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> TOGGLE / AUDITION</span>
-            <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
-            <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> MOUSE CLICK</span>
-            <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> LIVE FEED</span>
-          </div>
-
-          <div class="reticle-stage-hint">TAP PREVIEW OR USE JOYSTICK / BUTTONS TO SCULPT CROSSHAIR</div>
-        </div>
-
-        <!-- Customization Drawer -->
-        <aside class="reticle-sidebar-drawer">
-          <!-- 1. Overlay Master & Optics Calibration (Merged from settings) -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Overlay Reticle</span>
-              <button id="btnToggleOverlay" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-            </div>
-
-            <div class="overlay-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
-              <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">RETICLE</button>
-              <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
-            </div>
-            <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
-
-            <div class="slider-group" style="margin-bottom:10px;">
-              <div class="slider-header">
-                <span>First Focal Plane (FFP) Lock</span>
-                <button id="btnToggleReticleFfp" class="radar-btn radar-btn-sm radar-btn-active" style="min-width:110px;" title="Scale reticle in lockstep with whole-image digital zoom (FFP)">FFP: ON</button>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Opacity</span>
-                <span id="valOvOpacity" class="slider-val">75%</span>
-              </div>
-              <input id="sliderOvOpacity" type="range" min="10" max="100" value="75" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Reticle Scale</span>
-                <span id="valOvScale" class="slider-val">100%</span>
-              </div>
-              <input id="sliderOvScale" type="range" min="25" max="200" step="1" value="100" class="radar-slider" />
-            </div>
-
-            <div class="slider-group" style="margin-top:10px;">
-              <div class="slider-header">
-                <span>Reticle Color Theme</span>
-              </div>
-              <div class="theme-swatches-grid" style="display:flex; gap:6px; margin-top:4px;">
-                <button type="button" class="theme-swatch theme-swatch-reticle active" data-color="#f97316" style="background:#f97316;" title="Tactical Orange"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#22c55e" style="background:#22c55e;" title="Night Vision Green"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ef4444" style="background:#ef4444;" title="Infrared Red"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#3b82f6" style="background:#3b82f6;" title="Precision Blue"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ffffff" style="background:#ffffff;" title="High Contrast White"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#000000" style="background:#000000; border:1px solid #444;" title="Stealth Black"></button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. Click Geometry -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Click Geometry</span>
-              <button id="btnTestCallout" class="radar-btn radar-btn-sm radar-btn-active" title="Audition Sample Speech Callout">AUDITION</button>
-            </div>
-            <div id="calloutTestText" class="ring-signal-readout">READY (CLICK PREVIEW OR TAP AUDITION)</div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Clicks Per Arm</span>
-                <span id="valReticleClicks" class="slider-val">10 clicks</span>
-              </div>
-              <input id="sliderReticleClicks" type="range" min="2" max="30" step="1" value="10" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Click Spacing</span>
-                <span id="valReticleSpacing" class="slider-val">32 px</span>
-              </div>
-              <input id="sliderReticleSpacing" type="range" min="4" max="100" step="1" value="8" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Center Gap (POI View)</span>
-                <span id="valReticleGap" class="slider-val">64 px</span>
-              </div>
-              <input id="sliderReticleGap" type="range" min="0" max="140" step="1" value="64" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Center Point Style</span>
-                <span id="valReticleCenter" class="slider-val">EMPTY</span>
-              </div>
-              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-top:6px;">
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" title="Unobstructed open center gap">EMPTY</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" title="Sharp precision center aiming dot">DOT</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" title="Fine center intersection mini-crosshair">CROSS</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" title="Inverted caret pointing directly to dead-center pixel">CHEVRON</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Markings & Accents</span>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Center Brackets</span>
-                <button id="btnToggleReticleBrackets" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Major Tick Interval</span>
-                <span id="valReticleMajor" class="slider-val">EVERY 5</span>
-              </div>
-              <input id="sliderReticleMajor" type="range" min="0" max="10" step="1" value="5" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Number Labels</span>
-                <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Concentric Rings</span>
-                <button id="btnToggleReticleRings" class="radar-btn radar-btn-sm">OFF</button>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Stroke Weight</span>
-                <span id="valReticleStroke" class="slider-val">1.8 px</span>
-              </div>
-              <input id="sliderReticleStroke" type="range" min="0.5" max="5.0" step="0.1" value="1.8" class="radar-slider" />
-            </div>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-    <!-- =================================================================== -->
-    <!-- SCREEN 5: FULLSCREEN CONTROLLER & KEY MAPPING CONFIGURATOR          -->
-    <!-- =================================================================== -->
-    <section id="screenController" class="screen-view hidden">
-      <header class="controller-screen-header">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button id="btnControllerBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
-            <span>← LIVE FEED</span>
-          </button>
-          <button id="btnControllerBackToSettings" class="radar-btn" title="Return to General Settings Screen">
-            <span>⚙ SETTINGS</span>
-          </button>
-        </div>
-
-        <span class="settings-screen-title">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="2" y="6" width="20" height="12" rx="4"/>
-            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
-          </svg>
-          <span>CONTROLLER & KEY MAPPING CONFIGURATOR</span>
-        </span>
-
-        <div style="display:flex; align-items:center; gap:10px;">
-          <label style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">PROFILE:</label>
-          <select id="selectControllerProfile" class="radar-select" style="min-width:160px; height:30px; font-size:12px;">
-            <option value="default">Default DualShock 4</option>
-            <option value="simplified">Simplified Field Mode</option>
-            <option value="flight">Flight / Arcade Stick</option>
-          </select>
-          <button id="btnResetControllerBindings" class="radar-btn radar-btn-sm" title="Reset all mappings and stick calibration to factory default">RESET DEFAULTS</button>
-        </div>
-      </header>
-
-      <!-- Feedback Toast Banner -->
-      <div id="cmToastBanner" class="cm-toast-banner hidden">READY</div>
-
-      <!-- Real-Time Hardware Signal & Action Readout -->
-      <div id="cmLiveActionBanner" class="cm-live-banner">READY (PRESS ANY CONTROLLER BUTTON, TRIGGER, STICK OR KEY TO TEST)</div>
-
-      <!-- Device Selector Sub-Tabs (Gamepad vs 7-Button Remote) -->
-      <div class="cm-tab-bar">
-        <button id="tabBtnGamepad" class="cm-tab-btn active" title="Gamepad & Joystick Configurator">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="6" width="20" height="12" rx="4"/>
-            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
-          </svg>
-          <span>GAMEPAD / JOYSTICK</span>
-        </button>
-        <button id="tabBtnRemote" class="cm-tab-btn" title="7-Button Wireless Bluetooth Remote / Ring">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="6" y="2" width="12" height="20" rx="3"/>
-            <circle cx="12" cy="10" r="3.5"/>
-            <circle cx="9.5" cy="17" r="1.2"/>
-            <circle cx="14.5" cy="17" r="1.2"/>
-          </svg>
-          <span>7-BTN BLUETOOTH REMOTE / RING</span>
-        </button>
-      </div>
-
-      <div class="controller-screen-body">
-        <!-- TAB 1: GAMEPAD / JOYSTICK WORKSPACE -->
-        <div id="viewGamepadConfig" class="cm-view-tab">
-          <div class="controller-workspace-grid">
-          <!-- Left Column: Visual Controller Representation & Stick Calibration -->
-          <div class="cm-hardware-col">
-            <!-- 1. Interactive Visual Controller Diagram & Live Monitoring -->
-            <div class="settings-card">
-              <div class="settings-card-header">
-                <span class="settings-label">Live Controller Monitor</span>
-                <div style="display:flex; align-items:center; gap:6px;">
-                  <span id="gamepadStatusDot" class="gamepad-dot"></span>
-                  <span id="gamepadStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">DISCONNECTED</span>
-                  <button id="btnConnectWebHID" class="radar-btn radar-btn-sm radar-btn-active" style="height:24px; padding:0 8px; font-size:11px;" title="Connect Bluetooth PS4 Controller directly via Chrome WebHID">PAIR PS4 BT</button>
-                  <button id="btnDetectGamepad" class="radar-btn radar-btn-sm" style="height:24px; padding:0 6px; font-size:11px;" title="Scan for USB / XInput Gamepads">SCAN</button>
-                </div>
-              </div>
-
-              <!-- Controller Hardware Schematic Box -->
-              <div class="cm-controller-box">
-                <!-- Top Shoulders & Triggers -->
-                <div class="cm-row-triggers">
-                  <div class="cm-visual-btn cm-btn-trigger" data-gp="l2"><span class="cm-badge-lbl">L2 TRIGGER</span></div>
-                  <div class="cm-visual-btn cm-btn-bumper" data-gp="l1"><span class="cm-badge-lbl">L1</span></div>
-                  <div style="flex:1;"></div>
-                  <div class="cm-visual-btn cm-btn-bumper" data-gp="r1"><span class="cm-badge-lbl">R1</span></div>
-                  <div class="cm-visual-btn cm-btn-trigger" data-gp="r2"><span class="cm-badge-lbl">R2 TRIGGER</span></div>
-                </div>
-
-                <!-- Main Controller Body: D-Pad, Touchpad & Action Buttons -->
-                <div class="cm-row-middle">
-                  <!-- D-Pad Cluster -->
-                  <div class="cm-dpad-cluster">
-                    <div></div>
-                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-up">▲</div>
-                    <div></div>
-                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-left">◀</div>
-                    <div class="cm-dpad-center"></div>
-                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-right">▶</div>
-                    <div></div>
-                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-down">▼</div>
-                    <div></div>
-                  </div>
-
-                  <!-- Center Touchpad & System Buttons -->
-                  <div class="cm-center-cluster">
-                    <div class="cm-row-system">
-                      <div class="cm-visual-btn cm-btn-system" data-gp="share">SHARE</div>
-                      <div class="cm-visual-btn cm-btn-touchpad" data-gp="touchpad">
-                        <span>TOUCHPAD (VIRTUAL MOUSE)</span>
-                      </div>
-                      <div class="cm-visual-btn cm-btn-system" data-gp="options">OPTIONS</div>
-                    </div>
-                    <div class="cm-row-ps">
-                      <div class="cm-visual-btn cm-btn-ps" data-gp="ps">PS</div>
-                    </div>
-                  </div>
-
-                  <!-- Face Action Buttons Cluster -->
-                  <div class="cm-face-cluster">
-                    <div></div>
-                    <div class="cm-visual-btn cm-face-key" data-gp="triangle">△</div>
-                    <div></div>
-                    <div class="cm-visual-btn cm-face-key" data-gp="square">▢</div>
-                    <div class="cm-face-center"></div>
-                    <div class="cm-visual-btn cm-face-key" data-gp="circle">◯</div>
-                    <div></div>
-                    <div class="cm-visual-btn cm-face-key" data-gp="cross">✕</div>
-                    <div></div>
-                  </div>
-                </div>
-
-                <!-- Dual Analog Sticks (L3 / R3) -->
-                <div class="cm-row-sticks">
-                  <div class="cm-stick-pod">
-                    <div class="cm-visual-btn cm-stick-ring" data-gp="l3">
-                      <div class="cm-stick-thumb" id="cmLeftThumb">L3</div>
-                    </div>
-                    <span class="cm-stick-lbl">LEFT STICK (AIM)</span>
-                  </div>
-                  <div class="cm-stick-pod">
-                    <div class="cm-visual-btn cm-stick-ring" data-gp="r3">
-                      <div class="cm-stick-thumb" id="cmRightThumb">R3</div>
-                    </div>
-                    <span class="cm-stick-lbl">RIGHT STICK (PAN/ZOOM)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 2. Stick & Touchpad Fine Calibration -->
-            <div class="settings-card">
-              <div class="settings-card-header">
-                <span class="settings-label">Analog Stick & Touchpad Tuning</span>
-                <span class="slider-val" style="font-size:11px;">PRECISION CURVE</span>
-              </div>
-
-              <!-- Reticle Aim Speed -->
-              <div class="slider-group">
-                <div class="slider-header">
-                  <span>Reticle Aim Speed (Left Stick)</span>
-                  <span id="valControllerAimSpeed" class="slider-val">50%</span>
-                </div>
-                <input id="sliderControllerAimSpeed" type="range" min="15" max="150" step="5" value="50" class="radar-slider" title="Adjust joystick movement speed for the primary reticle (50% is default precision speed)" />
-              </div>
-
-              <!-- Left Stick Deadzone & Invert -->
-              <div class="slider-group">
-                <div class="slider-header">
-                  <span>Left Stick Deadzone</span>
-                  <span id="valLeftStickDeadzone" class="slider-val">16%</span>
-                </div>
-                <input id="sliderLeftStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" title="Adjust stick center deadzone to prevent stick drift" />
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-header">
-                  <span>Left Stick Y-Axis</span>
-                  <button id="btnToggleInvertLeftY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
-                </div>
-              </div>
-
-              <!-- Right Stick Deadzone & Invert -->
-              <div class="slider-group" style="margin-top:10px;">
-                <div class="slider-header">
-                  <span>Right Stick Deadzone</span>
-                  <span id="valRightStickDeadzone" class="slider-val">16%</span>
-                </div>
-                <input id="sliderRightStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" />
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-header">
-                  <span>Right Stick Y-Axis</span>
-                  <button id="btnToggleInvertRightY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
-                </div>
-              </div>
-
-              <!-- Touchpad Sensitivity -->
-              <div class="slider-group" style="margin-top:10px;">
-                <div class="slider-header">
-                  <span>Touchpad Virtual Mouse Sensitivity</span>
-                  <span id="valControllerTouchpadSens" class="slider-val">50%</span>
-                </div>
-                <input id="sliderControllerTouchpadSens" type="range" min="15" max="150" step="5" value="50" class="radar-slider" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Column: Interactive Key & Controller Mapping Matrix -->
-          <div class="cm-mapping-col">
-            <div class="settings-card" style="display:flex; flex-direction:column; height:100%;">
-              <div class="settings-card-header">
-                <span class="settings-label">Action Mapping Matrix</span>
-                <span style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">CLICK REBIND TO CHANGE</span>
-              </div>
-
-              <!-- Functional Category Filter Bar -->
-              <div class="cm-category-bar">
-                <button class="radar-btn radar-btn-sm mapping-cat-btn radar-btn-active" data-cat="all">ALL ACTIONS</button>
-                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="optics">OPTICS & SIGHT</button>
-                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="vision">VISION & HEATMAP</button>
-                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="recording">RECORDING & REPLAY</button>
-                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="system">SYSTEM & MOUSE</button>
-              </div>
-
-              <!-- Mapping Table Container with Sticky Header -->
-              <div class="cm-table-wrap">
-                <table class="cm-mapping-table">
-                  <thead>
-                    <tr>
-                      <th style="width: 44%;">APPLICATION ACTION</th>
-                      <th style="width: 28%;">CONTROLLER BINDING</th>
-                      <th style="width: 20%;">KEYBOARD KEY</th>
-                      <th style="width: 8%; text-align:center;">RESET</th>
-                    </tr>
-                  </thead>
-                  <tbody id="controllerMappingTableBody">
-                    <!-- Dynamically populated by controllerScreen.js -->
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="cm-table-footer-hint">
-                💡 <b>TIP:</b> Click any <b>BINDING</b> button, then press any button, trigger, or stick on your controller to rebind. Press <kbd>ESC</kbd> to cancel.
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-
-        <!-- TAB 2: 7-BUTTON BLUETOOTH REMOTE / RING WORKSPACE -->
-        <div id="viewRemoteConfig" class="cm-view-tab hidden">
-          <div class="controller-workspace-grid">
-            <!-- Left Column: Visual Remote Representation & Live Signal Diagnostics -->
-            <div class="cm-hardware-col">
-              <div class="settings-card">
-                <div class="settings-card-header">
-                  <span class="settings-label">Live Remote Monitor</span>
-                  <div style="display:flex; align-items:center; gap:6px;">
-                    <span id="remoteStatusDot" class="gamepad-dot" style="background:#10B981; box-shadow:0 0 8px #10B981;"></span>
-                    <span id="remoteStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">BLUETOOTH HID LISTENING</span>
-                  </div>
-                </div>
-
-                <!-- Remote Hardware Schematic Box -->
-                <div class="remote-device-box">
-                  <svg class="remote-device-svg" viewBox="0 0 280 330" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Type-C Port at Top -->
-                    <rect x="110" y="6" width="60" height="10" rx="4" fill="#0A0A0C" stroke="#3F3F46" stroke-width="1.5"/>
-
-                    <!-- Main Remote Body -->
-                    <rect x="15" y="20" width="250" height="295" rx="38" fill="#1C1D22" stroke="#2C2D35" stroke-width="3"/>
-                    <rect x="22" y="27" width="236" height="281" rx="32" fill="#141518" stroke="#1F2026" stroke-width="1"/>
-
-                    <!-- Top LED Status Indicator -->
-                    <circle id="remoteLedDot" class="remote-led-dot" cx="54" cy="74" r="5" fill="#3F3F46" stroke="#27272A" stroke-width="1"/>
-                    <text x="54" y="90" fill="#71717A" font-family="monospace" font-size="7" text-anchor="middle">LED</text>
-
-                    <!-- Center Action Button (Play / Pause / Lock) -->
-                    <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
-                      <circle cx="140" cy="132" r="26" fill="#2B2C33" stroke="#3E3F4A" stroke-width="2"/>
-                      <polygon points="132,125 132,139 142,132" fill="#F8FAFC"/>
-                      <line x1="145" y1="125" x2="145" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
-                      <line x1="149" y1="125" x2="149" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
-                    </g>
-
-                    <!-- D-Pad Directional Cluster (Radial symmetry, uniform 8px gap) -->
-                    <!-- Up Sector Button -->
-                    <g id="rBtnUP" class="remote-visual-btn" data-remote-act="UP">
-                      <path d="M 100.0 77.0 A 68 68 0 0 1 180.0 77.0 L 160.0 104.5 A 34 34 0 0 0 120.0 104.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="140,75 134,84 146,84" fill="#E2E8F0"/>
-                    </g>
-
-                    <!-- Down Sector Button -->
-                    <g id="rBtnDOWN" class="remote-visual-btn" data-remote-act="DOWN">
-                      <path d="M 180.0 187.0 A 68 68 0 0 1 100.0 187.0 L 120.0 159.5 A 34 34 0 0 0 160.0 159.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="140,189 134,180 146,180" fill="#E2E8F0"/>
-                    </g>
-
-                    <!-- Left Sector Button -->
-                    <g id="rBtnLEFT" class="remote-visual-btn" data-remote-act="LEFT">
-                      <path d="M 85.0 172.0 A 68 68 0 0 1 85.0 92.0 L 112.5 112.0 A 34 34 0 0 0 112.5 152.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="83,132 92,126 92,138" fill="#E2E8F0"/>
-                    </g>
-
-                    <!-- Right Sector Button -->
-                    <g id="rBtnRIGHT" class="remote-visual-btn" data-remote-act="RIGHT">
-                      <path d="M 195.0 92.0 A 68 68 0 0 1 195.0 172.0 L 167.5 152.0 A 34 34 0 0 0 167.5 112.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="197,132 188,126 188,138" fill="#E2E8F0"/>
-                    </g>
-
-                    <!-- Bottom Left Button (⏻ 1 - Instant Replay) -->
-                    <g id="rBtnBTN1" class="remote-visual-btn" data-remote-act="BTN1">
-                      <circle cx="86" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
-                      <!-- Vector Power Symbol -->
-                      <path d="M 86 238 L 86 245 M 80.5 242 A 6.5 6.5 0 1 0 91.5 242" stroke="#FF8533" stroke-width="2" fill="none" stroke-linecap="round"/>
-                      <text x="86" y="265" fill="#E2E8F0" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">1</text>
-                      <text x="86" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">REPLAY</text>
-                    </g>
-
-                    <!-- Bottom Right Button (2 - Mode Switcher) -->
-                    <g id="rBtnBTN2" class="remote-visual-btn" data-remote-act="BTN2">
-                      <circle cx="194" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
-                      <text x="194" y="258" fill="#F8FAFC" font-family="monospace" font-size="20" font-weight="bold" text-anchor="middle">2</text>
-                      <text x="194" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">MODE</text>
-                    </g>
-                  </svg>
-                </div>
-              </div>
-
-              <!-- Live Remote State Card -->
-              <div class="settings-card">
-                <div class="settings-card-header">
-                  <span class="settings-label">Remote State & Optics Status</span>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:10px; font-size:12px; font-family:var(--font-mono);">
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:var(--radar-text-muted);">ACTIVE REMOTE MODE:</span>
-                    <button id="btnCycleRemoteModeTab" class="remote-mode-pill" title="Click to cycle remote mode">[ 1/3 PAN VIEW ]</button>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:var(--radar-text-muted);">FFP RETICLE SYNC:</span>
-                    <button id="btnToggleFfpTab" class="radar-btn radar-btn-sm" title="Toggle First Focal Plane Lock">LOCKED 🔒</button>
-                  </div>
-                  <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:var(--radar-text-muted);">LAST RAW SIGNAL:</span>
-                    <span id="remoteLastSignalText" style="color:var(--radar-primary); font-weight:700;">READY (PRESS ANY REMOTE BUTTON)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Column: Mapping & Calibration Table + Cheatsheet -->
-            <div class="cm-mapping-col">
-              <div class="settings-card" style="flex:1; display:flex; flex-direction:column;">
-                <div class="settings-card-header">
-                  <span class="settings-label">7-Button Remote Calibration & Action Table</span>
-                  <button id="btnResetRemoteTabMap" class="radar-btn radar-btn-sm" title="Reset remote bindings to defaults">RESET REMOTE DEFAULTS</button>
-                </div>
-
-                <div class="cm-table-wrap">
-                  <table class="cm-mapping-table">
-                    <thead>
-                      <tr>
-                        <th style="width: 22%;">PHYSICAL BUTTON</th>
-                        <th style="width: 44%;">DISCRETE ONE-FINGER FUNCTION</th>
-                        <th style="width: 18%;">BOUND HID KEY</th>
-                        <th style="width: 16%; text-align:center;">CALIBRATE</th>
-                      </tr>
-                    </thead>
-                    <tbody id="remoteMappingTableBody">
-                      <!-- Dynamically rendered by controllerScreen.js -->
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Field Quick Reference Cheatsheet -->
-                <div class="remote-quick-guide-grid">
-                  <div class="remote-guide-card">
-                    <div class="remote-guide-card-title">① [PAN VIEW] MODE</div>
-                    <div>• <b>▲▼◀▶</b> Pan live camera feed</div>
-                    <div>• <b>● CENTER</b> Re-center pan (0,0)</div>
-                    <div>• <b>BTN 1</b> Instant Replay in/out</div>
-                    <div>• <b>BTN 2</b> Switch to ZOOM VIEW</div>
-                  </div>
-                  <div class="remote-guide-card">
-                    <div class="remote-guide-card-title">② [ZOOM VIEW] MODE</div>
-                    <div>• <b>▲ / ▼</b> Zoom live stream (±0.25x)</div>
-                    <div>• <b>◀ / ▶</b> Coarse zoom step (±0.5x)</div>
-                    <div>• <b>● CENTER</b> Reset zoom to 1.0x (1:1)</div>
-                    <div>• <i>(FFP auto-scales reticle with zoom)</i></div>
-                  </div>
-                  <div class="remote-guide-card">
-                    <div class="remote-guide-card-title">③ [RETICLE CAL] MODE</div>
-                    <div>• <b>▲ / ▼</b> Fine spacing (±1px)</div>
-                    <div>• <b>◀ / ▶</b> Coarse spacing (±5px)</div>
-                    <div>• <b>● CENTER</b> <b>LOCK / UNLOCK FFP 🔒</b></div>
-                    <div>• <b>BTN 2</b> Return to PAN VIEW</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </div>
-
-  <!-- PS4 Touchpad Virtual Mouse Pointer -->
-  <div id="spotrVirtualMouse" class="spotr-virtual-mouse hidden" aria-hidden="true">
-    <div class="vm-ring"></div>
-    <div class="vm-dot"></div>
-  </div>
-
-  <script type="module" src="./js/main.js?v=41"></script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#18181B" />
+  <title>SPOTR — Recon • Detect • Alert</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="stylesheet" href="./css/variables.css" />
+  <link rel="stylesheet" href="./css/layout.css" />
+  <link rel="stylesheet" href="./css/viewport.css" />
+  <link rel="stylesheet" href="./css/controls.css" />
+  <link rel="stylesheet" href="./css/gallery.css" />
+  <script>
+    if (new URLSearchParams(window.location.search).has('nosplash')) {
+      document.documentElement.classList.add('no-splash');
+    }
+  </script>
+  <style>
+    html.no-splash #splashScreen { display: none !important; }
+  </style>
+</head>
+<body>
+  <!-- Fullscreen Tactical Splash Screen (SPOTR Brand & Logo) -->
+  <aside id="splashScreen" class="splash-screen" role="dialog" aria-modal="true" aria-label="SPOTR Splash Screen">
+    <div class="splash-content">
+      <div class="splash-logo-wrap">
+        <svg class="splash-logo-svg" viewBox="0 0 580 220" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background -->
+          <rect width="580" height="220" rx="24" fill="#18181B"/>
+
+          <!-- Icon (Static) -->
+          <g transform="translate(30,30)">
+            <!-- Tile -->
+            <rect width="160" height="160" rx="28" fill="#202024"/>
+
+            <!-- Scope Ring -->
+            <circle
+              cx="80"
+              cy="80"
+              r="34"
+              fill="none"
+              stroke="#FF6B00"
+              stroke-width="10"/>
+
+            <!-- Crosshairs -->
+            <line x1="80" y1="22" x2="80" y2="46"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="80" y1="114" x2="80" y2="138"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="22" y1="80" x2="46" y2="80"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <line x1="114" y1="80" x2="138" y2="80"
+                  stroke="#FF6B00" stroke-width="4" stroke-linecap="round"/>
+
+            <!-- Centre Dot -->
+            <circle
+              cx="80"
+              cy="80"
+              r="7"
+              fill="#FF6B00"/>
+
+            <!-- Detection Indicator (Static) -->
+            <circle
+              cx="118"
+              cy="42"
+              r="9"
+              fill="#FFD166"/>
+          </g>
+
+          <!-- Logo Brand Text -->
+          <text
+              x="225"
+              y="108"
+              fill="#F8FAFC"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="80"
+              font-weight="700"
+              letter-spacing="4.65">
+              SPOTR
+          </text>
+
+          <!-- Trademark (Positioned closely at top-right shoulder of 'R') -->
+          <text
+              x="528"
+              y="64"
+              fill="#FFD166"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="15"
+              font-weight="700">
+              ™
+          </text>
+
+          <!-- Tagline with individual soft loading words -->
+          <text
+              class="splash-tagline"
+              x="225"
+              y="152"
+              fill="#E2E8F0"
+              font-family="Arial, Helvetica, sans-serif"
+              font-size="19"
+              font-weight="600"
+              letter-spacing="2.6">
+              <tspan class="splash-word-1">RECON</tspan>
+              <tspan class="splash-word-2"> • DETECT</tspan>
+              <tspan class="splash-word-3"> • ALERT</tspan>
+          </text>
+
+          <!-- Loading Progress Track (Aligned flush to Brand & Tagline width: 299px) -->
+          <rect
+              class="splash-line-track"
+              x="225"
+              y="170"
+              width="299"
+              height="4"
+              rx="2"
+              fill="rgba(255, 255, 255, 0.12)"/>
+
+          <!-- Loading Progress Bar (Animates left to right for 2s after last word loads) -->
+          <rect
+              class="splash-line-progress"
+              x="225"
+              y="170"
+              width="0"
+              height="4"
+              rx="2"
+              fill="#FF6B00"/>
+        </svg>
+      </div>
+    </div>
+  </aside>
+
+  <div id="appRoot">
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 1: 100% FULL-SCREEN LIVE CAMERA WORKSPACE                    -->
+    <!-- =================================================================== -->
+    <main id="screenLive" class="screen-view">
+      <div id="viewportContainer">
+        <!-- Hidden Video Source Element -->
+        <video id="cameraVideoEl" playsinline muted style="display:none;"></video>
+
+        <!-- Primary Full-Screen Stream Canvas -->
+        <canvas id="mainCanvas"></canvas>
+
+        <!-- Superimposed Guide Overlay Layer -->
+        <div id="overlayLayer" style="opacity: 0.75;">
+          <svg id="svgOverlay" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <img id="customOverlayImg" class="hidden" alt="Custom Overlay" />
+        </div>
+
+        <!-- Draggable ROI Target Crosshair (Toggled from Zoom Window Header) -->
+        <div id="zoomTargetCrosshair" title="Drag to position Zoom Window target">
+          <svg viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="28" stroke="var(--radar-text-muted)" stroke-width="2" stroke-dasharray="5 4" fill="rgba(45, 212, 191, 0.08)" />
+            <line x1="6" y1="48" x2="35" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="61" y1="48" x2="90" y2="48" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="48" y1="6" x2="48" y2="35" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <line x1="48" y1="61" x2="48" y2="90" stroke="var(--radar-text-muted)" stroke-width="2.5" />
+            <circle cx="48" cy="48" r="2.5" fill="var(--radar-text)" />
+          </svg>
+        </div>
+
+        <!-- Movable & Corner-Resizable Digital Zoom Window (PiP Magnifier) -->
+        <section id="pipZoomWindow">
+          <header id="pipHeader">
+            <span id="pipZoomBadge">3.0x</span>
+            <div class="pip-controls">
+              <!-- Single ROI Crosshair Show/Hide Toggle inside Zoom Window Header -->
+              <button id="btnPipToggleRoi" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide ROI Target Crosshair on Feed">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+                </svg>
+              </button>
+              <button id="pipZoomMinus" class="radar-btn radar-btn-sm" title="Decrease Window Zoom">−</button>
+              <button id="pipZoomPlus" class="radar-btn radar-btn-sm" title="Increase Window Zoom">+</button>
+            </div>
+          </header>
+          <div id="pipViewport">
+            <canvas id="pipCanvas" width="340" height="210"></canvas>
+            <div class="pip-center-reticle"></div>
+            <div id="pipResizeSW" class="pip-resize-handle pip-resize-sw" title="Drag corner to resize Zoom Window"></div>
+            <div id="pipResizeSE" class="pip-resize-handle pip-resize-se" title="Drag corner to resize Zoom Window"></div>
+          </div>
+        </section>
+
+        <!-- Instant Replay Video Modal (Full-screen native-resolution playback) -->
+        <div id="instantReplayModal" class="hidden">
+          <div class="replay-status-banner">
+            <span class="replay-pulse-dot"></span>
+            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED CLIP</span>
+          </div>
+          <canvas id="replayCanvas" width="1920" height="1080"></canvas>
+        </div>
+      </div>
+
+      <!-- Real-Time Reticle FFP / Subtension Scale OSD Toast -->
+      <div id="reticleFfpToast" class="reticle-ffp-toast hidden">
+        <span id="reticleFfpText">RETICLE SUBTENSION: 100% (FFP SYNC)</span>
+      </div>
+
+      <!-- SINGLE TOP-LEFT BUTTON SHOWN ONLY IN DECLUTTER MODE TO RESTORE UI -->
+      <button id="btnRestoreUi" class="radar-btn btn-restore-ui hidden" title="Restore Interface Controls">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+
+      <!-- TOP-LEFT FLOATING ICON STRIP (Declutter, Settings, PiP Window, Overlay Guide, Heatmap, HUD, Whole-Image Zoom) -->
+      <nav class="floating-strip strip-top-left">
+        <!-- Declutter / Hide Entire Interface Button -->
+        <button id="btnDeclutterUi" class="radar-btn" title="Declutter Screen (Hide All Interface Controls)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <button id="btnToggleOptions" class="radar-btn" title="Open System & Settings Screen">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+
+        <!-- PiP Digital Zoom Window Toggle (Uses POI Target Icon) -->
+        <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Show / Hide Digital Zoom Window">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+          </svg>
+        </button>
+
+        <!-- Overlay Guide On/Off Toggle on Top-Left Main Interface -->
+        <button id="btnToggleOverlayTop" class="radar-btn radar-btn-active" title="Toggle Superimposed Overlay Guide On / Off">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" d="M12 2v7M12 15v7M2 12h7M15 12h7M9 10v4M15 10v4M10 9h4M10 15h4"/>
+          </svg>
+        </button>
+
+        <!-- Micro-Change Heatmap Toggle on Main Interface -->
+        <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Localized Micro-Change Heatmap (Ignores Camera Shake)">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+
+        <!-- Voice Announcements (Audio Callouts) On/Off Toggle -->
+        <button id="btnToggleVoiceAnnounce" class="radar-btn radar-btn-muted" title="Voice Announcements: MUTED (Click to Enable)">
+          <!-- Voice Active Icon (Speaker with Radiating Sound Waves) -->
+          <svg id="iconVoiceOn" class="voice-icon hidden" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+          </svg>
+          <!-- Voice Muted Icon (Speaker with Red Diagonal Slash) -->
+          <svg id="iconVoiceMuted" class="voice-icon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"/>
+            <line x1="22" y1="2" x2="2" y2="22" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <button id="btnToggleHud" class="radar-btn" title="Show / Hide Stream Info HUD">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
+          </svg>
+        </button>
+
+        <!-- Whole-Image Zoom Tool at the end of the Top-Left Icons -->
+        <div class="control-pod control-pod-top">
+          <button id="mainZoomMinus" class="radar-btn" title="Zoom Out Whole Image">−</button>
+          <span id="mainZoomBadge" class="zoom-readout">1.0x</span>
+          <button id="mainZoomPlus" class="radar-btn" title="Zoom In Whole Image">+</button>
+          <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan & Zoom">1:1</button>
+        </div>
+      </nav>
+
+      <!-- TOP-RIGHT FLOATING ICON STRIP (RAM Buffer Toggle + Saved Recordings Screen) -->
+      <nav class="floating-strip strip-top-right">
+        <button id="btnToggleBuffer" class="radar-btn radar-btn-active" title="Enable / Disable In-Memory Video Buffer">
+          <span id="bufferDot" class="status-dot"></span>
+          <span id="bufferText">20s RAM</span>
+        </button>
+
+        <button id="btnSwitchScreen" class="radar-btn" title="Open Fullscreen Stored Video Browser">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
+          </svg>
+          <span id="clipCountBadge">0</span>
+        </button>
+      </nav>
+
+      <!-- STREAM TELEMETRY HUD OVERLAY -->
+      <aside id="hudOverlay" class="hidden">
+        <div class="hud-header">
+          <span>STREAM TELEMETRY</span>
+          <span id="hudFps">60 FPS</span>
+        </div>
+        <div class="hud-row"><span class="hud-key">SOURCE:</span><span id="hudSource" class="hud-val">USB CAM</span></div>
+        <div class="hud-row"><span class="hud-key">RES:</span><span id="hudResolution" class="hud-val">1920×1080</span></div>
+        <div class="hud-row"><span class="hud-key">MAIN ZOOM:</span><span id="hudMainZoom" class="hud-val">1.0x</span></div>
+        <div class="hud-row"><span class="hud-key">WIN ZOOM:</span><span id="hudPipZoom" class="hud-val">3.0x</span></div>
+        <div class="hud-row"><span class="hud-key">RAM BUFFER:</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
+      </aside>
+
+      <!-- BOTTOM CONTROL STRIP -->
+      <footer class="strip-bottom">
+        <!-- Left: 5-Button Bluetooth Ring Mode Pill -->
+        <div id="ringHudPill" class="ring-hud-pill" title="5-Button Bluetooth Ring Mode (Tap or press Ring Center button to cycle)">
+          <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
+          <span id="ringActionText" class="ring-action-text">● MODE • ●● REPLAY</span>
+        </div>
+
+        <!-- Center-Left: Quick-Cycle Tool HUD Pill (D-Pad ◀/▶ to cycle tools, ✕ to toggle) -->
+        <div id="quickToolPill" class="quick-tool-pill hidden" title="Cyclic Quick Tool (D-Pad ◀ / ▶ to cycle, ✕ to toggle on/off)">
+          <span id="quickToolBadge" class="quick-tool-badge">HEATMAP</span>
+          <span id="quickToolStatus" class="quick-tool-status status-off">OFF</span>
+          <span class="quick-tool-hint">◀ ▶ CYCLE • ✕ TOGGLE</span>
+        </div>
+
+        <!-- Center: Instant Replay Scrubber Bar -->
+        <div id="replayBar" class="hidden">
+          <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause Instant Replay">⏸</button>
+          <button id="btnReplayStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
+          <button id="btnReplayStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
+          <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" />
+          <span id="replayTimeText" class="slider-val">0.0s / 20.0s</span>
+          <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-active">LIVE</button>
+        </div>
+
+        <!-- Right: Instant Replay (Automatically saves the clip to Archive) -->
+        <div id="replayTriggerPod" class="control-pod" style="margin-left:auto;">
+          <button id="btnReplay20s" class="radar-btn radar-btn-active" title="Instant Playback & Auto-Save Memory Buffer">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
+            </svg>
+            <span id="replayBtnLabel">REPLAY</span>
+          </button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 2: FULLSCREEN STORED VIDEO PLAYER (GUI FLOATING ON TOP)      -->
+    <!-- =================================================================== -->
+    <section id="screenGallery" class="screen-view hidden">
+      <!-- 100% Fullscreen Playback Canvas -->
+      <div class="gallery-fullscreen-stage">
+        <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
+      </div>
+
+      <!-- Top-Left Floating Navigation, Clips Drawer Toggle & Video Playback Zoom Tool -->
+      <nav class="floating-strip strip-top-left">
+        <button id="btnBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+          <span>← LIVE FEED</span>
+        </button>
+
+        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-active" title="Show / Hide Saved Clips List">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+          <span>CLIPS</span>
+        </button>
+
+        <!-- Video Playback Zoom Tool (Zoom & Pan Saved Recordings) -->
+        <div class="control-pod control-pod-top">
+          <button id="galleryZoomMinus" class="radar-btn" title="Zoom Out Recorded Video">−</button>
+          <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
+          <button id="galleryZoomPlus" class="radar-btn" title="Zoom In Recorded Video">+</button>
+          <button id="galleryZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Video Pan & Zoom">1:1</button>
+        </div>
+      </nav>
+
+      <!-- Top-Right Floating Active Clip Telemetry Pill -->
+      <div class="floating-strip strip-top-right">
+        <div class="gallery-info-pill">
+          <span id="activeClipTitle" class="clip-name">NO CLIP SELECTED</span>
+          <span id="activeClipMeta" class="clip-meta">—</span>
+        </div>
+      </div>
+
+      <!-- Collapsible Floating Left Drawer for Saved Clips List -->
+      <aside id="galleryDrawer" class="gallery-floating-drawer">
+        <header class="panel-header" style="cursor:default;">
+          <span class="panel-title">SAVED RECORDINGS</span>
+          <button id="btnCloseGalleryDrawer" class="radar-btn radar-btn-sm" title="Hide Clips List so video is unobstructed">✕</button>
+        </header>
+        <div id="clipsList" class="clips-list-container"></div>
+      </aside>
+
+      <!-- Bottom Floating Full-Width Transport & Export Bar over the Video -->
+      <footer class="strip-bottom">
+        <div class="gallery-transport-bar">
+          <div class="player-btn-group">
+            <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-active">PAUSE ⏸</button>
+            <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
+            <button id="btnGalleryStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">STEP -1</button>
+            <button id="btnGalleryStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">STEP +1</button>
+          </div>
+
+          <div class="gallery-scrubber-wrap">
+            <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider" style="flex:1;" />
+            <span id="galleryTimeReadout" class="slider-val" style="min-width:110px; text-align:right;">0.0s / 0.0s</span>
+          </div>
+
+          <div class="player-btn-group">
+            <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video at Native Resolution (.webm)">EXPORT</button>
+            <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Recording">DELETE</button>
+          </div>
+        </div>
+      </footer>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 3: FULLSCREEN SETTINGS SCREEN                                -->
+    <!-- =================================================================== -->
+    <section id="screenSettings" class="screen-view hidden">
+      <header class="settings-screen-header">
+        <button id="btnSettingsBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+          <span>← LIVE FEED</span>
+        </button>
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span>SYSTEM & SENSOR SETTINGS</span>
+        </span>
+        <div style="display:flex; gap:10px;">
+          <button id="btnOpenControllerScreen" class="radar-btn radar-btn-active" title="Open Dedicated Controller & Key Mapping Screen">
+            <span>🎮 CONTROLLER MAPPING</span>
+          </button>
+          <button id="btnOpenReticleScreen" class="radar-btn radar-btn-active" title="Open Custom Reticle & Click Calibration">
+            <span>🎯 CUSTOM RETICLE</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="settings-screen-body">
+        <div class="settings-screen-grid">
+          <!-- 1. Video Source Selection (USB Webcams & Network RTSP Streams) -->
+          <div class="settings-card" id="cardCameraSource">
+            <div class="settings-card-header">
+              <span class="settings-label">Video Source</span>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button type="button" id="btnSourceModeUsb" class="radar-btn radar-btn-sm radar-btn-active" style="height:26px; font-size:11px; padding:0 8px;">USB CAM</button>
+                <button type="button" id="btnSourceModeRtsp" class="radar-btn radar-btn-sm" style="height:26px; font-size:11px; padding:0 8px;">NETWORK (RTSP)</button>
+                <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" style="height:26px; min-width:28px; padding:0 6px;" title="Rescan Cameras">↻</button>
+              </div>
+            </div>
+
+            <!-- USB Webcam Selection Sub-Panel -->
+            <div id="panelSourceUsb">
+              <select id="cameraSelect" class="radar-select" style="width:100%;"></select>
+            </div>
+
+            <!-- Network RTSP Selection Sub-Panel -->
+            <div id="panelSourceRtsp" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
+              <!-- RTSP Device Preset Tabs -->
+              <div style="display:flex; gap:4px;">
+                <button type="button" id="btnPresetBresser" class="radar-btn radar-btn-sm radar-btn-active" style="flex:1; height:26px; font-size:11px; padding:0 6px;">BRESSER HD CAM</button>
+                <button type="button" id="btnPresetOnvif" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">ONVIF IP CAM</button>
+                <button type="button" id="btnPresetCustom" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">CUSTOM URL</button>
+              </div>
+
+              <!-- Bresser Eyepiece HD Configuration -->
+              <div id="secBresserConfig" style="display:flex; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">BRESSER WI-FI CAMERA</span>
+                  <span id="badgeRtspWake" style="font-family:var(--font-mono); font-size:10px; color:var(--radar-text-muted);">STANDBY</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <input id="inputBresserIp" type="text" value="192.168.0.1" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="192.168.0.1" title="Bresser Eyepiece Camera IP Address" />
+                  <button type="button" id="btnBresserWake" class="radar-btn radar-btn-sm" style="height:30px; padding:0 10px; font-size:11px; font-weight:700;" title="Wake camera DSP media pipeline and connect">⚡ WAKE & CONNECT</button>
+                </div>
+
+                <!-- Stream Resolution Channel Switcher (ch0 Full HD default) -->
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">STREAM RESOLUTION / CHANNEL</label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px;">
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel radar-btn-active" data-channel="ch0" data-label="Bresser (1080p Main)" style="height:26px; font-size:10px; padding:0 4px;">● 1080p (ch0)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch1" data-label="Bresser (540p Sub)" style="height:26px; font-size:10px; padding:0 4px;">○ 540p (ch1)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch2" data-label="Bresser (270p Fast)" style="height:26px; font-size:10px; padding:0 4px;">○ 270p (ch2)</button>
+                  </div>
+                </div>
+
+                <!-- Direct / Editable RTSP Stream URL or Endpoint -->
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">RTSP STREAM URL / ENDPOINT</label>
+                  <div style="display:flex; gap:6px;">
+                    <input id="inputBresserRtspUrl" type="text" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:11px; height:28px;" value="rtsp://192.168.0.1/live/tcp/ch0" placeholder="rtsp://192.168.0.1/live/tcp/ch0" title="Direct RTSP Stream URL or Endpoint (editable for any device)" />
+                    <button type="button" id="btnConnectBresserEndpoint" class="radar-btn radar-btn-sm" style="height:28px; padding:0 8px; font-size:10px; font-weight:700;" title="Connect directly to this RTSP stream URL">CONNECT</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ONVIF IP Camera Configuration -->
+              <div id="secOnvifConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">ONVIF / CCTV STREAM SETTINGS</div>
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px;">
+                  <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Camera IP" />
+                  <input id="inputOnvifPort" type="number" value="554" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="554" />
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                  <input id="inputOnvifUser" type="text" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Username (opt)" />
+                  <input id="inputOnvifPass" type="password" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Password (opt)" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">ONVIF PROFILE / CHANNEL</label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel radar-btn-active" data-path="/onvif1" data-label="ONVIF (Profile 1 - 1080p)" style="height:26px; font-size:10px; padding:0 6px;">● PROFILE 1 (1080p)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel" data-path="/onvif2" data-label="ONVIF (Profile 2 - Sub)" style="height:26px; font-size:10px; padding:0 6px;">○ PROFILE 2 (Sub)</button>
+                  </div>
+                </div>
+                <button type="button" id="btnOnvifConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT ONVIF STREAM</button>
+              </div>
+
+              <!-- Custom RTSP URL Configuration -->
+              <div id="secCustomRtspConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">MANUAL RTSP URL</div>
+                <input id="inputCustomRtspUrl" type="text" value="" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="rtsp://192.168.0.1:554/live/ch0" />
+                <button type="button" id="btnCustomRtspConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT CUSTOM RTSP</button>
+              </div>
+
+              <!-- Connection Status & Gateway Telemetry -->
+              <div id="statusRtspBanner" style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); display:flex; justify-content:space-between; align-items:center; padding:4px 2px;">
+                <span id="textRtspStatus">RTSP GATEWAY: STANDBY</span>
+                <span id="textRtspFps"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Memory Recording</span>
+              <span id="valBufferResolution" class="slider-val" style="font-size:13px;">1920×1080</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Buffer Duration</span>
+                <span id="valBufferDuration" class="slider-val">20s</span>
+              </div>
+              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Frame Rate</span>
+                <span id="valBufferFps" class="slider-val">15 FPS</span>
+              </div>
+              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
+            </div>
+
+            <!-- Live Memory Availability & Requirement Meter -->
+            <div class="memory-meter-box">
+              <div class="memory-meter-labels">
+                <span id="memUsedLabel">USED: 0.0 MB</span>
+                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
+              </div>
+              <div class="memory-bar-track">
+                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
+                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Superimpose Overlay Guide & Reticle Customizer Shortcut -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Overlay & Reticle</span>
+              <button id="btnToggleOverlayQuick" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+            </div>
+            <p style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); margin: 6px 0 12px 0; line-height:1.4;">
+              Graduated reticles, custom optics overlay, FFP lock, opacity, click scale, and geometry are managed in the Reticle Customizer.
+            </p>
+            <button id="btnOpenReticleScreenCard" class="radar-btn radar-btn-sm radar-btn-active" style="width:100%; height:34px; font-weight:700;" title="Open Reticle Customizer">🎯 OPEN RETICLE CUSTOMIZER</button>
+          </div>
+
+          <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration & Female Voice Callout -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Heatmap & Voice</span>
+              <button id="btnToggleHeatmapSpeech" class="radar-btn radar-btn-sm" title="Announce Heatmap Detections via Speech (Clock Direction & Ticks from ROI Target)">VOICE: OFF</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Sensitivity</span>
+                <span id="valHeatmapSens" class="slider-val">60%</span>
+              </div>
+              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Display Duration</span>
+                <div class="duration-custom-controls">
+                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Enter Custom Heatmap Duration in Seconds" />
+                  <span id="valHeatmapDuration" class="slider-val" style="min-width:22px;">s</span>
+                  <button id="btnHeatmapInfinite" class="radar-btn radar-btn-sm" style="height:28px; min-width:34px; padding:0 6px; font-size:14px;" title="Toggle Infinite Heatmap Persistence (∞)">∞</button>
+                </div>
+              </div>
+              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" title="Drag right to 125 for Infinite (∞) or enter any custom seconds above" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Voice Pitch (Female Tone)</span>
+                <span id="valVoicePitch" class="slider-val">1.25x</span>
+              </div>
+              <input id="sliderVoicePitch" type="range" min="0.8" max="1.8" step="0.05" value="1.25" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Voice Speed</span>
+                <span id="valVoiceRate" class="slider-val">1.10x</span>
+              </div>
+              <input id="sliderVoiceRate" type="range" min="0.8" max="1.6" step="0.05" value="1.1" class="radar-slider" />
+            </div>
+
+            <!-- Voice Custom Keywords -->
+            <div class="voice-keywords-container" style="margin-top:10px; padding:10px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+              <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <span>CUSTOM VOICE KEYWORDS</span>
+                <span style="font-size:10px; color:var(--radar-primary);">EDITABLE</span>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div>
+                  <label style="display:block; font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted); margin-bottom:2px;">ALERT PREFIX</label>
+                  <input id="inputVoiceAlertKeyword" type="text" value="Detection" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:28px;" placeholder="e.g. Detection, Contact" title="Word spoken at the beginning of an alert" />
+                </div>
+                <div>
+                  <label style="display:block; font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted); margin-bottom:2px;">UNIT / DISTANCE</label>
+                  <input id="inputVoiceUnitKeyword" type="text" value="clicks" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:28px;" placeholder="e.g. clicks, mils, marks" title="Word spoken after the distance count" />
+                </div>
+              </div>
+              <div style="display:flex; gap:4px; margin-top:8px; flex-wrap:wrap;">
+                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Detection" data-unit="clicks" style="font-size:10px; height:22px; padding:0 6px;">Detection • clicks</button>
+                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Contact" data-unit="mils" style="font-size:10px; height:22px; padding:0 6px;">Contact • mils</button>
+                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Target" data-unit="marks" style="font-size:10px; height:22px; padding:0 6px;">Target • marks</button>
+                <button type="button" class="radar-btn radar-btn-sm btn-voice-preset" data-prefix="Warning" data-unit="units" style="font-size:10px; height:22px; padding:0 6px;">Warning • units</button>
+              </div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <button id="btnTestVoiceSettings" class="radar-btn radar-btn-sm" style="width:100%;" title="Audition female detection announcement">AUDITION: "Detection! 11 o'clock, 3 clicks"</button>
+            </div>
+          </div>
+
+          <!-- 5. Image Manipulation -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Image Adjust</span>
+              <button id="btnResetFilters" class="radar-btn radar-btn-sm">RESET</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Brightness</span>
+                <span id="valBrightness" class="slider-val">100%</span>
+              </div>
+              <input id="sliderBrightness" type="range" min="40" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Contrast</span>
+                <span id="valContrast" class="slider-val">100%</span>
+              </div>
+              <input id="sliderContrast" type="range" min="40" max="220" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Saturation</span>
+                <span id="valSaturation" class="slider-val">100%</span>
+              </div>
+              <input id="sliderSaturation" type="range" min="0" max="200" value="100" class="radar-slider" />
+            </div>
+
+            <div class="overlay-grid">
+              <button id="btnFilterInvert" class="radar-btn radar-btn-sm">INVERT</button>
+              <button id="btnFilterGrayscale" class="radar-btn radar-btn-sm">MONO</button>
+            </div>
+          </div>
+
+          <!-- 7. Interface Theme Color & Global UI Opacity -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Interface Appearance</span>
+              <input id="colorPickerCustom" type="color" value="#f97316" class="theme-color-input" title="Pick Custom Interface Color" />
+            </div>
+            <div class="swatch-row">
+              <button class="theme-swatch active" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+              <button class="theme-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+              <button class="theme-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+              <button class="theme-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #94a3b8;" title="White"></button>
+              <button class="theme-swatch" data-color="#000000" style="background:#000000; border:1px solid #475569;" title="Black"></button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Interface Opacity</span>
+                <span id="valUiOpacity" class="slider-val">100%</span>
+              </div>
+              <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 8. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">BT Ring Remote</span>
+              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
+            </div>
+            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
+            <div class="ring-dpad-grid">
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
+              <div></div>
+              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
+              <div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 4: FULLSCREEN RETICLE CUSTOMIZER & CALIBRATION SCREEN        -->
+    <!-- =================================================================== -->
+    <section id="screenReticle" class="screen-view hidden">
+      <header class="reticle-screen-header">
+        <button id="btnReticleBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+          <span>← LIVE FEED</span>
+        </button>
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9"/>
+            <path stroke-linecap="round" d="M12 3v4M12 17v4M3 12h4M17 12h4"/>
+          </svg>
+          <span>RETICLE CUSTOMIZER & CLICK CALIBRATION</span>
+        </span>
+        <div style="display:flex; gap:10px;">
+          <button id="btnResetReticle" class="radar-btn radar-btn-sm" title="Reset Reticle to Default 10-Click Preset">RESET PRESET</button>
+          <button id="btnReticleToSettings" class="radar-btn radar-btn-active" title="Return to Settings Screen">⚙ SETTINGS</button>
+        </div>
+      </header>
+
+      <div class="reticle-workspace">
+        <!-- Interactive Full Reticle Preview Stage -->
+        <div id="reticlePreviewStage" class="reticle-stage-area" title="Click anywhere on the preview to test speech announcement">
+          <!-- Real-Time Gamepad Action Toast / OSD Pill -->
+          <div id="reticleGamepadToast" class="reticle-gamepad-toast hidden">
+            <span id="reticleToastText">CLICKS PER ARM: 10</span>
+          </div>
+
+          <svg id="reticlePreviewSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <img id="reticlePreviewImg" class="hidden" alt="Custom Reticle Preview" style="max-width:90%; max-height:90%; object-fit:contain; pointer-events:none;" />
+
+          <!-- Interactive Controller Legend Strip -->
+          <div class="reticle-gamepad-legend">
+            <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK / D-PAD</kbd> SELECT & ADJUST</span>
+            <span class="gp-leg-pill" data-leg="rstick"><kbd>R-STICK</kbd> GAP / WEIGHT</span>
+            <span class="gp-leg-pill" data-leg="square"><kbd>▢</kbd> RINGS</span>
+            <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
+            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> TOGGLE / AUDITION</span>
+            <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
+            <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> MOUSE CLICK</span>
+            <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> LIVE FEED</span>
+          </div>
+
+          <div class="reticle-stage-hint">TAP PREVIEW OR USE JOYSTICK / BUTTONS TO SCULPT CROSSHAIR</div>
+        </div>
+
+        <!-- Customization Drawer -->
+        <aside class="reticle-sidebar-drawer">
+          <!-- 1. Overlay Master & Optics Calibration (Merged from settings) -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Overlay Reticle</span>
+              <button id="btnToggleOverlay" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+            </div>
+
+            <div class="overlay-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:8px;">
+              <button data-ov="crosshair" class="ov-btn radar-btn radar-btn-active">RETICLE</button>
+              <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">LOAD IMG</button>
+            </div>
+            <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
+
+            <div class="slider-group" style="margin-bottom:10px;">
+              <div class="slider-header">
+                <span>First Focal Plane (FFP) Lock</span>
+                <button id="btnToggleReticleFfp" class="radar-btn radar-btn-sm radar-btn-active" style="min-width:110px;" title="Scale reticle in lockstep with whole-image digital zoom (FFP)">FFP: ON</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Opacity</span>
+                <span id="valOvOpacity" class="slider-val">75%</span>
+              </div>
+              <input id="sliderOvOpacity" type="range" min="10" max="100" value="75" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Reticle Scale</span>
+                <span id="valOvScale" class="slider-val">100%</span>
+              </div>
+              <input id="sliderOvScale" type="range" min="25" max="200" step="1" value="100" class="radar-slider" />
+            </div>
+
+            <div class="slider-group" style="margin-top:10px;">
+              <div class="slider-header">
+                <span>Reticle Color Theme</span>
+              </div>
+              <div class="theme-swatches-grid" style="display:flex; gap:6px; margin-top:4px;">
+                <button type="button" class="theme-swatch theme-swatch-reticle active" data-color="#f97316" style="background:#f97316;" title="Tactical Orange"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#22c55e" style="background:#22c55e;" title="Night Vision Green"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ef4444" style="background:#ef4444;" title="Infrared Red"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#3b82f6" style="background:#3b82f6;" title="Precision Blue"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ffffff" style="background:#ffffff;" title="High Contrast White"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#000000" style="background:#000000; border:1px solid #444;" title="Stealth Black"></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Click Geometry -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Click Geometry</span>
+              <button id="btnTestCallout" class="radar-btn radar-btn-sm radar-btn-active" title="Audition Sample Speech Callout">AUDITION</button>
+            </div>
+            <div id="calloutTestText" class="ring-signal-readout">READY (CLICK PREVIEW OR TAP AUDITION)</div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Clicks Per Arm</span>
+                <span id="valReticleClicks" class="slider-val">10 clicks</span>
+              </div>
+              <input id="sliderReticleClicks" type="range" min="2" max="30" step="1" value="10" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Click Spacing</span>
+                <span id="valReticleSpacing" class="slider-val">32 px</span>
+              </div>
+              <input id="sliderReticleSpacing" type="range" min="4" max="100" step="1" value="8" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Gap (POI View)</span>
+                <span id="valReticleGap" class="slider-val">64 px</span>
+              </div>
+              <input id="sliderReticleGap" type="range" min="0" max="140" step="1" value="64" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Point Style</span>
+                <span id="valReticleCenter" class="slider-val">EMPTY</span>
+              </div>
+              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-top:6px;">
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" title="Unobstructed open center gap">EMPTY</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" title="Sharp precision center aiming dot">DOT</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" title="Fine center intersection mini-crosshair">CROSS</button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" title="Inverted caret pointing directly to dead-center pixel">CHEVRON</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Markings & Accents</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Center Brackets</span>
+                <button id="btnToggleReticleBrackets" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Major Tick Interval</span>
+                <span id="valReticleMajor" class="slider-val">EVERY 5</span>
+              </div>
+              <input id="sliderReticleMajor" type="range" min="0" max="10" step="1" value="5" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Number Labels</span>
+                <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Concentric Rings</span>
+                <button id="btnToggleReticleRings" class="radar-btn radar-btn-sm">OFF</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Stroke Weight</span>
+                <span id="valReticleStroke" class="slider-val">1.8 px</span>
+              </div>
+              <input id="sliderReticleStroke" type="range" min="0.5" max="5.0" step="0.1" value="1.8" class="radar-slider" />
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 5: FULLSCREEN CONTROLLER & KEY MAPPING CONFIGURATOR          -->
+    <!-- =================================================================== -->
+    <section id="screenController" class="screen-view hidden">
+      <header class="controller-screen-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button id="btnControllerBackToLive" class="radar-btn radar-btn-active" title="Return to Live Camera Stream">
+            <span>← LIVE FEED</span>
+          </button>
+          <button id="btnControllerBackToSettings" class="radar-btn" title="Return to General Settings Screen">
+            <span>⚙ SETTINGS</span>
+          </button>
+        </div>
+
+        <span class="settings-screen-title">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="6" width="20" height="12" rx="4"/>
+            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
+          </svg>
+          <span>CONTROLLER & KEY MAPPING CONFIGURATOR</span>
+        </span>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <label style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">PROFILE:</label>
+          <select id="selectControllerProfile" class="radar-select" style="min-width:160px; height:30px; font-size:12px;">
+            <option value="default">Default DualShock 4</option>
+            <option value="simplified">Simplified Field Mode</option>
+            <option value="flight">Flight / Arcade Stick</option>
+          </select>
+          <button id="btnResetControllerBindings" class="radar-btn radar-btn-sm" title="Reset all mappings and stick calibration to factory default">RESET DEFAULTS</button>
+        </div>
+      </header>
+
+      <!-- Feedback Toast Banner -->
+      <div id="cmToastBanner" class="cm-toast-banner hidden">READY</div>
+
+      <!-- Real-Time Hardware Signal & Action Readout -->
+      <div id="cmLiveActionBanner" class="cm-live-banner">READY (PRESS ANY CONTROLLER BUTTON, TRIGGER, STICK OR KEY TO TEST)</div>
+
+      <!-- Device Selector Sub-Tabs (Gamepad vs 7-Button Remote) -->
+      <div class="cm-tab-bar">
+        <button id="tabBtnGamepad" class="cm-tab-btn active" title="Gamepad & Joystick Configurator">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="4"/>
+            <path stroke-linecap="round" d="M6 12h4M8 10v4M15 11h.01M18 13h.01"/>
+          </svg>
+          <span>GAMEPAD / JOYSTICK</span>
+        </button>
+        <button id="tabBtnRemote" class="cm-tab-btn" title="7-Button Wireless Bluetooth Remote / Ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="2" width="12" height="20" rx="3"/>
+            <circle cx="12" cy="10" r="3.5"/>
+            <circle cx="9.5" cy="17" r="1.2"/>
+            <circle cx="14.5" cy="17" r="1.2"/>
+          </svg>
+          <span>7-BTN BLUETOOTH REMOTE / RING</span>
+        </button>
+      </div>
+
+      <div class="controller-screen-body">
+        <!-- TAB 1: GAMEPAD / JOYSTICK WORKSPACE -->
+        <div id="viewGamepadConfig" class="cm-view-tab">
+          <div class="controller-workspace-grid">
+          <!-- Left Column: Visual Controller Representation & Stick Calibration -->
+          <div class="cm-hardware-col">
+            <!-- 1. Interactive Visual Controller Diagram & Live Monitoring -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <span class="settings-label">Live Controller Monitor</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span id="gamepadStatusDot" class="gamepad-dot"></span>
+                  <span id="gamepadStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">DISCONNECTED</span>
+                  <button id="btnConnectWebHID" class="radar-btn radar-btn-sm radar-btn-active" style="height:24px; padding:0 8px; font-size:11px;" title="Connect Bluetooth PS4 Controller directly via Chrome WebHID">PAIR PS4 BT</button>
+                  <button id="btnDetectGamepad" class="radar-btn radar-btn-sm" style="height:24px; padding:0 6px; font-size:11px;" title="Scan for USB / XInput Gamepads">SCAN</button>
+                </div>
+              </div>
+
+              <!-- Controller Hardware Schematic Box -->
+              <div class="cm-controller-box">
+                <!-- Top Shoulders & Triggers -->
+                <div class="cm-row-triggers">
+                  <div class="cm-visual-btn cm-btn-trigger" data-gp="l2"><span class="cm-badge-lbl">L2 TRIGGER</span></div>
+                  <div class="cm-visual-btn cm-btn-bumper" data-gp="l1"><span class="cm-badge-lbl">L1</span></div>
+                  <div style="flex:1;"></div>
+                  <div class="cm-visual-btn cm-btn-bumper" data-gp="r1"><span class="cm-badge-lbl">R1</span></div>
+                  <div class="cm-visual-btn cm-btn-trigger" data-gp="r2"><span class="cm-badge-lbl">R2 TRIGGER</span></div>
+                </div>
+
+                <!-- Main Controller Body: D-Pad, Touchpad & Action Buttons -->
+                <div class="cm-row-middle">
+                  <!-- D-Pad Cluster -->
+                  <div class="cm-dpad-cluster">
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-up">▲</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-left">◀</div>
+                    <div class="cm-dpad-center"></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-right">▶</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-dpad-key" data-gp="dpad-down">▼</div>
+                    <div></div>
+                  </div>
+
+                  <!-- Center Touchpad & System Buttons -->
+                  <div class="cm-center-cluster">
+                    <div class="cm-row-system">
+                      <div class="cm-visual-btn cm-btn-system" data-gp="share">SHARE</div>
+                      <div class="cm-visual-btn cm-btn-touchpad" data-gp="touchpad">
+                        <span>TOUCHPAD (VIRTUAL MOUSE)</span>
+                      </div>
+                      <div class="cm-visual-btn cm-btn-system" data-gp="options">OPTIONS</div>
+                    </div>
+                    <div class="cm-row-ps">
+                      <div class="cm-visual-btn cm-btn-ps" data-gp="ps">PS</div>
+                    </div>
+                  </div>
+
+                  <!-- Face Action Buttons Cluster -->
+                  <div class="cm-face-cluster">
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="triangle">△</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="square">▢</div>
+                    <div class="cm-face-center"></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="circle">◯</div>
+                    <div></div>
+                    <div class="cm-visual-btn cm-face-key" data-gp="cross">✕</div>
+                    <div></div>
+                  </div>
+                </div>
+
+                <!-- Dual Analog Sticks (L3 / R3) -->
+                <div class="cm-row-sticks">
+                  <div class="cm-stick-pod">
+                    <div class="cm-visual-btn cm-stick-ring" data-gp="l3">
+                      <div class="cm-stick-thumb" id="cmLeftThumb">L3</div>
+                    </div>
+                    <span class="cm-stick-lbl">LEFT STICK (AIM)</span>
+                  </div>
+                  <div class="cm-stick-pod">
+                    <div class="cm-visual-btn cm-stick-ring" data-gp="r3">
+                      <div class="cm-stick-thumb" id="cmRightThumb">R3</div>
+                    </div>
+                    <span class="cm-stick-lbl">RIGHT STICK (PAN/ZOOM)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Stick & Touchpad Fine Calibration -->
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <span class="settings-label">Analog Stick & Touchpad Tuning</span>
+                <span class="slider-val" style="font-size:11px;">PRECISION CURVE</span>
+              </div>
+
+              <!-- Reticle Aim Speed -->
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Reticle Aim Speed (Left Stick)</span>
+                  <span id="valControllerAimSpeed" class="slider-val">50%</span>
+                </div>
+                <input id="sliderControllerAimSpeed" type="range" min="15" max="150" step="5" value="50" class="radar-slider" title="Adjust joystick movement speed for the primary reticle (50% is default precision speed)" />
+              </div>
+
+              <!-- Left Stick Deadzone & Invert -->
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Left Stick Deadzone</span>
+                  <span id="valLeftStickDeadzone" class="slider-val">16%</span>
+                </div>
+                <input id="sliderLeftStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" title="Adjust stick center deadzone to prevent stick drift" />
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Left Stick Y-Axis</span>
+                  <button id="btnToggleInvertLeftY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
+                </div>
+              </div>
+
+              <!-- Right Stick Deadzone & Invert -->
+              <div class="slider-group" style="margin-top:10px;">
+                <div class="slider-header">
+                  <span>Right Stick Deadzone</span>
+                  <span id="valRightStickDeadzone" class="slider-val">16%</span>
+                </div>
+                <input id="sliderRightStickDeadzone" type="range" min="5" max="30" step="1" value="16" class="radar-slider" />
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Right Stick Y-Axis</span>
+                  <button id="btnToggleInvertRightY" class="radar-btn radar-btn-sm" style="min-width:120px;">NORMAL (OFF)</button>
+                </div>
+              </div>
+
+              <!-- Touchpad Sensitivity -->
+              <div class="slider-group" style="margin-top:10px;">
+                <div class="slider-header">
+                  <span>Touchpad Virtual Mouse Sensitivity</span>
+                  <span id="valControllerTouchpadSens" class="slider-val">50%</span>
+                </div>
+                <input id="sliderControllerTouchpadSens" type="range" min="15" max="150" step="5" value="50" class="radar-slider" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Interactive Key & Controller Mapping Matrix -->
+          <div class="cm-mapping-col">
+            <div class="settings-card" style="display:flex; flex-direction:column; height:100%;">
+              <div class="settings-card-header">
+                <span class="settings-label">Action Mapping Matrix</span>
+                <span style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">CLICK REBIND TO CHANGE</span>
+              </div>
+
+              <!-- Functional Category Filter Bar -->
+              <div class="cm-category-bar">
+                <button class="radar-btn radar-btn-sm mapping-cat-btn radar-btn-active" data-cat="all">ALL ACTIONS</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="optics">OPTICS & SIGHT</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="vision">VISION & HEATMAP</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="recording">RECORDING & REPLAY</button>
+                <button class="radar-btn radar-btn-sm mapping-cat-btn" data-cat="system">SYSTEM & MOUSE</button>
+              </div>
+
+              <!-- Mapping Table Container with Sticky Header -->
+              <div class="cm-table-wrap">
+                <table class="cm-mapping-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 44%;">APPLICATION ACTION</th>
+                      <th style="width: 28%;">CONTROLLER BINDING</th>
+                      <th style="width: 20%;">KEYBOARD KEY</th>
+                      <th style="width: 8%; text-align:center;">RESET</th>
+                    </tr>
+                  </thead>
+                  <tbody id="controllerMappingTableBody">
+                    <!-- Dynamically populated by controllerScreen.js -->
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="cm-table-footer-hint">
+                💡 <b>TIP:</b> Click any <b>BINDING</b> button, then press any button, trigger, or stick on your controller to rebind. Press <kbd>ESC</kbd> to cancel.
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <!-- TAB 2: 7-BUTTON BLUETOOTH REMOTE / RING WORKSPACE -->
+        <div id="viewRemoteConfig" class="cm-view-tab hidden">
+          <div class="controller-workspace-grid">
+            <!-- Left Column: Visual Remote Representation & Live Signal Diagnostics -->
+            <div class="cm-hardware-col">
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <span class="settings-label">Live Remote Monitor</span>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span id="remoteStatusDot" class="gamepad-dot" style="background:#10B981; box-shadow:0 0 8px #10B981;"></span>
+                    <span id="remoteStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">BLUETOOTH HID LISTENING</span>
+                  </div>
+                </div>
+
+                <!-- Remote Hardware Schematic Box -->
+                <div class="remote-device-box">
+                  <svg class="remote-device-svg" viewBox="0 0 280 330" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Type-C Port at Top -->
+                    <rect x="110" y="6" width="60" height="10" rx="4" fill="#0A0A0C" stroke="#3F3F46" stroke-width="1.5"/>
+
+                    <!-- Main Remote Body -->
+                    <rect x="15" y="20" width="250" height="295" rx="38" fill="#1C1D22" stroke="#2C2D35" stroke-width="3"/>
+                    <rect x="22" y="27" width="236" height="281" rx="32" fill="#141518" stroke="#1F2026" stroke-width="1"/>
+
+                    <!-- Top LED Status Indicator -->
+                    <circle id="remoteLedDot" class="remote-led-dot" cx="54" cy="74" r="5" fill="#3F3F46" stroke="#27272A" stroke-width="1"/>
+                    <text x="54" y="90" fill="#71717A" font-family="monospace" font-size="7" text-anchor="middle">LED</text>
+
+                    <!-- Center Action Button (Play / Pause / Lock) -->
+                    <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
+                      <circle cx="140" cy="132" r="26" fill="#2B2C33" stroke="#3E3F4A" stroke-width="2"/>
+                      <polygon points="132,125 132,139 142,132" fill="#F8FAFC"/>
+                      <line x1="145" y1="125" x2="145" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
+                      <line x1="149" y1="125" x2="149" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
+                    </g>
+
+                    <!-- D-Pad Directional Cluster (Radial symmetry, uniform 8px gap) -->
+                    <!-- Up Sector Button -->
+                    <g id="rBtnUP" class="remote-visual-btn" data-remote-act="UP">
+                      <path d="M 100.0 77.0 A 68 68 0 0 1 180.0 77.0 L 160.0 104.5 A 34 34 0 0 0 120.0 104.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,75 134,84 146,84" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Down Sector Button -->
+                    <g id="rBtnDOWN" class="remote-visual-btn" data-remote-act="DOWN">
+                      <path d="M 180.0 187.0 A 68 68 0 0 1 100.0 187.0 L 120.0 159.5 A 34 34 0 0 0 160.0 159.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,189 134,180 146,180" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Left Sector Button -->
+                    <g id="rBtnLEFT" class="remote-visual-btn" data-remote-act="LEFT">
+                      <path d="M 85.0 172.0 A 68 68 0 0 1 85.0 92.0 L 112.5 112.0 A 34 34 0 0 0 112.5 152.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="83,132 92,126 92,138" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Right Sector Button -->
+                    <g id="rBtnRIGHT" class="remote-visual-btn" data-remote-act="RIGHT">
+                      <path d="M 195.0 92.0 A 68 68 0 0 1 195.0 172.0 L 167.5 152.0 A 34 34 0 0 0 167.5 112.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="197,132 188,126 188,138" fill="#E2E8F0"/>
+                    </g>
+
+                    <!-- Bottom Left Button (⏻ 1 - Instant Replay) -->
+                    <g id="rBtnBTN1" class="remote-visual-btn" data-remote-act="BTN1">
+                      <circle cx="86" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
+                      <!-- Vector Power Symbol -->
+                      <path d="M 86 238 L 86 245 M 80.5 242 A 6.5 6.5 0 1 0 91.5 242" stroke="#FF8533" stroke-width="2" fill="none" stroke-linecap="round"/>
+                      <text x="86" y="265" fill="#E2E8F0" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">1</text>
+                      <text x="86" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">REPLAY</text>
+                    </g>
+
+                    <!-- Bottom Right Button (2 - Mode Switcher) -->
+                    <g id="rBtnBTN2" class="remote-visual-btn" data-remote-act="BTN2">
+                      <circle cx="194" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
+                      <text x="194" y="258" fill="#F8FAFC" font-family="monospace" font-size="20" font-weight="bold" text-anchor="middle">2</text>
+                      <text x="194" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">MODE</text>
+                    </g>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Live Remote State Card -->
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <span class="settings-label">Remote State & Optics Status</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px; font-size:12px; font-family:var(--font-mono);">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">ACTIVE REMOTE MODE:</span>
+                    <button id="btnCycleRemoteModeTab" class="remote-mode-pill" title="Click to cycle remote mode">[ 1/3 PAN VIEW ]</button>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">FFP RETICLE SYNC:</span>
+                    <button id="btnToggleFfpTab" class="radar-btn radar-btn-sm" title="Toggle First Focal Plane Lock">LOCKED 🔒</button>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:var(--radar-text-muted);">LAST RAW SIGNAL:</span>
+                    <span id="remoteLastSignalText" style="color:var(--radar-primary); font-weight:700;">READY (PRESS ANY REMOTE BUTTON)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Mapping & Calibration Table + Cheatsheet -->
+            <div class="cm-mapping-col">
+              <div class="settings-card" style="flex:1; display:flex; flex-direction:column;">
+                <div class="settings-card-header">
+                  <span class="settings-label">7-Button Remote Calibration & Action Table</span>
+                  <button id="btnResetRemoteTabMap" class="radar-btn radar-btn-sm" title="Reset remote bindings to defaults">RESET REMOTE DEFAULTS</button>
+                </div>
+
+                <div class="cm-table-wrap">
+                  <table class="cm-mapping-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 22%;">PHYSICAL BUTTON</th>
+                        <th style="width: 44%;">DISCRETE ONE-FINGER FUNCTION</th>
+                        <th style="width: 18%;">BOUND HID KEY</th>
+                        <th style="width: 16%; text-align:center;">CALIBRATE</th>
+                      </tr>
+                    </thead>
+                    <tbody id="remoteMappingTableBody">
+                      <!-- Dynamically rendered by controllerScreen.js -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Field Quick Reference Cheatsheet -->
+                <div class="remote-quick-guide-grid">
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">① [PAN VIEW] MODE</div>
+                    <div>• <b>▲▼◀▶</b> Pan live camera feed</div>
+                    <div>• <b>● CENTER</b> Re-center pan (0,0)</div>
+                    <div>• <b>BTN 1</b> Instant Replay in/out</div>
+                    <div>• <b>BTN 2</b> Switch to ZOOM VIEW</div>
+                  </div>
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">② [ZOOM VIEW] MODE</div>
+                    <div>• <b>▲ / ▼</b> Zoom live stream (±0.25x)</div>
+                    <div>• <b>◀ / ▶</b> Coarse zoom step (±0.5x)</div>
+                    <div>• <b>● CENTER</b> Reset zoom to 1.0x (1:1)</div>
+                    <div>• <i>(FFP auto-scales reticle with zoom)</i></div>
+                  </div>
+                  <div class="remote-guide-card">
+                    <div class="remote-guide-card-title">③ [RETICLE CAL] MODE</div>
+                    <div>• <b>▲ / ▼</b> Fine spacing (±1px)</div>
+                    <div>• <b>◀ / ▶</b> Coarse spacing (±5px)</div>
+                    <div>• <b>● CENTER</b> <b>LOCK / UNLOCK FFP 🔒</b></div>
+                    <div>• <b>BTN 2</b> Return to PAN VIEW</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- PS4 Touchpad Virtual Mouse Pointer -->
+  <div id="spotrVirtualMouse" class="spotr-virtual-mouse hidden" aria-hidden="true">
+    <div class="vm-ring"></div>
+    <div class="vm-dot"></div>
+  </div>
+
+  <script type="module" src="./js/main.js?v=41"></script>
+</body>
+</html>
