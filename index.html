@@ -608,9 +608,9 @@
             <div class="slider-group">
               <div class="slider-header">
                 <span>Voice Speed</span>
-                <span id="valVoiceRate" class="slider-val">1.10x</span>
+                <span id="valVoiceRate" class="slider-val">0.80x</span>
               </div>
-              <input id="sliderVoiceRate" type="range" min="0.8" max="1.6" step="0.05" value="1.1" class="radar-slider" />
+              <input id="sliderVoiceRate" type="range" min="0.6" max="1.0" step="0.1" value="0.8" class="radar-slider" />
             </div>
 
             <!-- Voice Custom Keywords -->
@@ -763,8 +763,8 @@
             <span class="gp-leg-pill" data-leg="lstick"><kbd>L-STICK / D-PAD</kbd> SELECT & ADJUST</span>
             <span class="gp-leg-pill" data-leg="rstick"><kbd>R-STICK</kbd> GAP / WEIGHT</span>
             <span class="gp-leg-pill" data-leg="square"><kbd>▢</kbd> RINGS</span>
-            <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> BRACKETS</span>
-            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> TOGGLE / AUDITION</span>
+            <span class="gp-leg-pill" data-leg="tri"><kbd>△</kbd> TOGGLE RETICLE</span>
+            <span class="gp-leg-pill" data-leg="cross"><kbd>✕</kbd> SELECT / TEST</span>
             <span class="gp-leg-pill" data-leg="bumpers"><kbd>L1/R1</kbd> CLICKS</span>
             <span class="gp-leg-pill" data-leg="triggers"><kbd>L2/R2</kbd> MOUSE CLICK</span>
             <span class="gp-leg-pill" data-leg="circle"><kbd>◯</kbd> LIVE FEED</span>
@@ -851,9 +851,12 @@
             <div class="slider-group">
               <div class="slider-header">
                 <span>Center Gap (POI View)</span>
-                <span id="valReticleGap" class="slider-val">64 px</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <input id="inputReticleGap" type="number" min="0" max="280" step="1" value="64" class="radar-num-input" style="width:58px; height:24px; text-align:center; padding:2px 4px; font-size:11px;" title="Manual pixel input for center gap (0 - 280)" />
+                  <span id="valReticleGap" class="slider-val">64 px</span>
+                </div>
               </div>
-              <input id="sliderReticleGap" type="range" min="0" max="140" step="1" value="64" class="radar-slider" />
+              <input id="sliderReticleGap" type="range" min="0" max="280" step="1" value="64" class="radar-slider" />
             </div>
 
             <div class="slider-group">
@@ -898,24 +901,10 @@
 
             <div class="slider-group">
               <div class="slider-header">
-                <span>Center Brackets</span>
-                <button id="btnToggleReticleBrackets" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-              </div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
                 <span>Major Tick Interval</span>
                 <span id="valReticleMajor" class="slider-val">EVERY 5</span>
               </div>
               <input id="sliderReticleMajor" type="range" min="0" max="10" step="1" value="5" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Number Labels</span>
-                <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-              </div>
             </div>
 
             <div class="slider-group">

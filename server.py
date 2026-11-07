@@ -45,10 +45,12 @@ class RtspSession:
 
     def start(self, url, transport="tcp"):
         with self.lock:
+            # Only reuse if actively streaming frames within the last 1.5 seconds
             if self.is_running and self.active_url == url:
-                return True
+                if self.latest_frame_time and (time.time() - self.latest_frame_time < 1.5):
+                    return True
 
-        # Stop previous session cleanly without deadlock
+        # Stop previous session cleanly without deadlock and release camera hardware socket
         self.stop()
 
         with self.lock:
@@ -81,13 +83,23 @@ class RtspSession:
 
             frame_count = 0
             fps_timer = time.time()
+            consecutive_failures = 0
 
             while self.is_running:
                 # Grab frame directly with minimal latency
                 ret = cap.grab()
                 if not ret:
+                    consecutive_failures += 1
+                    if consecutive_failures > 500:  # ~2.5s of consecutive grab failures -> stream dead
+                        print(f"[-] [RTSP Gateway] Grab timeout / stream stalled on {url}")
+                        with self.lock:
+                            self.error_message = "Camera stream timed out or stalled."
+                            self.is_running = False
+                        break
                     time.sleep(0.005)
                     continue
+
+                consecutive_failures = 0
 
                 ret, frame = cap.retrieve()
                 if not ret or frame is None:
@@ -199,6 +211,9 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
         trigger_path = query.get('path', ['/app/getmediainfo'])[0].strip()
         if not trigger_path.startswith('/'):
             trigger_path = '/' + trigger_path
+
+        # Stop any existing RTSP session to ensure port 554 is completely free
+        rtsp_session.stop()
 
         trigger_url = f"http://{ip}{trigger_path}"
         print(f"[*] [RTSP Gateway] Triggering camera wake-up: {trigger_url}...")
@@ -338,6 +353,9 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
             pass
         except Exception as e:
             print(f"[!] [RTSP Gateway] Client disconnected: {e}")
+        finally:
+            print("[*] [RTSP Gateway] Client disconnected, releasing RTSP camera session...")
+            rtsp_session.stop()
 
     def send_json_response(self, code, obj):
         data = json.dumps(obj).encode('utf-8')

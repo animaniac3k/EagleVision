@@ -4,15 +4,17 @@
  * Provides interactive real-time customization of the main graduated reticle:
  * - Number of indents/clicks per arm (top, bottom, left, right)
  * - Click spacing (distance between clicks in SVG/pixel units)
- * - Center gap size (unobstructed area for the point of interest)
- * - Click number labels (1, 2, 3... or 5, 10)
+ * - Center gap size (unobstructed area for the point of interest) up to 280px with slider + manual input
+ * - Center point style (Empty, Dot, Cross, Chevron)
  * - Concentric range rings
+ * - Reticle color theme (Orange, Green, Red, Blue, White, Black)
  * - Interactive test click on preview stage to audition voice callouts
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
-import { buildGraduatedCrosshairSvg, getClickDistanceInPixels, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from '../renderer/overlayManager.js';
+import { buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from '../renderer/overlayManager.js';
 import { speakDetectionAnnouncement } from '../renderer/compositor.js';
+import { applyThemeColor } from './sidebarControls.js';
 
 export function initReticleScreen() {
   const screenReticle = document.getElementById('screenReticle');
@@ -34,19 +36,19 @@ export function initReticleScreen() {
   const sliderOvScale = document.getElementById('sliderOvScale');
   const valOvScale = document.getElementById('valOvScale');
 
-  // Control inputs
+  // Card 2: Control inputs
   const sliderClicks = document.getElementById('sliderReticleClicks');
   const valClicks = document.getElementById('valReticleClicks');
   const sliderSpacing = document.getElementById('sliderReticleSpacing');
   const valSpacing = document.getElementById('valReticleSpacing');
   const sliderGap = document.getElementById('sliderReticleGap');
+  const inputGap = document.getElementById('inputReticleGap');
   const valGap = document.getElementById('valReticleGap');
   const valCenter = document.getElementById('valReticleCenter');
-  const centerBtns = document.querySelectorAll('.center-style-btn');
-  const btnBrackets = document.getElementById('btnToggleReticleBrackets');
+
+  // Card 3: Markings
   const sliderMajor = document.getElementById('sliderReticleMajor');
   const valMajor = document.getElementById('valReticleMajor');
-  const btnLabels = document.getElementById('btnToggleReticleLabels');
   const btnRings = document.getElementById('btnToggleReticleRings');
   const sliderStroke = document.getElementById('sliderReticleStroke');
   const valStroke = document.getElementById('valReticleStroke');
@@ -56,8 +58,18 @@ export function initReticleScreen() {
     const op = (appState.overlayOpacity ?? 75) / 100;
     const sc = (appState.overlayScale ?? 100) / 100;
 
-    if (appState.overlayType === 'custom' && appState.customOverlayUrl && previewImg) {
-      if (previewSvg) previewSvg.classList.add('hidden');
+    // Overlay On/Off state directly governs stage visibility
+    if (!appState.overlayEnabled) {
+      if (previewSvg) {
+        previewSvg.classList.add('hidden');
+        previewSvg.innerHTML = '';
+      }
+      if (previewImg) previewImg.classList.add('hidden');
+    } else if (appState.overlayType === 'custom' && appState.customOverlayUrl && previewImg) {
+      if (previewSvg) {
+        previewSvg.classList.add('hidden');
+        previewSvg.innerHTML = '';
+      }
       previewImg.classList.remove('hidden');
       if (previewImg.src !== appState.customOverlayUrl) {
         previewImg.src = appState.customOverlayUrl;
@@ -97,6 +109,10 @@ export function initReticleScreen() {
     document.querySelectorAll('.ov-btn').forEach(b => {
       b.classList.toggle('radar-btn-active', b.dataset.ov === (appState.overlayType || 'crosshair'));
     });
+    document.querySelectorAll('.theme-swatch-reticle').forEach(sw => {
+      const isSel = (sw.dataset.color || '').toLowerCase() === (appState.themeColor || '#f97316').toLowerCase();
+      sw.classList.toggle('active', isSel);
+    });
 
     const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
     const maxFittingStep = Math.max(8, Math.floor(240 / clicks));
@@ -112,10 +128,17 @@ export function initReticleScreen() {
       sliderSpacing.value = String(effStep);
       valSpacing.textContent = `${effStep} px`;
     }
-    if (sliderGap && valGap) {
-      sliderGap.value = String(cfg.centerGap ?? 64);
-      valGap.textContent = `${cfg.centerGap ?? 64} px`;
+    const gapVal = Math.max(0, Math.min(280, Number(cfg.centerGap ?? 64)));
+    if (sliderGap) {
+      sliderGap.value = String(gapVal);
     }
+    if (inputGap) {
+      inputGap.value = String(gapVal);
+    }
+    if (valGap) {
+      valGap.textContent = `${gapVal} px`;
+    }
+
     const activeCenter = String(cfg.centerStyle || 'empty').toLowerCase();
     if (valCenter) {
       valCenter.textContent = activeCenter.toUpperCase();
@@ -124,17 +147,10 @@ export function initReticleScreen() {
       const isSel = (btn.dataset.center || '').toLowerCase() === activeCenter;
       btn.classList.toggle('radar-btn-active', isSel);
     });
-    if (btnBrackets) {
-      btnBrackets.textContent = cfg.innerBrackets ? 'ON' : 'OFF';
-      btnBrackets.classList.toggle('radar-btn-active', Boolean(cfg.innerBrackets));
-    }
+
     if (sliderMajor && valMajor) {
       sliderMajor.value = String(cfg.majorInterval ?? 5);
       valMajor.textContent = cfg.majorInterval === 0 ? 'NONE' : `EVERY ${cfg.majorInterval}`;
-    }
-    if (btnLabels) {
-      btnLabels.textContent = cfg.showLabels ? 'ON' : 'OFF';
-      btnLabels.classList.toggle('radar-btn-active', Boolean(cfg.showLabels));
     }
     if (btnRings) {
       btnRings.textContent = cfg.concentricRings ? 'ON' : 'OFF';
@@ -161,11 +177,9 @@ export function initReticleScreen() {
     { key: 'overlayScale', label: 'Reticle Scale', min: 25, max: 200, step: 5, isRoot: true, elementId: 'sliderOvScale' },
     { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 30, step: 1, elementId: 'sliderReticleClicks' },
     { key: 'clickSpacing', label: 'Click Spacing', min: 8, max: 100, step: 1, elementId: 'sliderReticleSpacing' },
-    { key: 'centerGap', label: 'Center Gap', min: 0, max: 140, step: 1, elementId: 'sliderReticleGap' },
+    { key: 'centerGap', label: 'Center Gap', min: 0, max: 280, step: 2, elementId: 'sliderReticleGap' },
     { key: 'centerStyle', label: 'Center Point', isOption: true, options: ['empty', 'dot', 'cross', 'chevron'], elementId: 'valReticleCenter' },
-    { key: 'innerBrackets', label: 'Center Brackets', isToggle: true, elementId: 'btnToggleReticleBrackets' },
     { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
-    { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
     { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
     { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, isFloat: true, elementId: 'sliderReticleStroke' }
   ];
@@ -263,7 +277,7 @@ export function initReticleScreen() {
         updateReticleConfig({ [ctrl.key]: nextOpt });
         return `${ctrl.label.toUpperCase()}: ${nextOpt.toUpperCase()}`;
       } else {
-        const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : 10));
+        const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : (ctrl.key === 'centerGap' ? 64 : 10)));
         let nextVal = cur + delta * ctrl.step;
         nextVal = Math.max(ctrl.min, Math.min(ctrl.max, nextVal));
         if (ctrl.isFloat) {
@@ -288,7 +302,7 @@ export function initReticleScreen() {
         const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
         const phrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
         speakDetectionAnnouncement(phrase);
-        return `AUDITION: "${phrase}"`;
+        return `TEST CALLOUT: "${phrase}"`;
       }
     },
     quickAdjustClicks: (delta) => {
@@ -307,7 +321,7 @@ export function initReticleScreen() {
     },
     quickAdjustGap: (delta) => {
       const cfg = appState.reticleConfig || {};
-      const next = Math.max(0, Math.min(140, (cfg.centerGap ?? 64) + delta));
+      const next = Math.max(0, Math.min(280, (cfg.centerGap ?? 64) + delta));
       updateReticleConfig({ centerGap: next });
       return `CENTER GAP: ${next}px`;
     },
@@ -340,11 +354,9 @@ export function initReticleScreen() {
       clickSpacing: 32,
       centerGap: 64,
       centerStyle: 'empty',
-      innerBrackets: true,
       majorInterval: 5,
       minorTickLen: 10,
       majorTickLen: 18,
-      showLabels: true,
       concentricRings: false,
       ringInterval: 5,
       strokeWidth: 1.8,
@@ -352,7 +364,67 @@ export function initReticleScreen() {
     });
   });
 
-  // Delegated Center Style Button Listener (guarantees instant, 100% reliable clicks across all screens)
+  // Card 1: Direct Event Listeners (Guarantees instant, 100% reliable clicks)
+  btnToggleOverlay?.addEventListener('click', () => {
+    updateState({ overlayEnabled: !appState.overlayEnabled });
+    saveSettings(appState);
+    renderPreview();
+  });
+
+  btnToggleReticleFfp?.addEventListener('click', () => {
+    const nextFfp = appState.reticleFfpMode === false;
+    updateState({ reticleFfpMode: nextFfp });
+    saveSettings(appState);
+    renderPreview();
+  });
+
+  sliderOvOpacity?.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    if (valOvOpacity) valOvOpacity.textContent = `${val}%`;
+    updateState({ overlayOpacity: val });
+    saveSettings(appState);
+    renderPreview();
+  });
+
+  sliderOvScale?.addEventListener('input', (e) => {
+    const val = Number(e.target.value);
+    if (valOvScale) valOvScale.textContent = `${val}%`;
+    updateState({ overlayScale: val });
+    saveSettings(appState);
+    renderPreview();
+  });
+
+  document.querySelectorAll('#screenReticle .ov-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      const type = b.dataset.ov;
+      if (type === 'custom') {
+        document.getElementById('fileCustomOverlay')?.click();
+        return;
+      }
+      updateState({ overlayType: 'crosshair', overlayEnabled: true });
+      saveSettings(appState);
+      renderPreview();
+    });
+  });
+
+  // Color Theme Swatches on Reticle Screen
+  document.querySelectorAll('.theme-swatch-reticle').forEach((sw) => {
+    sw.addEventListener('click', () => {
+      const color = sw.dataset.color;
+      if (!color) return;
+      applyThemeColor(color);
+      document.querySelectorAll('.theme-swatch').forEach((s) => {
+        s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === color.toLowerCase());
+      });
+      const colorPickerCustom = document.getElementById('colorPickerCustom');
+      if (colorPickerCustom) colorPickerCustom.value = color;
+      updateState({ themeColor: color });
+      saveSettings(appState);
+      renderPreview();
+    });
+  });
+
+  // Delegated Center Style Button Listener
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.center-style-btn');
     if (!btn) return;
@@ -374,19 +446,19 @@ export function initReticleScreen() {
   });
 
   sliderGap?.addEventListener('input', (e) => {
-    updateReticleConfig({ centerGap: Number(e.target.value) || 0 });
+    const nextGap = Math.max(0, Math.min(280, Number(e.target.value) || 0));
+    if (inputGap) inputGap.value = String(nextGap);
+    updateReticleConfig({ centerGap: nextGap });
   });
 
-  btnBrackets?.addEventListener('click', () => {
-    updateReticleConfig({ innerBrackets: !appState.reticleConfig.innerBrackets });
+  inputGap?.addEventListener('input', (e) => {
+    const nextGap = Math.max(0, Math.min(280, Number(e.target.value) || 0));
+    if (sliderGap) sliderGap.value = String(nextGap);
+    updateReticleConfig({ centerGap: nextGap });
   });
 
   sliderMajor?.addEventListener('input', (e) => {
     updateReticleConfig({ majorInterval: Number(e.target.value) || 0 });
-  });
-
-  btnLabels?.addEventListener('click', () => {
-    updateReticleConfig({ showLabels: !appState.reticleConfig.showLabels });
   });
 
   btnRings?.addEventListener('click', () => {
@@ -399,7 +471,7 @@ export function initReticleScreen() {
 
   // Interactive Click on the Preview Stage to test arbitrary angle & clicks
   previewStage?.addEventListener('pointerdown', (e) => {
-    if (!previewSvg) return;
+    if (!previewSvg || !appState.overlayEnabled) return;
     const stageRect = previewStage.getBoundingClientRect();
     const svgRect = previewSvg.getBoundingClientRect();
 

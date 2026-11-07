@@ -229,7 +229,7 @@ export async function speakDetectionAnnouncement(phrase) {
       try {
         const u = new SpeechSynthesisUtterance(phrase);
         u.pitch = Number(appState.voicePitch) || 1.25;
-        u.rate = Number(appState.voiceRate) || 1.1;
+        u.rate = Number(appState.voiceRate) || 0.80;
         window.speechSynthesis.speak(u);
       } catch (_) {}
     }
@@ -242,7 +242,7 @@ export async function speakDetectionAnnouncement(phrase) {
   // Interrupt prior speech cleanly
   stopVoiceAnnouncement();
 
-  const rate = Math.max(0.75, Math.min(1.6, Number(appState.voiceRate) || 1.10));
+  const rate = Math.max(0.50, Math.min(1.5, Number(appState.voiceRate) || 0.80));
   const pitchMultiplier = Math.max(0.75, Math.min(1.5, Number(appState.voicePitch) || 1.25));
   // Standard semitone detune: 1200 * log2(pitch)
   const detuneCents = Math.round(1200 * Math.log2(pitchMultiplier));

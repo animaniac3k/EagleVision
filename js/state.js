@@ -53,13 +53,11 @@ export const appState = {
   reticleConfig: {
     clickCount: 10,        // Number of clicks/indents per arm (2..30)
     clickSpacing: 32,      // SVG units between clicks (8..100)
-    centerGap: 64,         // Unobstructed center gap (0..140)
+    centerGap: 64,         // Unobstructed center gap (0..280)
     centerStyle: 'empty',  // Center point: 'empty' | 'dot' | 'cross' | 'chevron'
-    innerBrackets: true,   // Bracket ticks marking center gap
     majorInterval: 5,      // Major tick every N clicks (0 for none)
     minorTickLen: 10,      // Minor tick length (4..16)
     majorTickLen: 18,      // Major tick length (8..26)
-    showLabels: true,      // Click numbers on arms (1, 2, 3... or 5, 10)
     concentricRings: false,// Concentric range circles
     ringInterval: 5,       // Circle every N clicks
     strokeWidth: 1.8,      // Reticle stroke thickness (0.5..5.0)
@@ -79,7 +77,7 @@ export const appState = {
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
   heatmapSpeechEnabled: false, // Voice callouts ("Detection! 11 o'clock, 3 clicks")
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
-  voiceRate: 1.1,         // Voice speech rate (0.8..1.5)
+  voiceRate: 0.80,        // Voice speech rate (0.6..1.0)
   voiceAlertKeyword: 'Detection', // Customizable alert keyword (e.g. Contact, Target, Alert)
   voiceUnitKeyword: 'clicks',     // Customizable distance unit (e.g. clicks, mils, marks, units)
 

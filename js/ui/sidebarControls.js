@@ -380,6 +380,7 @@ export function initSidebarAndTopControls(videoEl) {
 
       // If Bresser stream is currently live, switch channels immediately
       if (appState.isRtspStream && appState.activeDeviceId?.includes('live/tcp/')) {
+        await fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
         const targetUrl = (inputBresserRtspUrl?.value || `rtsp://${(inputBresserIp?.value || '192.168.0.1').trim()}/live/tcp/${selectedBresserChannel}`).trim();
         const lbl = btn.dataset.label || `Bresser (${selectedBresserChannel})`;
         await startCameraStream(videoEl, 'rtsp:' + targetUrl, lbl);
@@ -421,6 +422,7 @@ export function initSidebarAndTopControls(videoEl) {
     }
     if (textRtspStatus) textRtspStatus.textContent = `WAKING MEDIA PIPELINE AT ${ip}...`;
 
+    await fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
     const wakeResult = await wakeCameraPipeline(ip, '/app/getmediainfo');
 
     if (wakeResult && wakeResult.success) {
@@ -716,8 +718,7 @@ export function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
     syncVoiceToggleUI(next);
     if (next) {
-      const alertWord = appState.voiceAlertKeyword || 'Detection';
-      speakDetectionAnnouncement(`${alertWord}! Voice callouts active`);
+      speakDetectionAnnouncement('Voice callouts active');
     } else {
       stopVoiceAnnouncement();
     }
@@ -748,11 +749,11 @@ export function initSidebarAndTopControls(videoEl) {
   }
 
   if (sliderVoiceRate && valVoiceRate) {
-    const r = Number(appState.voiceRate || 1.10);
+    const r = Number(appState.voiceRate || 0.80);
     sliderVoiceRate.value = String(r);
     valVoiceRate.textContent = `${r.toFixed(2)}x`;
     sliderVoiceRate.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value) || 1.10;
+      const val = parseFloat(e.target.value) || 0.80;
       valVoiceRate.textContent = `${val.toFixed(2)}x`;
       updateState({ voiceRate: val });
       saveSettings(appState);

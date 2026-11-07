@@ -1142,10 +1142,9 @@ function dispatchControllerInputs(actionState) {
         window.reticleGamepadAPI?.showToast(res || 'ACTIVATED', 'cross');
         updateState({ lastGamepadAction: `RETICLE: ${res || 'ACTIVATE'}` });
       } else {
-        document.getElementById('btnToggleReticleLabels')?.click();
-        const stateStr = appState.reticleConfig?.showLabels ? 'ON' : 'OFF';
-        window.reticleGamepadAPI?.showToast(`NUMBER LABELS: ${stateStr}`, 'cross');
-        updateState({ lastGamepadAction: `RETICLE: NUMBER LABELS ${stateStr}` });
+        const res = window.reticleGamepadAPI?.activate();
+        window.reticleGamepadAPI?.showToast(res || 'TEST AUDITION', 'cross');
+        updateState({ lastGamepadAction: `RETICLE: ${res || 'AUDITION'}` });
       }
     } else if (screen === 'gallery') {
       document.getElementById('btnGalleryPlayPause')?.click();
@@ -1205,10 +1204,10 @@ function dispatchControllerInputs(actionState) {
   // Triangle (△)
   if (isJustPressed('triangle')) {
     if (screen === 'reticle') {
-      document.getElementById('btnToggleReticleBrackets')?.click();
-      const stateStr = appState.reticleConfig?.innerBrackets ? 'ON' : 'OFF';
-      window.reticleGamepadAPI?.showToast(`CENTER BRACKETS: ${stateStr}`, 'tri');
-      updateState({ lastGamepadAction: `RETICLE: CENTER BRACKETS ${stateStr}` });
+      document.getElementById('btnToggleOverlay')?.click();
+      const stateStr = appState.overlayEnabled ? 'ON' : 'OFF';
+      window.reticleGamepadAPI?.showToast(`OVERLAY RETICLE: ${stateStr}`, 'tri');
+      updateState({ lastGamepadAction: `RETICLE: OVERLAY ${stateStr}` });
     } else if (screen === 'gallery') {
       document.getElementById('btnToggleGalleryDrawer')?.click();
       updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (CLIPS DRAWER)' });

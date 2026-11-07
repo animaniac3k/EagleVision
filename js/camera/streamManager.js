@@ -67,9 +67,17 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
   stopCurrentStream();
 
   // Route network / RTSP streams to the dedicated RTSP canvas bridge
-  if (typeof preferredDeviceId === 'string' && preferredDeviceId.startsWith('rtsp:')) {
-    const rawUrl = preferredDeviceId.replace(/^rtsp:/, '');
-    return startRtspStream(videoEl, rawUrl, customLabel || 'RTSP STREAM');
+  if (typeof preferredDeviceId === 'string' && (preferredDeviceId.startsWith('rtsp:') || preferredDeviceId.startsWith('rtsp://'))) {
+    let cleanUrl = preferredDeviceId;
+    while (cleanUrl.startsWith('rtsp:')) {
+      cleanUrl = cleanUrl.slice(5);
+    }
+    if (cleanUrl.startsWith('//')) {
+      cleanUrl = 'rtsp:' + cleanUrl;
+    } else if (!cleanUrl.startsWith('rtsp://')) {
+      cleanUrl = 'rtsp://' + cleanUrl;
+    }
+    return startRtspStream(videoEl, cleanUrl, customLabel || 'RTSP STREAM');
   }
 
   if (preferredDeviceId === 'sim' || !navigator.mediaDevices?.getUserMedia) {
