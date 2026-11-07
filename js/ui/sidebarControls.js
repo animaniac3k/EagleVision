@@ -101,7 +101,6 @@ export function initSidebarAndTopControls(videoEl) {
   const btnToggleOptions = document.getElementById('btnToggleOptions');
   const btnSettingsBackToLive = document.getElementById('btnSettingsBackToLive');
   const btnOpenReticleScreen = document.getElementById('btnOpenReticleScreen');
-  const btnOpenReticleScreenCard = document.getElementById('btnOpenReticleScreenCard');
   const btnOpenControllerScreen = document.getElementById('btnOpenControllerScreen');
 
   const btnTogglePip = document.getElementById('btnTogglePip');
@@ -146,7 +145,6 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ currentScreen: 'reticle', replayActive: false });
   };
   btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
-  btnOpenReticleScreenCard?.addEventListener('click', openReticleScreen);
 
   const openControllerScreen = () => {
     screenLive?.classList.add('hidden');
@@ -587,11 +585,6 @@ export function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  const btnToggleOverlayQuick = document.getElementById('btnToggleOverlayQuick');
-  btnToggleOverlayQuick?.addEventListener('click', () => {
-    updateState({ overlayEnabled: !appState.overlayEnabled });
-    saveSettings(appState);
-  });
 
   ovButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1003,10 +996,6 @@ export function initSidebarAndTopControls(videoEl) {
     if (btnToggleOverlay) {
       btnToggleOverlay.textContent = state.overlayEnabled ? 'ON' : 'OFF';
       btnToggleOverlay.classList.toggle('radar-btn-active', state.overlayEnabled);
-    }
-    if (btnToggleOverlayQuick) {
-      btnToggleOverlayQuick.textContent = state.overlayEnabled ? 'ON' : 'OFF';
-      btnToggleOverlayQuick.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
 
     if (btnToggleReticleFfp) {

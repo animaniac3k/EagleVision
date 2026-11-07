@@ -22,11 +22,9 @@ export function initReticleScreen() {
   const btnReticleBackToLive = document.getElementById('btnReticleBackToLive');
   const btnReticleToSettings = document.getElementById('btnReticleToSettings');
   const btnResetReticle = document.getElementById('btnResetReticle');
-  const btnTestCallout = document.getElementById('btnTestCallout');
   const previewSvg = document.getElementById('reticlePreviewSvg');
   const previewImg = document.getElementById('reticlePreviewImg');
   const previewStage = document.getElementById('reticlePreviewStage');
-  const calloutTestText = document.getElementById('calloutTestText');
 
   // Card 1: Overlay Master & Optics inputs
   const btnToggleOverlay = document.getElementById('btnToggleOverlay');
@@ -289,7 +287,6 @@ export function initReticleScreen() {
         const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
         const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
         const phrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
-        if (calloutTestText) calloutTestText.textContent = `🔊 "${phrase}"`;
         speakDetectionAnnouncement(phrase);
         return `AUDITION: "${phrase}"`;
       }
@@ -400,16 +397,6 @@ export function initReticleScreen() {
     updateReticleConfig({ strokeWidth: Number(e.target.value) || 1.8 });
   });
 
-  // Test Speech Announcement button
-  btnTestCallout?.addEventListener('click', () => {
-    const testClicks = Math.min(3, appState.reticleConfig?.clickCount || 10);
-    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
-    const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
-    const testPhrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
-    if (calloutTestText) calloutTestText.textContent = `🔊 "${testPhrase}"`;
-    speakDetectionAnnouncement(testPhrase);
-  });
-
   // Interactive Click on the Preview Stage to test arbitrary angle & clicks
   previewStage?.addEventListener('pointerdown', (e) => {
     if (!previewSvg) return;
@@ -445,9 +432,6 @@ export function initReticleScreen() {
 
     const phrase = clicks === 0 ? `${prefix}! Center` : `${prefix}! ${clockHour} o'clock, ${clicks} ${unitWord}`;
 
-    if (calloutTestText) {
-      calloutTestText.textContent = `🔊 "${phrase}"`;
-    }
     speakDetectionAnnouncement(phrase);
 
     // Draw temporary animated ping dot at click location

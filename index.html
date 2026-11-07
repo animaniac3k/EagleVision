@@ -570,18 +570,6 @@
             </div>
           </div>
 
-          <!-- 3. Superimpose Overlay Guide & Reticle Customizer Shortcut -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Overlay & Reticle</span>
-              <button id="btnToggleOverlayQuick" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
-            </div>
-            <p style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); margin: 6px 0 12px 0; line-height:1.4;">
-              Graduated reticles, custom optics overlay, FFP lock, opacity, click scale, and geometry are managed in the Reticle Customizer.
-            </p>
-            <button id="btnOpenReticleScreenCard" class="radar-btn radar-btn-sm radar-btn-active" style="width:100%; height:34px; font-weight:700;" title="Open Reticle Customizer">🎯 OPEN RETICLE CUSTOMIZER</button>
-          </div>
-
           <!-- 4. Micro-Change Heatmap Sensitivity, Display Duration & Female Voice Callout -->
           <div class="settings-card">
             <div class="settings-card-header">
@@ -827,13 +815,13 @@
               <div class="slider-header">
                 <span>Reticle Color Theme</span>
               </div>
-              <div class="theme-swatches-grid" style="display:flex; gap:6px; margin-top:4px;">
-                <button type="button" class="theme-swatch theme-swatch-reticle active" data-color="#f97316" style="background:#f97316;" title="Tactical Orange"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#22c55e" style="background:#22c55e;" title="Night Vision Green"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ef4444" style="background:#ef4444;" title="Infrared Red"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#3b82f6" style="background:#3b82f6;" title="Precision Blue"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ffffff" style="background:#ffffff;" title="High Contrast White"></button>
-                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#000000" style="background:#000000; border:1px solid #444;" title="Stealth Black"></button>
+              <div class="swatch-row" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; margin-top:6px; width:100%;">
+                <button type="button" class="theme-swatch theme-swatch-reticle active" data-color="#f97316" style="background:#f97316; height:36px; width:100%; border-radius:4px;" title="Tactical Orange"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#22c55e" style="background:#22c55e; height:36px; width:100%; border-radius:4px;" title="Night Vision Green"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ef4444" style="background:#ef4444; height:36px; width:100%; border-radius:4px;" title="Infrared Red"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#3b82f6" style="background:#3b82f6; height:36px; width:100%; border-radius:4px;" title="Precision Blue"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#ffffff" style="background:#ffffff; height:36px; width:100%; border-radius:4px;" title="High Contrast White"></button>
+                <button type="button" class="theme-swatch theme-swatch-reticle" data-color="#000000" style="background:#000000; height:36px; width:100%; border-radius:4px; border:1.5px solid #555;" title="Stealth Black"></button>
               </div>
             </div>
           </div>
@@ -842,9 +830,7 @@
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Click Geometry</span>
-              <button id="btnTestCallout" class="radar-btn radar-btn-sm radar-btn-active" title="Audition Sample Speech Callout">AUDITION</button>
             </div>
-            <div id="calloutTestText" class="ring-signal-readout">READY (CLICK PREVIEW OR TAP AUDITION)</div>
 
             <div class="slider-group">
               <div class="slider-header">
@@ -875,11 +861,32 @@
                 <span>Center Point Style</span>
                 <span id="valReticleCenter" class="slider-val">EMPTY</span>
               </div>
-              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-top:6px;">
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" title="Unobstructed open center gap">EMPTY</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" title="Sharp precision center aiming dot">DOT</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" title="Fine center intersection mini-crosshair">CROSS</button>
-                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" title="Inverted caret pointing directly to dead-center pixel">CHEVRON</button>
+              <div class="btn-group-row" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-top:6px;">
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn radar-btn-active" data-center="empty" style="height:36px; display:flex; align-items:center; justify-content:center; padding:2px;" title="Empty: Unobstructed open center gap">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="pointer-events:none;">
+                    <circle cx="12" cy="12" r="5" stroke-width="1.5" stroke-dasharray="2 2" opacity="0.75"/>
+                    <line x1="2" y1="12" x2="7" y2="12" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="17" y1="12" x2="22" y2="12" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="12" y1="2" x2="12" y2="7" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="12" y1="17" x2="12" y2="22" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="dot" style="height:36px; display:flex; align-items:center; justify-content:center; padding:2px;" title="Dot: Precision center aiming point">
+                  <svg width="22" height="22" viewBox="0 0 24 24" style="pointer-events:none;">
+                    <circle cx="12" cy="12" r="4.5" fill="currentColor"/>
+                  </svg>
+                </button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="cross" style="height:36px; display:flex; align-items:center; justify-content:center; padding:2px;" title="Cross: Fine center intersection crosshair">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="pointer-events:none;">
+                    <line x1="12" y1="4" x2="12" y2="20" stroke-width="2.2" stroke-linecap="round"/>
+                    <line x1="4" y1="12" x2="20" y2="12" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <button type="button" class="radar-btn radar-btn-sm center-style-btn" data-center="chevron" style="height:36px; display:flex; align-items:center; justify-content:center; padding:2px;" title="Chevron: Tactical inverted caret aiming point">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="pointer-events:none;">
+                    <path d="M 5 18 L 12 8 L 19 18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="miter"/>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
