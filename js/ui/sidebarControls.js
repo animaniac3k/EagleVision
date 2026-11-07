@@ -13,7 +13,7 @@ import {
   getEstimatedBufferMB
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
-import { speakDetectionAnnouncement } from '../renderer/compositor.js';
+import { speakDetectionAnnouncement, stopVoiceAnnouncement } from '../renderer/compositor.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
@@ -415,8 +415,8 @@ export function initSidebarAndTopControls(videoEl) {
     if (next) {
       const alertWord = appState.voiceAlertKeyword || 'Detection';
       speakDetectionAnnouncement(`${alertWord}! Voice callouts active`);
-    } else if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    } else {
+      stopVoiceAnnouncement();
     }
   }
 

@@ -4,7 +4,7 @@
 import { appState, updateState } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';
 import { startCameraStream } from './camera/streamManager.js';
-import { initCompositor } from './renderer/compositor.js';
+import { initCompositor, preloadVoiceAudio } from './renderer/compositor.js';
 import { initOverlayManager } from './renderer/overlayManager.js';
 import { initZoomWindow } from './renderer/zoomWindow.js';
 import { startMemoryBuffer } from './recorder/memoryRingBuffer.js';
@@ -32,6 +32,9 @@ async function bootstrapApp() {
 
   // 2. Start 60fps Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
   const mainCanvas = initCompositor(videoEl);
+
+  // Preload embedded studio female voice sprite for instantaneous callouts
+  preloadVoiceAudio();
 
   // 3. Initialize ALL UI screens, controllers & event listeners IMMEDIATELY (synchronously)
   // so all buttons, sliders, screens and shortcuts are interactive from the first millisecond

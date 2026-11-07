@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v41';
+const CACHE_NAME = 'spotr-v42';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,8 @@ const ASSETS = [
   './js/renderer/zoomWindow.js',
   './js/renderer/imageFilters.js',
   './js/renderer/overlayManager.js',
+  './js/audio/voiceManifest.js',
+  './js/audio/voiceAudioEngine.js',
   './js/recorder/memoryRingBuffer.js',
   './js/recorder/instantReplay.js',
   './js/storage/videoStore.js',
@@ -30,7 +32,8 @@ const ASSETS = [
   './js/input/gamepadController.js',
   './assets/icons/icon.svg',
   './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  './assets/icons/icon-512.png',
+  './assets/audio/voice-sprite.mp3'
 ];
 
 self.addEventListener('install', (event) => {

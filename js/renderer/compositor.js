@@ -12,86 +12,9 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
 import { getClickDistanceInPixels, getCenterGapDistanceInPixels } from './overlayManager.js';
+import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 
-let cachedFemaleVoice = null;
-
-export function pickFemaleVoice() {
-  if (!('speechSynthesis' in window)) return null;
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices || !voices.length) return null;
-
-  const femaleKeywords = [
-    'female', 'zira', 'samantha', 'victoria', 'karen', 'moira',
-    'fiona', 'tessa', 'susan', 'hazel', 'catherine', 'helena',
-    'natural (female)', 'google uk english female', 'google us english female',
-    'jenny', 'aria', 'ava', 'en-us-x-sfg#female', 'en-us-x-tpd#female'
-  ];
-
-  // Try matching keywords in English voices first
-  for (const kw of femaleKeywords) {
-    const v = voices.find((voice) =>
-      voice.lang.startsWith('en') &&
-      (voice.name.toLowerCase().includes(kw) || voice.voiceURI.toLowerCase().includes(kw))
-    );
-    if (v) {
-      cachedFemaleVoice = v;
-      return v;
-    }
-  }
-
-  // Next, try any voice matching female keyword regardless of language
-  for (const kw of femaleKeywords) {
-    const v = voices.find((voice) =>
-      voice.name.toLowerCase().includes(kw) || voice.voiceURI.toLowerCase().includes(kw)
-    );
-    if (v) {
-      cachedFemaleVoice = v;
-      return v;
-    }
-  }
-
-  // Fallback to any English voice
-  const enVoice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
-  cachedFemaleVoice = enVoice;
-  return enVoice;
-}
-
-export function initVoiceSynthesis() {
-  if (!('speechSynthesis' in window)) return;
-  pickFemaleVoice();
-  if (window.speechSynthesis.onvoiceschanged !== undefined) {
-    window.speechSynthesis.onvoiceschanged = () => {
-      pickFemaleVoice();
-    };
-  }
-  window.speechSynthesis.addEventListener?.('voiceschanged', () => {
-    pickFemaleVoice();
-  });
-}
-
-// Immediately trigger voice discovery in browser
-if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-  initVoiceSynthesis();
-}
-
-export function speakDetectionAnnouncement(phrase) {
-  if (!('speechSynthesis' in window)) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(phrase);
-    if (!cachedFemaleVoice) {
-      pickFemaleVoice();
-    }
-    if (cachedFemaleVoice) {
-      utter.voice = cachedFemaleVoice;
-    }
-    utter.pitch = Number(appState.voicePitch) || 1.25;
-    utter.rate = Number(appState.voiceRate) || 1.1;
-    window.speechSynthesis.speak(utter);
-  } catch (err) {
-    console.warn('Speech synthesis error:', err);
-  }
-}
+export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
 
 const HEAT_W = 160;
 const HEAT_H = 90;
@@ -125,7 +48,7 @@ export function initCompositor(videoEl) {
   const SPEECH_COOLDOWN_MS = 3600;
 
   function announceHeatmapDetection(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
-    if (!appState.heatmapSpeechEnabled || !('speechSynthesis' in window)) return;
+    if (!appState.heatmapSpeechEnabled) return;
     const now = performance.now();
     if (now - lastSpeechTimeMs < SPEECH_COOLDOWN_MS) return;
 
