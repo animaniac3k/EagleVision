@@ -7,6 +7,7 @@
  * RAM usage and available memory budget reporting.
  */
 import { appState, updateState } from '../state.js';
+import { getRtspCanvas } from '../camera/streamManager.js';
 
 let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height }
 let totalBytes = 0;
@@ -70,10 +71,18 @@ export function startMemoryBuffer(videoEl) {
 
   captureInterval = setInterval(() => {
     if (!appState.bufferEnabled || appState.replayActive || encodingInProgress) return;
-    if (!currentVideoEl || currentVideoEl.readyState < 2) return;
+    let source = currentVideoEl;
+    if (appState.isRtspStream) {
+      const rtspCanv = getRtspCanvas();
+      if (rtspCanv && rtspCanv.width > 0) {
+        source = rtspCanv;
+      }
+    }
+    if (!source) return;
+    if (source.tagName === 'VIDEO' && source.readyState < 2) return;
 
-    const nativeW = currentVideoEl.videoWidth || appState.streamWidth || 1920;
-    const nativeH = currentVideoEl.videoHeight || appState.streamHeight || 1080;
+    const nativeW = source.videoWidth || source.width || appState.streamWidth || 1920;
+    const nativeH = source.videoHeight || source.height || appState.streamHeight || 1080;
 
     if (captureCanvas.width !== nativeW || captureCanvas.height !== nativeH) {
       captureCanvas.width = nativeW;
@@ -84,7 +93,7 @@ export function startMemoryBuffer(videoEl) {
     const capturedAt = performance.now();
 
     try {
-      captureCtx.drawImage(currentVideoEl, 0, 0, nativeW, nativeH);
+      captureCtx.drawImage(source, 0, 0, nativeW, nativeH);
       captureCanvas.toBlob(
         async (blob) => {
           try {

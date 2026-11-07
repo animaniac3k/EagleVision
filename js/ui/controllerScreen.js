@@ -9,10 +9,10 @@
  * 5. Profile presets (Default DualShock 4, Simplified Field, Flight / Arcade).
  */
 
-import { appState, updateState, subscribeState } from '../state.js';
+import { appState, updateState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
-import { DEFAULT_KEY_MAP, REMOTE_MODES, getActiveRemoteMode, setRemoteMode } from './ringController.js';
+import { REMOTE_MODES, getActiveRemoteMode, setRemoteMode } from './ringController.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [

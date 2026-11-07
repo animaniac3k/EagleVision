@@ -154,8 +154,6 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     );
   }
 
-
-
   // Optional Concentric Range Circles connecting corresponding clicks
   if (cfg.concentricRings) {
     const ringInt = Math.max(1, Number(cfg.ringInterval) || 5);

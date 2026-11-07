@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v51';
+const CACHE_NAME = 'eaglevision-v52';
 const ASSETS = [
   './',
   './index.html',

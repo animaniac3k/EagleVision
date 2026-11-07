@@ -18,6 +18,7 @@ let activeFrameUrls = [];
 let activeDuration = 20;
 let playheadSec = 0;
 let isPlaying = false;
+let playbackSpeed = 1.0;
 let lastTickMs = 0;
 let rafId = null;
 let lastRenderedIdx = -1;
@@ -143,7 +144,7 @@ export function initInstantReplay() {
   function tickLoop(nowMs) {
     if (!appState.replayActive) return;
     if (isPlaying) {
-      const dtSec = Math.max(0, (nowMs - lastTickMs) / 1000);
+      const dtSec = Math.max(0, (nowMs - lastTickMs) / 1000) * playbackSpeed;
       playheadSec += dtSec;
       if (playheadSec >= activeDuration) {
         playheadSec = 0;
@@ -167,6 +168,9 @@ export function initInstantReplay() {
     activeDuration = Math.max(0.5, snap.durationSec);
     playheadSec = 0;
     isPlaying = true;
+    playbackSpeed = 1.0;
+    const btnSlow = document.getElementById('btnReplaySlowMo');
+    if (btnSlow) { btnSlow.classList.remove('radar-btn-active'); btnSlow.textContent = '0.5x'; }
     lastTickMs = performance.now();
 
     canvasEl.width = snap.width || 1920;
@@ -210,6 +214,13 @@ export function initInstantReplay() {
     replayBar.classList.add('hidden');
     updateState({ replayActive: false });
   }
+
+  const btnSlowMo = document.getElementById('btnReplaySlowMo');
+  btnSlowMo?.addEventListener('click', () => {
+    playbackSpeed = playbackSpeed === 1.0 ? 0.5 : 1.0;
+    btnSlowMo.classList.toggle('radar-btn-active', playbackSpeed < 0.9);
+    btnSlowMo.textContent = playbackSpeed < 0.9 ? '0.5x (SLOW)' : '0.5x';
+  });
 
   btnPlayPause.addEventListener('click', () => {
     isPlaying = !isPlaying;

@@ -11,7 +11,7 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
-import { getClickDistanceInPixels, getCenterGapDistanceInPixels } from './overlayManager.js';
+import { getClickDistanceInPixels } from './overlayManager.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 
 export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };

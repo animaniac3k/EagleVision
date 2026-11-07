@@ -413,3 +413,7 @@ export function stopCurrentStream() {
     fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
   }
 }
+
+export function getRtspCanvas() {
+  return rtspCanvas;
+}

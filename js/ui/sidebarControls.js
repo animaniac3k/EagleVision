@@ -9,7 +9,6 @@ import {
   wakeCameraPipeline,
   checkRtspGatewayStatus
 } from '../camera/streamManager.js';
-import { makeElementDraggable } from '../renderer/zoomWindow.js';
 import {
   startMemoryBuffer,
   stopMemoryBuffer,
@@ -224,9 +223,16 @@ export function initSidebarAndTopControls(videoEl) {
   sliderBufferFps.value = String(appState.bufferTargetFps || 15);
   valBufferFps.textContent = `${appState.bufferTargetFps || 15} FPS`;
 
+  const replayBtnLabel = document.getElementById('replayBtnLabel');
+  const updateReplayBtnLabel = (sec) => {
+    if (replayBtnLabel) replayBtnLabel.textContent = `REPLAY (${sec}s)`;
+  };
+  updateReplayBtnLabel(appState.bufferMaxSeconds || 20);
+
   sliderBufferDuration.addEventListener('input', (e) => {
     const sec = Number(e.target.value) || 20;
     valBufferDuration.textContent = `${sec}s`;
+    updateReplayBtnLabel(sec);
     updateState({ bufferMaxSeconds: sec });
     saveSettings(appState);
     updateMemoryBufferConfig();
@@ -952,14 +958,6 @@ export function initSidebarAndTopControls(videoEl) {
       liveActionBanner.textContent = state.lastGamepadAction;
     }
 
-    // Sync Center Point Style buttons and text across screens
-    const activeCenterStyle = String(state.reticleConfig?.centerStyle || 'empty').toLowerCase();
-    const valSettingsCenter = document.getElementById('valSettingsReticleCenter');
-    if (valSettingsCenter) {
-      valSettingsCenter.textContent = activeCenterStyle.toUpperCase();
-    }
-    document.querySelectorAll('.center-style-btn').forEach(btn => {
-      btn.classList.toggle('radar-btn-active', (btn.dataset.center || '').toLowerCase() === activeCenterStyle);
-    });
+
   });
 }

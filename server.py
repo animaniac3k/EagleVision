@@ -342,7 +342,7 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(b'\r\n')
                 else:
                     time.sleep(0.008)
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
         except Exception as e:
             print(f"[!] [RTSP Gateway] Client disconnected: {e}")

@@ -1,7 +1,7 @@
 {
-  "name": "SPOTR — Recon • Detect • Alert",
-  "short_name": "SPOTR",
-  "id": "spotr-tactical-pwa",
+  "name": "EagleVision — Tactical Recon & Optics Viewer",
+  "short_name": "EagleVision",
+  "id": "eaglevision-tactical-pwa",
   "description": "Tactical Precision Camera Stream Viewer, Scope Reticle Customizer, Digital Zoom Loupe, Gamepad/Touchpad Virtual Mouse & In-Memory Video Buffer.",
   "start_url": "./index.html",
   "scope": "./",
