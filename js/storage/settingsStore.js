@@ -18,6 +18,7 @@ export function loadSavedSettings() {
           majorInterval: 5,
           minorTickLen: 10,
           majorTickLen: 18,
+          showLabels: true,
           concentricRings: false,
           ringInterval: 5,
           strokeWidth: 1.8,

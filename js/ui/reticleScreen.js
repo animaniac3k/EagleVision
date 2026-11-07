@@ -47,6 +47,7 @@ export function initReticleScreen() {
   const valCenter = document.getElementById('valReticleCenter');
 
   // Card 3: Markings
+  const btnLabels = document.getElementById('btnToggleReticleLabels');
   const sliderMajor = document.getElementById('sliderReticleMajor');
   const valMajor = document.getElementById('valReticleMajor');
   const btnRings = document.getElementById('btnToggleReticleRings');
@@ -148,6 +149,11 @@ export function initReticleScreen() {
       btn.classList.toggle('radar-btn-active', isSel);
     });
 
+    if (btnLabels) {
+      const showLabels = cfg.showLabels !== false;
+      btnLabels.textContent = showLabels ? 'ON' : 'OFF';
+      btnLabels.classList.toggle('radar-btn-active', showLabels);
+    }
     if (sliderMajor && valMajor) {
       sliderMajor.value = String(cfg.majorInterval ?? 5);
       valMajor.textContent = cfg.majorInterval === 0 ? 'NONE' : `EVERY ${cfg.majorInterval}`;
@@ -179,6 +185,7 @@ export function initReticleScreen() {
     { key: 'clickSpacing', label: 'Click Spacing', min: 8, max: 100, step: 1, elementId: 'sliderReticleSpacing' },
     { key: 'centerGap', label: 'Center Gap', min: 0, max: 280, step: 2, elementId: 'sliderReticleGap' },
     { key: 'centerStyle', label: 'Center Point', isOption: true, options: ['empty', 'dot', 'cross', 'chevron'], elementId: 'valReticleCenter' },
+    { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
     { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
     { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
     { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, isFloat: true, elementId: 'sliderReticleStroke' }
@@ -357,6 +364,7 @@ export function initReticleScreen() {
       majorInterval: 5,
       minorTickLen: 10,
       majorTickLen: 18,
+      showLabels: true,
       concentricRings: false,
       ringInterval: 5,
       strokeWidth: 1.8,
@@ -407,6 +415,23 @@ export function initReticleScreen() {
     });
   });
 
+  const fileCustomOverlay = document.getElementById('fileCustomOverlay');
+  fileCustomOverlay?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (appState.customOverlayUrl) {
+      URL.revokeObjectURL(appState.customOverlayUrl);
+    }
+    const url = URL.createObjectURL(file);
+    updateState({
+      customOverlayUrl: url,
+      overlayType: 'custom',
+      overlayEnabled: true
+    });
+    saveSettings(appState);
+    renderPreview();
+  });
+
   // Color Theme Swatches on Reticle Screen
   document.querySelectorAll('.theme-swatch-reticle').forEach((sw) => {
     sw.addEventListener('click', () => {
@@ -455,6 +480,11 @@ export function initReticleScreen() {
     const nextGap = Math.max(0, Math.min(280, Number(e.target.value) || 0));
     if (sliderGap) sliderGap.value = String(nextGap);
     updateReticleConfig({ centerGap: nextGap });
+  });
+
+  btnLabels?.addEventListener('click', () => {
+    const cur = appState.reticleConfig?.showLabels !== false;
+    updateReticleConfig({ showLabels: !cur });
   });
 
   sliderMajor?.addEventListener('input', (e) => {

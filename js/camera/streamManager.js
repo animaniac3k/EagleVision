@@ -272,40 +272,51 @@ function startSimulatedStream(videoEl) {
 /**
  * Connect to an RTSP network stream via the EagleVision local Python streaming gateway
  */
+let rtspStatusPollTimer = null;
+
 export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   stopCurrentStream();
 
-  const w = 1920;
-  const h = 1080;
+  // Initial resolution heuristic based on channel endpoint (ch1 = 960x540, ch0 = 1920x1080)
+  const isSub = rtspUrl.includes('ch1');
+  const initW = isSub ? 960 : 1920;
+  const initH = isSub ? 540 : 1080;
 
   rtspCanvas = document.createElement('canvas');
-  rtspCanvas.width = w;
-  rtspCanvas.height = h;
+  rtspCanvas.width = initW;
+  rtspCanvas.height = initH;
   const ctx = rtspCanvas.getContext('2d');
 
   // Fill initial dark backdrop with tactical status
   ctx.fillStyle = '#051317';
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, initW, initH);
   ctx.fillStyle = '#2dd4bf';
   ctx.font = 'bold 24px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('CONNECTING TO RTSP STREAM...', w / 2, h / 2);
+  ctx.fillText('CONNECTING TO RTSP STREAM...', initW / 2, initH / 2);
 
   rtspImg = new Image();
   rtspImg.crossOrigin = 'anonymous';
 
-  let hasReceivedFrame = false;
+  let lastTrackedW = initW;
+  let lastTrackedH = initH;
 
-  rtspImg.onload = () => {
-    hasReceivedFrame = true;
-    const nw = rtspImg.naturalWidth || 1920;
-    const nh = rtspImg.naturalHeight || 1080;
+  const syncFrameDimensions = (nw, nh) => {
+    if (nw <= 0 || nh <= 0) return;
     if (rtspCanvas.width !== nw || rtspCanvas.height !== nh) {
       rtspCanvas.width = nw;
       rtspCanvas.height = nh;
+    }
+    if (lastTrackedW !== nw || lastTrackedH !== nh) {
+      lastTrackedW = nw;
+      lastTrackedH = nh;
       updateState({ streamWidth: nw, streamHeight: nh });
     }
-    ctx.drawImage(rtspImg, 0, 0);
+  };
+
+  rtspImg.onload = () => {
+    syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
+    ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
   };
 
   rtspImg.onerror = (err) => {
@@ -321,16 +332,35 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.fillText('Check camera Wi-Fi connection and gateway server', rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
   };
 
-  // Keep canvas stream ticking even between frames
+  // Dynamically render frames and adapt to the exact received image resolution
   rtspDrawLoopActive = true;
   const drawLoop = () => {
     if (!rtspDrawLoopActive) return;
     if (rtspImg && rtspImg.complete && rtspImg.naturalWidth > 0) {
-      ctx.drawImage(rtspImg, 0, 0);
+      syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
+      ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
     }
     rtspAnimTimer = requestAnimationFrame(drawLoop);
   };
   rtspAnimTimer = requestAnimationFrame(drawLoop);
+
+  // Periodically query gateway /api/rtsp/status to sync exact stream telemetry (dimensions & FPS)
+  rtspStatusPollTimer = setInterval(async () => {
+    if (!rtspDrawLoopActive) return;
+    try {
+      const st = await checkRtspGatewayStatus();
+      if (st && st.isStreaming) {
+        const patch = {};
+        if (st.width && st.height && (st.width !== appState.streamWidth || st.height !== appState.streamHeight)) {
+          syncFrameDimensions(st.width, st.height);
+        }
+        if (typeof st.fps === 'number' && st.fps > 0) {
+          patch.fps = Math.round(st.fps);
+          updateState(patch);
+        }
+      }
+    } catch {}
+  }, 1000);
 
   // Connect to the gateway multipart stream endpoint
   const streamApiUrl = `/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
@@ -344,8 +374,8 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   updateState({
     activeDeviceId: 'rtsp:' + rtspUrl,
     activeDeviceLabel: label.slice(0, 24).toUpperCase(),
-    streamWidth: w,
-    streamHeight: h,
+    streamWidth: initW,
+    streamHeight: initH,
     isSimulatedStream: false,
     isRtspStream: true
   });
@@ -357,6 +387,10 @@ export function stopCurrentStream() {
   if (simTimer) {
     clearInterval(simTimer);
     simTimer = null;
+  }
+  if (rtspStatusPollTimer) {
+    clearInterval(rtspStatusPollTimer);
+    rtspStatusPollTimer = null;
   }
   if (rtspAnimTimer) {
     cancelAnimationFrame(rtspAnimTimer);

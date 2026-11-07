@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v50';
+const CACHE_NAME = 'spotr-v51';
 const ASSETS = [
   './',
   './index.html',

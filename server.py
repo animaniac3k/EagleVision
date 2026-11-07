@@ -242,17 +242,10 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
                 },
                 {
                     "id": "ch1",
-                    "name": "Sub Stream 1 (960x540)",
+                    "name": "Sub Stream (960x540)",
                     "url": f"rtsp://{ip}/live/tcp/ch1",
                     "isDefault": False,
                     "resolution": "960x540"
-                },
-                {
-                    "id": "ch2",
-                    "name": "Sub Stream 2 (480x270 Fast)",
-                    "url": f"rtsp://{ip}/live/tcp/ch2",
-                    "isDefault": False,
-                    "resolution": "480x270"
                 }
             ]
 

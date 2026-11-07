@@ -178,13 +178,7 @@ export function initSidebarAndTopControls(videoEl) {
     });
   }
 
-  // 2c. First Focal Plane (FFP) Zoom Lock Toggle
-  const btnToggleReticleFfp = document.getElementById('btnToggleReticleFfp');
-  btnToggleReticleFfp?.addEventListener('click', () => {
-    const next = !appState.reticleFfpMode;
-    updateState({ reticleFfpMode: next });
-    saveSettings(appState);
-  });
+  // Note: btnToggleReticleFfp is managed exclusively in reticleScreen.js
 
   // 2d. Cyclic Quick Tool HUD Pill Tap-to-Toggle
   const quickToolPill = document.getElementById('quickToolPill');
@@ -573,60 +567,7 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
   });
 
-  // 9. Overlay Guide Controls (Simplified: Open-Center Crosshair + Load Image Only)
-  const btnToggleOverlay = document.getElementById('btnToggleOverlay');
-  const ovButtons = document.querySelectorAll('.ov-btn');
-  const fileCustomOverlay = document.getElementById('fileCustomOverlay');
-  const sliderOvOpacity = document.getElementById('sliderOvOpacity');
-  const valOvOpacity = document.getElementById('valOvOpacity');
-  const sliderOvScale = document.getElementById('sliderOvScale');
-  const valOvScale = document.getElementById('valOvScale');
-
-  btnToggleOverlay?.addEventListener('click', () => {
-    updateState({ overlayEnabled: !appState.overlayEnabled });
-    saveSettings(appState);
-  });
-
-
-  ovButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const type = btn.dataset.ov;
-      if (type === 'custom') {
-        fileCustomOverlay.click();
-        return;
-      }
-      updateState({ overlayType: 'crosshair', overlayEnabled: true });
-      saveSettings(appState);
-    });
-  });
-
-  fileCustomOverlay.addEventListener('change', (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (appState.customOverlayUrl) {
-      URL.revokeObjectURL(appState.customOverlayUrl);
-    }
-    const url = URL.createObjectURL(file);
-    updateState({
-      customOverlayUrl: url,
-      overlayType: 'custom',
-      overlayEnabled: true
-    });
-  });
-
-  sliderOvOpacity.addEventListener('input', (e) => {
-    const val = Number(e.target.value);
-    valOvOpacity.textContent = `${val}%`;
-    updateState({ overlayOpacity: val });
-    saveSettings(appState);
-  });
-
-  sliderOvScale.addEventListener('input', (e) => {
-    const val = Number(e.target.value);
-    valOvScale.textContent = `${val}%`;
-    updateState({ overlayScale: val });
-    saveSettings(appState);
-  });
+  // Note: Overlay reticle master controls (btnToggleOverlay, opacity, scale, load img) are managed exclusively in reticleScreen.js
 
   // 10. Heatmap Sensitivity, Display Duration (with Infinity support) & Voice Callouts
   const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');

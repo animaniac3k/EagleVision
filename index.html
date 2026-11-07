@@ -481,10 +481,9 @@
                 <!-- Stream Resolution Channel Switcher (ch0 Full HD default) -->
                 <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
                   <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">STREAM RESOLUTION / CHANNEL</label>
-                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px;">
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel radar-btn-active" data-channel="ch0" data-label="Bresser (1080p Main)" style="height:26px; font-size:10px; padding:0 4px;">● 1080p (ch0)</button>
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch1" data-label="Bresser (540p Sub)" style="height:26px; font-size:10px; padding:0 4px;">○ 540p (ch1)</button>
-                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch2" data-label="Bresser (270p Fast)" style="height:26px; font-size:10px; padding:0 4px;">○ 270p (ch2)</button>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel radar-btn-active" data-channel="ch0" data-label="Bresser (1080p Main)" style="height:28px; font-size:11px; padding:0 6px;">● 1080p Full HD (ch0)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch1" data-label="Bresser (540p Sub)" style="height:28px; font-size:11px; padding:0 6px;">○ 540p Sub (ch1)</button>
                   </div>
                 </div>
 
@@ -897,6 +896,13 @@
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Markings & Accents</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Number Labels</span>
+                <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+              </div>
             </div>
 
             <div class="slider-group">
@@ -1341,6 +1347,6 @@
     <div class="vm-dot"></div>
   </div>
 
-  <script type="module" src="./js/main.js?v=50"></script>
+  <script type="module" src="./js/main.js?v=51"></script>
 </body>
 </html>

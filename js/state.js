@@ -58,6 +58,7 @@ export const appState = {
     majorInterval: 5,      // Major tick every N clicks (0 for none)
     minorTickLen: 10,      // Minor tick length (4..16)
     majorTickLen: 18,      // Major tick length (8..26)
+    showLabels: true,      // Click numbers on arms (1, 2, 3... or 5, 10)
     concentricRings: false,// Concentric range circles
     ringInterval: 5,       // Circle every N clicks
     strokeWidth: 1.8,      // Reticle stroke thickness (0.5..5.0)

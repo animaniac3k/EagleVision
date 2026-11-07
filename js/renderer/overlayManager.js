@@ -70,6 +70,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       majorInterval: 5,
       minorTickLen: 10,
       majorTickLen: 18,
+      showLabels: true,
       concentricRings: false,
       ringInterval: 5,
       strokeWidth: 1.8,
@@ -93,6 +94,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   const majorInt = Math.max(0, Number(cfg.majorInterval) || 5);
   const minorLen = Math.min(Math.max(3, Number(cfg.minorTickLen) || 10), Math.max(5, step * 0.9));
   const majorLen = Math.min(Math.max(6, Number(cfg.majorTickLen) || 18), Math.max(8, step * 1.6));
+  const showLabels = Boolean(cfg.showLabels);
 
   const lines = [];
   const armLen = clicks * step;
@@ -183,11 +185,21 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     lines.push(
       `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
+    if (showLabels && isMajor) {
+      lines.push(
+        `<text x="${xL}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+      );
+    }
 
     // Right tick
     lines.push(
       `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
+    if (showLabels && isMajor) {
+      lines.push(
+        `<text x="${xR}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+      );
+    }
   }
 
   // Vertical Indents / Tick Marks (Top & Bottom - 1 to clicks up to 30, measured from dead center)
@@ -206,11 +218,21 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     lines.push(
       `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
+    if (showLabels && isMajor) {
+      lines.push(
+        `<text x="${cx + half + 4}" y="${yT + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+      );
+    }
 
     // Bottom tick
     lines.push(
       `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
+    if (showLabels && isMajor) {
+      lines.push(
+        `<text x="${cx + half + 4}" y="${yB + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+      );
+    }
   }
 
   return lines.join('\n');
