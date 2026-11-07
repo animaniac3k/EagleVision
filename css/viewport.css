@@ -20,6 +20,10 @@
   height: 100%;
   display: block;
   cursor: grab;
+  touch-action: none;
+  will-change: transform;
+  transform: translateZ(0);
+  contain: strict;
 }
 
 #mainCanvas:active {
@@ -38,6 +42,8 @@
   justify-content: center;
   z-index: 10;
   overflow: hidden;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 #svgOverlay {
@@ -242,6 +248,9 @@
 }
 
 #replayCanvas {
+  touch-action: none;
+  will-change: transform;
+  transform: translateZ(0);
   width: 100%;
   height: 100%;
   object-fit: contain;

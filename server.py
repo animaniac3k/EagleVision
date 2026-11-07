@@ -33,6 +33,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 class RtspSession:
     def __init__(self):
         self.lock = threading.Lock()
+        self.condition = threading.Condition(self.lock)
         self.active_url = None
         self.is_running = False
         self.latest_jpeg = None
@@ -121,11 +122,12 @@ class RtspSession:
                     frame_count = 0
                     fps_timer = now
 
-                with self.lock:
+                with self.condition:
                     self.latest_jpeg = jpeg_bytes
                     self.latest_frame_time = now
                     self.stream_width = w
                     self.stream_height = h
+                    self.condition.notify_all()
         except Exception as e:
             print(f"[!] [RTSP Gateway] Exception in capture worker: {e}")
             with self.lock:
@@ -140,10 +142,11 @@ class RtspSession:
 
     def stop(self):
         t_to_join = None
-        with self.lock:
+        with self.condition:
             if not self.is_running:
                 return
             self.is_running = False
+            self.condition.notify_all()
             t_to_join = self.worker_thread
             self.worker_thread = None
             self.active_url = None
@@ -324,14 +327,19 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             while rtsp_session.is_running:
                 jpeg_bytes = None
-                frame_time = 0
-                with rtsp_session.lock:
+                with rtsp_session.condition:
+                    # Immediate wakeup when a new frame is encoded, zero polling latency
+                    rtsp_session.condition.wait_for(
+                        lambda: not rtsp_session.is_running or rtsp_session.latest_frame_time > last_sent_time,
+                        timeout=0.04
+                    )
+                    if not rtsp_session.is_running:
+                        break
                     if rtsp_session.latest_jpeg and rtsp_session.latest_frame_time > last_sent_time:
                         jpeg_bytes = rtsp_session.latest_jpeg
-                        frame_time = rtsp_session.latest_frame_time
+                        last_sent_time = rtsp_session.latest_frame_time
 
                 if jpeg_bytes:
-                    last_sent_time = frame_time
                     header = (
                         b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n'
@@ -340,8 +348,6 @@ class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(header)
                     self.wfile.write(jpeg_bytes)
                     self.wfile.write(b'\r\n')
-                else:
-                    time.sleep(0.008)
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
         except Exception as e:

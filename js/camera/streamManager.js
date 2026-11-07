@@ -332,17 +332,8 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.fillText('Check camera Wi-Fi connection and gateway server', rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
   };
 
-  // Dynamically render frames and adapt to the exact received image resolution
+  // Frames are decoded directly on arrival via rtspImg.onload; redundant 60Hz rAF polling eliminated
   rtspDrawLoopActive = true;
-  const drawLoop = () => {
-    if (!rtspDrawLoopActive) return;
-    if (rtspImg && rtspImg.complete && rtspImg.naturalWidth > 0) {
-      syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
-      ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
-    }
-    rtspAnimTimer = requestAnimationFrame(drawLoop);
-  };
-  rtspAnimTimer = requestAnimationFrame(drawLoop);
 
   // Periodically query gateway /api/rtsp/status to sync exact stream telemetry (dimensions & FPS)
   rtspStatusPollTimer = setInterval(async () => {

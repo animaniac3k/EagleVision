@@ -24,8 +24,8 @@ const GLOBAL_MOTION_REJECTION_RATIO = 0.18; // If >18% of image changes at once,
 export function initCompositor(videoEl) {
   const mainCanvas = document.getElementById('mainCanvas');
   const pipCanvas = document.getElementById('pipCanvas');
-  const mainCtx = mainCanvas.getContext('2d');
-  const pipCtx = pipCanvas.getContext('2d');
+  const mainCtx = mainCanvas.getContext('2d', { alpha: false, desynchronized: true }) || mainCanvas.getContext('2d');
+  const pipCtx = pipCanvas.getContext('2d', { alpha: false }) || pipCanvas.getContext('2d');
 
   // Offscreen buffers for Localized Micro-Change Heatmap
   const sampleCanvas = document.createElement('canvas');
@@ -45,6 +45,7 @@ export function initCompositor(videoEl) {
   let refInitialized = false;
   let lastHeatTimeMs = performance.now();
   let lastSpeechTimeMs = 0;
+  let lastHeatComputeMs = 0;
   const SPEECH_COOLDOWN_MS = 3600;
 
   function announceHeatmapDetection(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
@@ -305,7 +306,11 @@ export function initCompositor(videoEl) {
       const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
 
       if (appState.heatmapEnabled) {
-        updateHeatmap(videoEl, sx, sy, cropW, cropH, vw, vh, cw, ch);
+        const nowMs = performance.now();
+        if (nowMs - lastHeatComputeMs >= 48) { // Decouple heavy pixel analysis to ~20Hz to eliminate GPU readback stalls
+          updateHeatmap(videoEl, sx, sy, cropW, cropH, vw, vh, cw, ch);
+          lastHeatComputeMs = nowMs;
+        }
       }
 
       // 1. Render Main Canvas

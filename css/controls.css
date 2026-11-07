@@ -429,3 +429,16 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   font-size: 12px;
   padding: 0 4px;
 }
+
+/* Mobile / Low-Capability Hardware Shader Optimization */
+@media (hover: none) and (pointer: coarse) {
+  .floating-strip .radar-btn,
+  .control-pod,
+  .ring-hud-pill,
+  .quick-tool-pill,
+  #replayBar {
+    backdrop-filter: none !important;
+    background: rgba(9, 26, 32, 0.94) !important;
+    contain: paint;
+  }
+}

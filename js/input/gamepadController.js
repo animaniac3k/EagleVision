@@ -998,11 +998,17 @@ function pollGamepadAPI() {
   if (!getPads) return;
 
   const rawPads = getPads.call(navigator) || [];
-  const validPads = Array.from(rawPads).filter((p) => p !== null && p !== undefined);
+  let pad = null;
+  let count = 0;
+  for (let i = 0; i < rawPads.length; i++) {
+    const p = rawPads[i];
+    if (p !== null && p !== undefined) {
+      count++;
+      if (!pad) pad = p;
+    }
+  }
 
-  updateSettingsDiagnostics('gamepad_api', validPads.length);
-
-  const pad = validPads.length > 0 ? validPads[0] : null;
+  updateSettingsDiagnostics('gamepad_api', count);
 
   if (!pad) {
     consecutiveNullFrames++;
