@@ -935,30 +935,6 @@ export function initSidebarAndTopControls(videoEl) {
     mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
     mainZoomReset.classList.toggle('hidden', state.mainZoom <= 1.01);
 
-    if (btnToggleOverlay) {
-      btnToggleOverlay.textContent = state.overlayEnabled ? 'ON' : 'OFF';
-      btnToggleOverlay.classList.toggle('radar-btn-active', state.overlayEnabled);
-    }
-
-    if (btnToggleReticleFfp) {
-      const ffpActive = state.reticleFfpMode !== false;
-      btnToggleReticleFfp.textContent = ffpActive ? 'FFP: ON' : 'FFP: OFF';
-      btnToggleReticleFfp.classList.toggle('radar-btn-active', ffpActive);
-    }
-    const valOvScale = document.getElementById('valOvScale');
-    const sliderOvScale = document.getElementById('sliderOvScale');
-    if (valOvScale) valOvScale.textContent = `${Math.round(state.overlayScale || 100)}%`;
-    if (sliderOvScale) sliderOvScale.value = String(Math.round(state.overlayScale || 100));
-
-    const valOvOpacity = document.getElementById('valOvOpacity');
-    const sliderOvOpacity = document.getElementById('sliderOvOpacity');
-    if (valOvOpacity) valOvOpacity.textContent = `${Math.round(state.overlayOpacity || 75)}%`;
-    if (sliderOvOpacity) sliderOvOpacity.value = String(Math.round(state.overlayOpacity || 75));
-
-    ovButtons.forEach((b) => {
-      b.classList.toggle('radar-btn-active', b.dataset.ov === state.overlayType);
-    });
-
     btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
     btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
 

@@ -367,7 +367,9 @@ def run_server():
     mimetypes.add_type('audio/mpeg', '.mp3')
     mimetypes.add_type('image/svg+xml', '.svg')
 
-    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    # On Windows, allow_reuse_address=True can cause multiple processes to bind
+    # to the exact same port simultaneously, resulting in dropped connections.
+    socketserver.ThreadingTCPServer.allow_reuse_address = (os.name != 'nt')
     with socketserver.ThreadingTCPServer(("", PORT), EagleVisionRequestHandler) as httpd:
         print("============================================================")
         print("  EAGLEVISION PORTABLE SERVER & RTSP STREAMING GATEWAY")
