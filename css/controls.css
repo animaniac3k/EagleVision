@@ -338,7 +338,9 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
 
 .theme-swatch.active {
   border-color: #ffffff;
-  box-shadow: 0 0 10px var(--radar-accent);
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+  box-shadow: 0 0 10px var(--radar-accent), 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
 .theme-color-input {

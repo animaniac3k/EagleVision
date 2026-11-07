@@ -7,6 +7,38 @@ let activeMediaStream = null;
 let simCanvas = null;
 let staticBgCanvas = null;
 let simTimer = null;
+let rtspImg = null;
+let rtspCanvas = null;
+let rtspAnimTimer = null;
+let rtspDrawLoopActive = false;
+
+/**
+ * Wake the camera hardware media pipeline (e.g. Bresser Eyepiece HD /app/getmediainfo)
+ */
+export async function wakeCameraPipeline(ip = '192.168.0.1', path = '/app/getmediainfo') {
+  try {
+    const res = await fetch(`/api/rtsp/wake?ip=${encodeURIComponent(ip)}&path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.warn('[streamManager] RTSP Wake failed:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Check if the Python RTSP streaming gateway is active on the host
+ */
+export async function checkRtspGatewayStatus() {
+  try {
+    const res = await fetch('/api/rtsp/status', { cache: 'no-store' });
+    if (!res.ok) return { available: false };
+    return await res.json();
+  } catch {
+    return { available: false };
+  }
+}
 
 export async function enumerateCameras() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -31,8 +63,14 @@ export async function enumerateCameras() {
   }
 }
 
-export async function startCameraStream(videoEl, preferredDeviceId = 'auto') {
+export async function startCameraStream(videoEl, preferredDeviceId = 'auto', customLabel = null) {
   stopCurrentStream();
+
+  // Route network / RTSP streams to the dedicated RTSP canvas bridge
+  if (typeof preferredDeviceId === 'string' && preferredDeviceId.startsWith('rtsp:')) {
+    const rawUrl = preferredDeviceId.replace(/^rtsp:/, '');
+    return startRtspStream(videoEl, rawUrl, customLabel || 'RTSP STREAM');
+  }
 
   if (preferredDeviceId === 'sim' || !navigator.mediaDevices?.getUserMedia) {
     return startSimulatedStream(videoEl);
@@ -216,7 +254,92 @@ function startSimulatedStream(videoEl) {
     activeDeviceLabel: 'TEST SIGNAL 1080P',
     streamWidth: w,
     streamHeight: h,
-    isSimulatedStream: true
+    isSimulatedStream: true,
+    isRtspStream: false
+  });
+
+  return stream;
+}
+
+/**
+ * Connect to an RTSP network stream via the EagleVision local Python streaming gateway
+ */
+export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
+  stopCurrentStream();
+
+  const w = 1920;
+  const h = 1080;
+
+  rtspCanvas = document.createElement('canvas');
+  rtspCanvas.width = w;
+  rtspCanvas.height = h;
+  const ctx = rtspCanvas.getContext('2d');
+
+  // Fill initial dark backdrop with tactical status
+  ctx.fillStyle = '#051317';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#2dd4bf';
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('CONNECTING TO RTSP STREAM...', w / 2, h / 2);
+
+  rtspImg = new Image();
+  rtspImg.crossOrigin = 'anonymous';
+
+  let hasReceivedFrame = false;
+
+  rtspImg.onload = () => {
+    hasReceivedFrame = true;
+    const nw = rtspImg.naturalWidth || 1920;
+    const nh = rtspImg.naturalHeight || 1080;
+    if (rtspCanvas.width !== nw || rtspCanvas.height !== nh) {
+      rtspCanvas.width = nw;
+      rtspCanvas.height = nh;
+      updateState({ streamWidth: nw, streamHeight: nh });
+    }
+    ctx.drawImage(rtspImg, 0, 0);
+  };
+
+  rtspImg.onerror = (err) => {
+    console.warn('[streamManager] RTSP stream image error:', err);
+    ctx.fillStyle = '#051317';
+    ctx.fillRect(0, 0, rtspCanvas.width, rtspCanvas.height);
+    ctx.fillStyle = '#fda4af';
+    ctx.font = 'bold 22px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('RTSP STREAM DISCONNECTED / TIMEOUT', rtspCanvas.width / 2, rtspCanvas.height / 2 - 20);
+    ctx.font = '16px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('Check camera Wi-Fi connection and gateway server', rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
+  };
+
+  // Keep canvas stream ticking even between frames
+  rtspDrawLoopActive = true;
+  const drawLoop = () => {
+    if (!rtspDrawLoopActive) return;
+    if (rtspImg && rtspImg.complete && rtspImg.naturalWidth > 0) {
+      ctx.drawImage(rtspImg, 0, 0);
+    }
+    rtspAnimTimer = requestAnimationFrame(drawLoop);
+  };
+  rtspAnimTimer = requestAnimationFrame(drawLoop);
+
+  // Connect to the gateway multipart stream endpoint
+  const streamApiUrl = `/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
+  rtspImg.src = streamApiUrl;
+
+  const stream = rtspCanvas.captureStream(30);
+  activeMediaStream = stream;
+  videoEl.srcObject = stream;
+  videoEl.play().catch(() => {});
+
+  updateState({
+    activeDeviceId: 'rtsp:' + rtspUrl,
+    activeDeviceLabel: label.slice(0, 24).toUpperCase(),
+    streamWidth: w,
+    streamHeight: h,
+    isSimulatedStream: false,
+    isRtspStream: true
   });
 
   return stream;
@@ -227,8 +350,21 @@ export function stopCurrentStream() {
     clearInterval(simTimer);
     simTimer = null;
   }
+  if (rtspAnimTimer) {
+    cancelAnimationFrame(rtspAnimTimer);
+    rtspAnimTimer = null;
+  }
+  rtspDrawLoopActive = false;
+  if (rtspImg) {
+    rtspImg.onload = null;
+    rtspImg.onerror = null;
+    rtspImg.src = '';
+    rtspImg = null;
+  }
   if (activeMediaStream) {
     activeMediaStream.getTracks().forEach((t) => t.stop());
     activeMediaStream = null;
   }
+  // Notify local Python server to release RTSP socket
+  fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
 }

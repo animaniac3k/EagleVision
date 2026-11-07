@@ -3,7 +3,12 @@
  * Micro-Change Heatmap, Overlays, Filters & HSL Color Theme
  */
 import { appState, updateState, subscribeState } from '../state.js';
-import { enumerateCameras, startCameraStream } from '../camera/streamManager.js';
+import {
+  enumerateCameras,
+  startCameraStream,
+  wakeCameraPipeline,
+  checkRtspGatewayStatus
+} from '../camera/streamManager.js';
 import { makeElementDraggable } from '../renderer/zoomWindow.js';
 import {
   startMemoryBuffer,
@@ -17,13 +22,13 @@ import { speakDetectionAnnouncement, stopVoiceAnnouncement } from '../renderer/c
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
-  let clean = (hex || '#2dd4bf').replace('#', '').trim();
+  let clean = (hex || '#f97316').replace('#', '').trim();
   if (clean.length === 3) {
     clean = clean.split('').map((c) => c + c).join('');
   }
-  const r = (parseInt(clean.substring(0, 2), 16) || 45) / 255;
-  const g = (parseInt(clean.substring(2, 4), 16) || 212) / 255;
-  const b = (parseInt(clean.substring(4, 6), 16) || 191) / 255;
+  const r = (parseInt(clean.substring(0, 2), 16) || 0) / 255;
+  const g = (parseInt(clean.substring(2, 4), 16) || 0) / 255;
+  const b = (parseInt(clean.substring(4, 6), 16) || 0) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -45,20 +50,44 @@ export function applyThemeColor(hex) {
   const surfSat = Math.min(45, sat);
 
   const root = document.documentElement.style;
+
+  // Background and panels
   root.setProperty('--radar-bg-deep', `hsl(${h}, ${surfSat}%, 3%)`);
   root.setProperty('--radar-bg', `hsl(${h}, ${surfSat}%, 5%)`);
   root.setProperty('--radar-panel', `hsla(${h}, ${surfSat}%, 8%, 0.94)`);
   root.setProperty('--radar-header', `hsl(${h}, ${surfSat}%, 11%)`);
   root.setProperty('--radar-surface', `hsl(${h}, ${surfSat}%, 9%)`);
   root.setProperty('--radar-surface-hover', `hsl(${h}, ${surfSat}%, 15%)`);
-  root.setProperty('--radar-border', `hsl(${h}, ${Math.min(60, sat)}%, 24%)`);
-  root.setProperty('--radar-border-strong', hex);
+
+  // Text and accents
   root.setProperty('--radar-text', `hsl(${h}, ${Math.min(85, sat)}%, 92%)`);
   root.setProperty('--radar-text-secondary', `hsl(${h}, ${Math.min(80, sat)}%, 80%)`);
   root.setProperty('--radar-text-muted', `hsl(${h}, ${Math.min(75, sat)}%, 66%)`);
   root.setProperty('--radar-accent', hex);
-  root.setProperty('--radar-accent-contrast', `hsl(${h}, ${surfSat}%, 5%)`);
-  root.setProperty('--shadow-glow', `0 0 14px hsla(${h}, ${sat}%, 55%, 0.4)`);
+
+  if (l < 0.15) {
+    // Pure Tactical Black Scheme (Solid Black Reticle, high-contrast light borders & text)
+    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.25)');
+    root.setProperty('--radar-border-strong', '#94a3b8');
+    root.setProperty('--radar-accent-contrast', '#ffffff');
+    root.setProperty('--shadow-glow', '0 0 10px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.4)');
+    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.65))');
+  } else if (l > 0.85) {
+    // Pure White Scheme
+    root.setProperty('--radar-border', 'hsl(0, 0%, 30%)');
+    root.setProperty('--radar-border-strong', '#ffffff');
+    root.setProperty('--radar-accent-contrast', '#051317');
+    root.setProperty('--shadow-glow', '0 0 14px rgba(255, 255, 255, 0.5)');
+    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85))');
+  } else {
+    // Chromatic Schemes (Orange, Green, Red, Blue)
+    root.setProperty('--radar-border', `hsl(${h}, ${Math.min(60, sat)}%, 24%)`);
+    root.setProperty('--radar-border-strong', hex);
+    const contrastColor = (l > 0.55 && h > 35 && h < 185) ? `hsl(${h}, ${surfSat}%, 5%)` : '#ffffff';
+    root.setProperty('--radar-accent-contrast', contrastColor);
+    root.setProperty('--shadow-glow', `0 0 14px hsla(${h}, ${sat}%, 55%, 0.4)`);
+    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75))');
+  }
 }
 
 export function initSidebarAndTopControls(videoEl) {
@@ -86,7 +115,7 @@ export function initSidebarAndTopControls(videoEl) {
   const cameraSelect = document.getElementById('cameraSelect');
   const btnRefreshCameras = document.getElementById('btnRefreshCameras');
 
-  applyThemeColor(appState.themeColor || '#2dd4bf');
+  applyThemeColor(appState.themeColor || '#f97316');
 
   // 0. Declutter Mode (Hides whole interface except single top-left restore button)
   btnDeclutterUi?.addEventListener('click', () => {
@@ -219,13 +248,232 @@ export function initSidebarAndTopControls(videoEl) {
     updateMemoryBufferConfig();
   });
 
-  // 7. Camera Enumeration & Selection
+  // 7. Video Source Enumeration & Selection (USB & Network RTSP)
+  const btnSourceModeUsb = document.getElementById('btnSourceModeUsb');
+  const btnSourceModeRtsp = document.getElementById('btnSourceModeRtsp');
+  const panelSourceUsb = document.getElementById('panelSourceUsb');
+  const panelSourceRtsp = document.getElementById('panelSourceRtsp');
+
+  const btnPresetBresser = document.getElementById('btnPresetBresser');
+  const btnPresetOnvif = document.getElementById('btnPresetOnvif');
+  const btnPresetCustom = document.getElementById('btnPresetCustom');
+
+  const secBresserConfig = document.getElementById('secBresserConfig');
+  const secOnvifConfig = document.getElementById('secOnvifConfig');
+  const secCustomRtspConfig = document.getElementById('secCustomRtspConfig');
+
+  const inputBresserIp = document.getElementById('inputBresserIp');
+  const btnBresserWake = document.getElementById('btnBresserWake');
+  const badgeRtspWake = document.getElementById('badgeRtspWake');
+
+  const inputOnvifIp = document.getElementById('inputOnvifIp');
+  const inputOnvifPort = document.getElementById('inputOnvifPort');
+  const inputOnvifUser = document.getElementById('inputOnvifUser');
+  const inputOnvifPass = document.getElementById('inputOnvifPass');
+  const btnOnvifConnect = document.getElementById('btnOnvifConnect');
+
+  const inputCustomRtspUrl = document.getElementById('inputCustomRtspUrl');
+  const btnCustomRtspConnect = document.getElementById('btnCustomRtspConnect');
+
+  const textRtspStatus = document.getElementById('textRtspStatus');
+  const textRtspFps = document.getElementById('textRtspFps');
+
+  let selectedBresserChannel = appState.rtspChannel || 'ch1'; // Default highest res (1080p)
+  let selectedOnvifPath = appState.rtspOnvifPath || '/onvif1';
+
+  function setSourceMode(mode) {
+    updateState({ rtspSourceMode: mode });
+    saveSettings(appState);
+
+    if (mode === 'rtsp') {
+      btnSourceModeRtsp?.classList.add('radar-btn-active');
+      btnSourceModeUsb?.classList.remove('radar-btn-active');
+      if (panelSourceUsb) panelSourceUsb.style.display = 'none';
+      if (panelSourceRtsp) panelSourceRtsp.style.display = 'flex';
+      checkRtspGatewayStatus().then((st) => {
+        if (!st.available) {
+          if (textRtspStatus) textRtspStatus.textContent = 'GATEWAY: OFFLINE (Run server.py)';
+        } else if (textRtspStatus) {
+          textRtspStatus.textContent = `GATEWAY: ONLINE (OpenCV ${st.opencvVersion || 'Ready'})`;
+        }
+      });
+    } else {
+      btnSourceModeUsb?.classList.add('radar-btn-active');
+      btnSourceModeRtsp?.classList.remove('radar-btn-active');
+      if (panelSourceUsb) panelSourceUsb.style.display = 'block';
+      if (panelSourceRtsp) panelSourceRtsp.style.display = 'none';
+    }
+  }
+
+  btnSourceModeUsb?.addEventListener('click', () => setSourceMode('usb'));
+  btnSourceModeRtsp?.addEventListener('click', () => setSourceMode('rtsp'));
+
+  function setRtspPreset(preset) {
+    updateState({ rtspPreset: preset });
+    saveSettings(appState);
+
+    [btnPresetBresser, btnPresetOnvif, btnPresetCustom].forEach((b) => b?.classList.remove('radar-btn-active'));
+    [secBresserConfig, secOnvifConfig, secCustomRtspConfig].forEach((s) => {
+      if (s) s.style.display = 'none';
+    });
+
+    if (preset === 'bresser') {
+      btnPresetBresser?.classList.add('radar-btn-active');
+      if (secBresserConfig) secBresserConfig.style.display = 'flex';
+    } else if (preset === 'onvif') {
+      btnPresetOnvif?.classList.add('radar-btn-active');
+      if (secOnvifConfig) secOnvifConfig.style.display = 'flex';
+    } else {
+      btnPresetCustom?.classList.add('radar-btn-active');
+      if (secCustomRtspConfig) secCustomRtspConfig.style.display = 'flex';
+    }
+  }
+
+  btnPresetBresser?.addEventListener('click', () => setRtspPreset('bresser'));
+  btnPresetOnvif?.addEventListener('click', () => setRtspPreset('onvif'));
+  btnPresetCustom?.addEventListener('click', () => setRtspPreset('custom'));
+
+  // Bresser Channel Selection buttons
+  document.querySelectorAll('.btn-bresser-channel').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      document.querySelectorAll('.btn-bresser-channel').forEach((b) => b.classList.remove('radar-btn-active'));
+      btn.classList.add('radar-btn-active');
+      selectedBresserChannel = btn.dataset.channel || 'ch1';
+      updateState({ rtspChannel: selectedBresserChannel });
+      saveSettings(appState);
+
+      // If Bresser stream is currently live, switch channels immediately
+      if (appState.isRtspStream && appState.activeDeviceId?.includes('live/tcp/')) {
+        const ip = (inputBresserIp?.value || '192.168.0.1').trim();
+        const nextUrl = `rtsp://${ip}/live/tcp/${selectedBresserChannel}`;
+        const lbl = btn.dataset.label || 'Bresser HD CAM';
+        await startCameraStream(videoEl, 'rtsp:' + nextUrl, lbl);
+        if (appState.bufferEnabled) startMemoryBuffer(videoEl);
+        if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${lbl}`;
+        populateCameraDropdown();
+      }
+    });
+  });
+
+  // Bresser Wake-Up Trigger & Stream Connection
+  btnBresserWake?.addEventListener('click', async () => {
+    const ip = (inputBresserIp?.value || '192.168.0.1').trim();
+    updateState({ rtspCameraIp: ip });
+    saveSettings(appState);
+
+    if (badgeRtspWake) {
+      badgeRtspWake.textContent = '⚡ WAKING...';
+      badgeRtspWake.style.color = '#f59e0b';
+    }
+    if (textRtspStatus) textRtspStatus.textContent = `WAKING MEDIA PIPELINE AT ${ip}...`;
+
+    const wakeResult = await wakeCameraPipeline(ip, '/app/getmediainfo');
+
+    if (wakeResult && wakeResult.success) {
+      if (badgeRtspWake) {
+        badgeRtspWake.textContent = 'READY (1080p)';
+        badgeRtspWake.style.color = '#22c55e';
+      }
+      const streamUrl = `rtsp://${ip}/live/tcp/${selectedBresserChannel}`;
+      const streamLabel = `Bresser (${selectedBresserChannel === 'ch1' ? '1080p Main' : selectedBresserChannel})`;
+      if (textRtspStatus) textRtspStatus.textContent = `CONNECTING: ${streamUrl}...`;
+
+      await startCameraStream(videoEl, 'rtsp:' + streamUrl, streamLabel);
+      if (appState.bufferEnabled) startMemoryBuffer(videoEl);
+
+      if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${streamLabel.toUpperCase()}`;
+      populateCameraDropdown();
+    } else {
+      if (badgeRtspWake) {
+        badgeRtspWake.textContent = 'WAKE FAILED';
+        badgeRtspWake.style.color = '#fda4af';
+      }
+      if (textRtspStatus) {
+        textRtspStatus.textContent = `ERROR: ${wakeResult?.error || 'Check Bresser Wi-Fi connection'}`;
+      }
+    }
+  });
+
+  // ONVIF Channel Selection
+  document.querySelectorAll('.btn-onvif-channel').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.btn-onvif-channel').forEach((b) => b.classList.remove('radar-btn-active'));
+      btn.classList.add('radar-btn-active');
+      selectedOnvifPath = btn.dataset.path || '/onvif1';
+      updateState({ rtspOnvifPath: selectedOnvifPath });
+      saveSettings(appState);
+    });
+  });
+
+  // ONVIF Connect
+  btnOnvifConnect?.addEventListener('click', async () => {
+    const ip = (inputOnvifIp?.value || '192.168.1.100').trim();
+    const port = (inputOnvifPort?.value || '554').trim();
+    const user = (inputOnvifUser?.value || '').trim();
+    const pass = (inputOnvifPass?.value || '').trim();
+
+    updateState({
+      rtspCameraIp: ip,
+      rtspOnvifPort: parseInt(port, 10) || 554,
+      rtspOnvifUser: user
+    });
+    saveSettings(appState);
+
+    const authPrefix = user ? `${encodeURIComponent(user)}:${encodeURIComponent(pass)}@` : '';
+    const streamUrl = `rtsp://${authPrefix}${ip}:${port}${selectedOnvifPath}`;
+    const label = `ONVIF ${ip} (${selectedOnvifPath})`;
+
+    if (textRtspStatus) textRtspStatus.textContent = `CONNECTING TO ${ip}...`;
+    await startCameraStream(videoEl, 'rtsp:' + streamUrl, label);
+    if (appState.bufferEnabled) startMemoryBuffer(videoEl);
+    if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${label}`;
+    populateCameraDropdown();
+  });
+
+  // Custom RTSP Connect
+  btnCustomRtspConnect?.addEventListener('click', async () => {
+    const customUrl = (inputCustomRtspUrl?.value || '').trim();
+    if (!customUrl) return;
+
+    updateState({ rtspCustomUrl: customUrl });
+    saveSettings(appState);
+
+    if (textRtspStatus) textRtspStatus.textContent = `CONNECTING TO RTSP...`;
+    await startCameraStream(videoEl, 'rtsp:' + customUrl, 'CUSTOM RTSP');
+    if (appState.bufferEnabled) startMemoryBuffer(videoEl);
+    if (textRtspStatus) textRtspStatus.textContent = `LIVE: CUSTOM RTSP`;
+    populateCameraDropdown();
+  });
+
+  // Restore saved RTSP view state
+  if (appState.rtspSourceMode) {
+    setSourceMode(appState.rtspSourceMode);
+  }
+  if (appState.rtspPreset) {
+    setRtspPreset(appState.rtspPreset);
+  }
+  if (inputBresserIp && appState.rtspCameraIp) {
+    inputBresserIp.value = appState.rtspCameraIp;
+  }
+  if (inputCustomRtspUrl && appState.rtspCustomUrl) {
+    inputCustomRtspUrl.value = appState.rtspCustomUrl;
+  }
+
   async function populateCameraDropdown() {
     const devices = await enumerateCameras();
-    cameraSelect.innerHTML = devices
+    let optionsHtml = '';
+
+    // If an RTSP stream is currently active, surface it at the top of the selector
+    if (appState.isRtspStream && appState.activeDeviceId) {
+      optionsHtml += `<option value="${appState.activeDeviceId}" selected>📡 ${appState.activeDeviceLabel}</option>`;
+    }
+
+    optionsHtml += devices
       .map((d) => `<option value="${d.deviceId}">${d.label}</option>`)
       .join('');
-    if (appState.activeDeviceId && devices.some((d) => d.deviceId === appState.activeDeviceId)) {
+
+    cameraSelect.innerHTML = optionsHtml;
+    if (appState.activeDeviceId && !appState.isRtspStream && devices.some((d) => d.deviceId === appState.activeDeviceId)) {
       cameraSelect.value = appState.activeDeviceId;
     }
   }

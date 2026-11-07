@@ -442,13 +442,86 @@
 
       <div class="settings-screen-body">
         <div class="settings-screen-grid">
-          <!-- 1. USB Camera Source -->
-          <div class="settings-card">
+          <!-- 1. Video Source Selection (USB Webcams & Network RTSP Streams) -->
+          <div class="settings-card" id="cardCameraSource">
             <div class="settings-card-header">
-              <label for="cameraSelect" class="settings-label">Camera Source</label>
-              <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" title="Rescan USB Cameras">↻</button>
+              <span class="settings-label">Video Source</span>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button type="button" id="btnSourceModeUsb" class="radar-btn radar-btn-sm radar-btn-active" style="height:26px; font-size:11px; padding:0 8px;">USB CAM</button>
+                <button type="button" id="btnSourceModeRtsp" class="radar-btn radar-btn-sm" style="height:26px; font-size:11px; padding:0 8px;">NETWORK (RTSP)</button>
+                <button id="btnRefreshCameras" class="radar-btn radar-btn-sm" style="height:26px; min-width:28px; padding:0 6px;" title="Rescan Cameras">↻</button>
+              </div>
             </div>
-            <select id="cameraSelect" class="radar-select"></select>
+
+            <!-- USB Webcam Selection Sub-Panel -->
+            <div id="panelSourceUsb">
+              <select id="cameraSelect" class="radar-select" style="width:100%;"></select>
+            </div>
+
+            <!-- Network RTSP Selection Sub-Panel -->
+            <div id="panelSourceRtsp" class="hidden" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
+              <!-- RTSP Device Preset Tabs -->
+              <div style="display:flex; gap:4px;">
+                <button type="button" id="btnPresetBresser" class="radar-btn radar-btn-sm radar-btn-active" style="flex:1; height:26px; font-size:11px; padding:0 6px;">BRESSER HD CAM</button>
+                <button type="button" id="btnPresetOnvif" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">ONVIF IP CAM</button>
+                <button type="button" id="btnPresetCustom" class="radar-btn radar-btn-sm" style="flex:1; height:26px; font-size:11px; padding:0 6px;">CUSTOM URL</button>
+              </div>
+
+              <!-- Bresser Eyepiece HD Configuration -->
+              <div id="secBresserConfig" style="display:flex; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">BRESSER WI-FI CAMERA</span>
+                  <span id="badgeRtspWake" style="font-family:var(--font-mono); font-size:10px; color:var(--radar-text-muted);">STANDBY</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <input id="inputBresserIp" type="text" value="192.168.0.1" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="192.168.0.1" title="Bresser Eyepiece Camera IP Address" />
+                  <button type="button" id="btnBresserWake" class="radar-btn radar-btn-sm" style="height:30px; padding:0 10px; font-size:11px; font-weight:700;" title="Wake camera DSP media pipeline and connect">⚡ WAKE & CONNECT</button>
+                </div>
+
+                <!-- Stream Resolution Channel Switcher (Defaulting to highest res) -->
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">STREAM RESOLUTION / CHANNEL</label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel radar-btn-active" data-channel="ch1" data-label="Bresser (1080p Main)" style="height:26px; font-size:10px; padding:0 6px;">● MAIN (1080p - ch1)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-bresser-channel" data-channel="ch2" data-label="Bresser (Fast Sub)" style="height:26px; font-size:10px; padding:0 6px;">○ SUB (Fast - ch2)</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ONVIF IP Camera Configuration -->
+              <div id="secOnvifConfig" class="hidden" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">ONVIF / CCTV STREAM SETTINGS</div>
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px;">
+                  <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Camera IP" />
+                  <input id="inputOnvifPort" type="number" value="554" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="554" />
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                  <input id="inputOnvifUser" type="text" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Username (opt)" />
+                  <input id="inputOnvifPass" type="password" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Password (opt)" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                  <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">ONVIF PROFILE / CHANNEL</label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel radar-btn-active" data-path="/onvif1" data-label="ONVIF (Profile 1 - 1080p)" style="height:26px; font-size:10px; padding:0 6px;">● PROFILE 1 (1080p)</button>
+                    <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel" data-path="/onvif2" data-label="ONVIF (Profile 2 - Sub)" style="height:26px; font-size:10px; padding:0 6px;">○ PROFILE 2 (Sub)</button>
+                  </div>
+                </div>
+                <button type="button" id="btnOnvifConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT ONVIF STREAM</button>
+              </div>
+
+              <!-- Custom RTSP URL Configuration -->
+              <div id="secCustomRtspConfig" class="hidden" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">MANUAL RTSP URL</div>
+                <input id="inputCustomRtspUrl" type="text" value="" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="rtsp://192.168.0.1:554/live/ch0" />
+                <button type="button" id="btnCustomRtspConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT CUSTOM RTSP</button>
+              </div>
+
+              <!-- Connection Status & Gateway Telemetry -->
+              <div id="statusRtspBanner" style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted); display:flex; justify-content:space-between; align-items:center; padding:4px 2px;">
+                <span id="textRtspStatus">RTSP GATEWAY: STANDBY</span>
+                <span id="textRtspFps"></span>
+              </div>
+            </div>
           </div>
 
           <!-- 2. In-Memory Rewind & Recording Buffer Config + Memory Meter -->
@@ -654,15 +727,15 @@
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Interface Appearance</span>
-              <input id="colorPickerCustom" type="color" value="#2dd4bf" class="theme-color-input" title="Pick Custom Interface Color" />
+              <input id="colorPickerCustom" type="color" value="#f97316" class="theme-color-input" title="Pick Custom Interface Color" />
             </div>
             <div class="swatch-row">
-              <button class="theme-swatch active" data-color="#2dd4bf" style="background:#2dd4bf;" title="Radar Teal"></button>
-              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Phosphor Green"></button>
-              <button class="theme-swatch" data-color="#38bdf8" style="background:#38bdf8;" title="Sonar Cyan-Blue"></button>
-              <button class="theme-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Avionics Amber"></button>
-              <button class="theme-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Night-Vision Crimson"></button>
-              <button class="theme-swatch" data-color="#e5e5e5" style="background:#e5e5e5;" title="Monochrome Silver"></button>
+              <button class="theme-swatch active" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+              <button class="theme-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+              <button class="theme-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+              <button class="theme-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+              <button class="theme-swatch" data-color="#ffffff" style="background:#ffffff; border:1px solid #94a3b8;" title="White"></button>
+              <button class="theme-swatch" data-color="#000000" style="background:#000000; border:1px solid #475569;" title="Black"></button>
             </div>
 
             <div class="slider-group">

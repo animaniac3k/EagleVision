@@ -11,6 +11,18 @@ export const appState = {
   streamHeight: 1080,
   fps: 60,
   isSimulatedStream: false,
+  isRtspStream: false,
+  rtspSourceMode: 'usb',       // 'usb' | 'rtsp'
+  rtspPreset: 'bresser',       // 'bresser' | 'onvif' | 'custom'
+  rtspCameraIp: '192.168.0.1', // Default Bresser Eyepiece HD IP
+  rtspChannel: 'ch1',          // Default highest res channel (1080p)
+  rtspOnvifPort: 554,
+  rtspOnvifPath: '/onvif1',
+  rtspOnvifUser: '',
+  rtspOnvifPass: '',
+  rtspCustomUrl: '',
+  rtspWakeStatus: 'idle',      // 'idle' | 'waking' | 'live' | 'error'
+  rtspAvailableChannels: [],
 
   // Main Viewport Zoom & Pan
   mainZoom: 1.0,
@@ -80,7 +92,7 @@ export const appState = {
   replayActive: false,
 
   // Interface Theme Color, Global UI Opacity, Declutter Mode, Gamepad & 5-Button Bluetooth Ring
-  themeColor: '#2dd4bf',
+  themeColor: '#f97316',
   uiOpacity: 100,
   uiDecluttered: false,
   touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)

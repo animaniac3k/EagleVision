@@ -57,14 +57,14 @@ const DEADZONE = 0.16;
 const BASE_ROI_SPEED = 0.012;
 const BASE_PAN_SPEED = 0.014;
 
-// Tactical GUI Color Schemes (Cycled via L3 / R3)
+// Tactical GUI Color Schemes (Cycled via L3 / R3) - Orange, Green, Red, Blue, White, Black
 const GUI_THEMES = [
-  { id: 'teal', name: 'Radar Teal', color: '#2dd4bf' },
-  { id: 'green', name: 'Phosphor Green', color: '#22c55e' },
-  { id: 'cyan', name: 'Sonar Cyan', color: '#38bdf8' },
-  { id: 'amber', name: 'Avionics Amber', color: '#f59e0b' },
-  { id: 'crimson', name: 'Night-Vision Crimson', color: '#f43f5e' },
-  { id: 'silver', name: 'Monochrome Silver', color: '#e5e5e5' }
+  { id: 'orange', name: 'Orange', color: '#f97316' },
+  { id: 'green', name: 'Green', color: '#22c55e' },
+  { id: 'red', name: 'Red', color: '#ef4444' },
+  { id: 'blue', name: 'Blue', color: '#3b82f6' },
+  { id: 'white', name: 'White', color: '#ffffff' },
+  { id: 'black', name: 'Black', color: '#000000' }
 ];
 
 const ROLES = [

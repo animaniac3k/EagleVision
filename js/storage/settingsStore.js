@@ -60,7 +60,7 @@ export function saveSettings(state) {
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
-      themeColor: state.themeColor || '#2dd4bf',
+      themeColor: state.themeColor || '#f97316',
       uiOpacity: state.uiOpacity ?? 100,
       touchpadSensitivity: state.touchpadSensitivity ?? 50,
       reticleAimSpeed: state.reticleAimSpeed ?? 50,
@@ -70,7 +70,15 @@ export function saveSettings(state) {
       rightStickInvertY: Boolean(state.rightStickInvertY),
       activeControllerProfile: state.activeControllerProfile || 'default',
       controllerBindings: state.controllerBindings || null,
-      ringKeyMap: state.ringKeyMap || {}
+      ringKeyMap: state.ringKeyMap || {},
+      rtspSourceMode: state.rtspSourceMode || 'usb',
+      rtspPreset: state.rtspPreset || 'bresser',
+      rtspCameraIp: state.rtspCameraIp || '192.168.0.1',
+      rtspChannel: state.rtspChannel || 'ch1',
+      rtspOnvifPort: state.rtspOnvifPort || 554,
+      rtspOnvifPath: state.rtspOnvifPath || '/onvif1',
+      rtspOnvifUser: state.rtspOnvifUser || '',
+      rtspCustomUrl: state.rtspCustomUrl || ''
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));
   } catch {

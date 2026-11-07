@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v42';
+const CACHE_NAME = 'spotr-v44';
 const ASSETS = [
   './',
   './index.html',
@@ -55,6 +55,12 @@ self.addEventListener('activate', (event) => {
 // Network-first strategy so updates load immediately, with offline cache fallback
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
+    return;
+  }
+
+  // Bypass service worker caching for RTSP live streams and local API calls
+  const reqUrl = new URL(event.request.url);
+  if (reqUrl.pathname.startsWith('/api/')) {
     return;
   }
 

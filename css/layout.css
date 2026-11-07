@@ -188,6 +188,7 @@
   max-height: 560px;
   pointer-events: none;
   overflow: visible;
+  filter: var(--reticle-shadow, drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75)));
 }
 
 .reticle-stage-hint {
