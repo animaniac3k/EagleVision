@@ -34,7 +34,6 @@ class RtspSession:
     def __init__(self):
         self.lock = threading.Lock()
         self.active_url = None
-        self.cap = None
         self.is_running = False
         self.latest_jpeg = None
         self.latest_frame_time = 0
@@ -48,88 +47,99 @@ class RtspSession:
         with self.lock:
             if self.is_running and self.active_url == url:
                 return True
-            self.stop_locked()
 
+        # Stop previous session cleanly without deadlock
+        self.stop()
+
+        with self.lock:
             self.active_url = url
             self.is_running = True
             self.error_message = None
+            self.latest_jpeg = None
             self.worker_thread = threading.Thread(target=self._capture_worker, args=(url, transport), daemon=True)
             self.worker_thread.start()
             return True
 
     def _capture_worker(self, url, transport):
         print(f"[*] [RTSP Gateway] Connecting to {url} (transport={transport})...")
+        # threads;1 enforces single-threaded slice decoding, completely preventing libavcodec pthread_frame.c race conditions
         os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-            f"rtsp_transport;{transport}|timeout;3000000|fflags;nobuffer|flags;low_delay"
+            f"rtsp_transport;{transport}|timeout;3000000|fflags;nobuffer|flags;low_delay|threads;1"
         )
 
-        cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        cap = None
+        try:
+            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        if not cap.isOpened():
-            print(f"[-] [RTSP Gateway] Failed to open stream: {url}")
+            if not cap.isOpened():
+                print(f"[-] [RTSP Gateway] Failed to open stream: {url}")
+                with self.lock:
+                    self.error_message = "Unable to open RTSP video stream."
+                    self.is_running = False
+                return
+
+            frame_count = 0
+            fps_timer = time.time()
+
+            while self.is_running:
+                # Grab frame directly with minimal latency
+                ret = cap.grab()
+                if not ret:
+                    time.sleep(0.005)
+                    continue
+
+                ret, frame = cap.retrieve()
+                if not ret or frame is None:
+                    continue
+
+                h, w = frame.shape[:2]
+
+                # Encode directly to JPEG for browser multipart stream
+                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                if not ret:
+                    continue
+
+                jpeg_bytes = jpeg.tobytes()
+                now = time.time()
+
+                frame_count += 1
+                if now - fps_timer >= 1.0:
+                    self.fps = frame_count / (now - fps_timer)
+                    frame_count = 0
+                    fps_timer = now
+
+                with self.lock:
+                    self.latest_jpeg = jpeg_bytes
+                    self.latest_frame_time = now
+                    self.stream_width = w
+                    self.stream_height = h
+        except Exception as e:
+            print(f"[!] [RTSP Gateway] Exception in capture worker: {e}")
             with self.lock:
-                self.error_message = "Unable to open RTSP video stream."
-                self.is_running = False
-            return
-
-        with self.lock:
-            self.cap = cap
-
-        frame_count = 0
-        fps_timer = time.time()
-
-        while self.is_running:
-            # Grab frame directly with minimal latency
-            ret = cap.grab()
-            if not ret:
-                time.sleep(0.005)
-                continue
-
-            ret, frame = cap.retrieve()
-            if not ret or frame is None:
-                continue
-
-            h, w = frame.shape[:2]
-
-            # Encode directly to JPEG for browser multipart stream
-            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if not ret:
-                continue
-
-            jpeg_bytes = jpeg.tobytes()
-            now = time.time()
-
-            frame_count += 1
-            if now - fps_timer >= 1.0:
-                self.fps = frame_count / (now - fps_timer)
-                frame_count = 0
-                fps_timer = now
-
-            with self.lock:
-                self.latest_jpeg = jpeg_bytes
-                self.latest_frame_time = now
-                self.stream_width = w
-                self.stream_height = h
-
-        cap.release()
-        print(f"[*] [RTSP Gateway] Closed stream: {url}")
+                self.error_message = str(e)
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+            print(f"[*] [RTSP Gateway] Closed stream: {url}")
 
     def stop(self):
+        t_to_join = None
         with self.lock:
-            self.stop_locked()
+            if not self.is_running:
+                return
+            self.is_running = False
+            t_to_join = self.worker_thread
+            self.worker_thread = None
+            self.active_url = None
+            self.latest_jpeg = None
+            self.error_message = None
 
-    def stop_locked(self):
-        self.is_running = False
-        if self.cap:
-            try:
-                self.cap.release()
-            except Exception:
-                pass
-            self.cap = None
-        self.active_url = None
-        self.latest_jpeg = None
-        self.error_message = None
+        if t_to_join and t_to_join.is_alive() and threading.current_thread() != t_to_join:
+            t_to_join.join(timeout=1.5)
 
 
 rtsp_session = RtspSession()

@@ -365,6 +365,9 @@ export function stopCurrentStream() {
     activeMediaStream.getTracks().forEach((t) => t.stop());
     activeMediaStream = null;
   }
-  // Notify local Python server to release RTSP socket
-  fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
+  // Only notify local Python server to release RTSP socket if an RTSP stream was active
+  if (appState.isRtspStream) {
+    updateState({ isRtspStream: false });
+    fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
+  }
 }

@@ -459,7 +459,7 @@
             </div>
 
             <!-- Network RTSP Selection Sub-Panel -->
-            <div id="panelSourceRtsp" class="hidden" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
+            <div id="panelSourceRtsp" style="display:none; flex-direction:column; gap:10px; margin-top:4px;">
               <!-- RTSP Device Preset Tabs -->
               <div style="display:flex; gap:4px;">
                 <button type="button" id="btnPresetBresser" class="radar-btn radar-btn-sm radar-btn-active" style="flex:1; height:26px; font-size:11px; padding:0 6px;">BRESSER HD CAM</button>
@@ -489,7 +489,7 @@
               </div>
 
               <!-- ONVIF IP Camera Configuration -->
-              <div id="secOnvifConfig" class="hidden" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+              <div id="secOnvifConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
                 <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">ONVIF / CCTV STREAM SETTINGS</div>
                 <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px;">
                   <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Camera IP" />
@@ -510,7 +510,7 @@
               </div>
 
               <!-- Custom RTSP URL Configuration -->
-              <div id="secCustomRtspConfig" class="hidden" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+              <div id="secCustomRtspConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
                 <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">MANUAL RTSP URL</div>
                 <input id="inputCustomRtspUrl" type="text" value="" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="rtsp://192.168.0.1:554/live/ch0" />
                 <button type="button" id="btnCustomRtspConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT CUSTOM RTSP</button>

@@ -288,8 +288,14 @@ export function initSidebarAndTopControls(videoEl) {
     if (mode === 'rtsp') {
       btnSourceModeRtsp?.classList.add('radar-btn-active');
       btnSourceModeUsb?.classList.remove('radar-btn-active');
-      if (panelSourceUsb) panelSourceUsb.style.display = 'none';
-      if (panelSourceRtsp) panelSourceRtsp.style.display = 'flex';
+      if (panelSourceUsb) {
+        panelSourceUsb.classList.add('hidden');
+        panelSourceUsb.style.display = 'none';
+      }
+      if (panelSourceRtsp) {
+        panelSourceRtsp.classList.remove('hidden');
+        panelSourceRtsp.style.display = 'flex';
+      }
       checkRtspGatewayStatus().then((st) => {
         if (!st.available) {
           if (textRtspStatus) textRtspStatus.textContent = 'GATEWAY: OFFLINE (Run server.py)';
@@ -300,8 +306,14 @@ export function initSidebarAndTopControls(videoEl) {
     } else {
       btnSourceModeUsb?.classList.add('radar-btn-active');
       btnSourceModeRtsp?.classList.remove('radar-btn-active');
-      if (panelSourceUsb) panelSourceUsb.style.display = 'block';
-      if (panelSourceRtsp) panelSourceRtsp.style.display = 'none';
+      if (panelSourceUsb) {
+        panelSourceUsb.classList.remove('hidden');
+        panelSourceUsb.style.display = 'block';
+      }
+      if (panelSourceRtsp) {
+        panelSourceRtsp.classList.add('hidden');
+        panelSourceRtsp.style.display = 'none';
+      }
     }
   }
 
@@ -314,18 +326,30 @@ export function initSidebarAndTopControls(videoEl) {
 
     [btnPresetBresser, btnPresetOnvif, btnPresetCustom].forEach((b) => b?.classList.remove('radar-btn-active'));
     [secBresserConfig, secOnvifConfig, secCustomRtspConfig].forEach((s) => {
-      if (s) s.style.display = 'none';
+      if (s) {
+        s.classList.add('hidden');
+        s.style.display = 'none';
+      }
     });
 
     if (preset === 'bresser') {
       btnPresetBresser?.classList.add('radar-btn-active');
-      if (secBresserConfig) secBresserConfig.style.display = 'flex';
+      if (secBresserConfig) {
+        secBresserConfig.classList.remove('hidden');
+        secBresserConfig.style.display = 'flex';
+      }
     } else if (preset === 'onvif') {
       btnPresetOnvif?.classList.add('radar-btn-active');
-      if (secOnvifConfig) secOnvifConfig.style.display = 'flex';
+      if (secOnvifConfig) {
+        secOnvifConfig.classList.remove('hidden');
+        secOnvifConfig.style.display = 'flex';
+      }
     } else {
       btnPresetCustom?.classList.add('radar-btn-active');
-      if (secCustomRtspConfig) secCustomRtspConfig.style.display = 'flex';
+      if (secCustomRtspConfig) {
+        secCustomRtspConfig.classList.remove('hidden');
+        secCustomRtspConfig.style.display = 'flex';
+      }
     }
   }
 
