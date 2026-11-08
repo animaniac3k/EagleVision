@@ -1,5 +1,5 @@
 /**
- * EagleVision Embedded Voice Audio Engine
+ * SPOTR Embedded Voice Audio Engine
  * 
  * 100% Host-Independent, Offline Studio Female Voice Synthesizer
  * Uses Web Audio API + Pre-rendered 24kHz Jenny (en-US) Studio Voice Sprites.

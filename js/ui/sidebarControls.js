@@ -469,6 +469,7 @@ export function initSidebarAndTopControls(videoEl) {
     const pass = (inputOnvifPass?.value || '').trim();
 
     updateState({
+      rtspOnvifIp: ip,
       rtspCameraIp: ip,
       rtspOnvifPort: parseInt(port, 10) || 554,
       rtspOnvifUser: user
@@ -513,6 +514,15 @@ export function initSidebarAndTopControls(videoEl) {
   }
   if (inputCustomRtspUrl && appState.rtspCustomUrl) {
     inputCustomRtspUrl.value = appState.rtspCustomUrl;
+  }
+  if (inputOnvifIp && appState.rtspOnvifIp) {
+    inputOnvifIp.value = appState.rtspOnvifIp;
+  }
+  if (inputOnvifPort && appState.rtspOnvifPort) {
+    inputOnvifPort.value = appState.rtspOnvifPort;
+  }
+  if (inputOnvifUser && appState.rtspOnvifUser) {
+    inputOnvifUser.value = appState.rtspOnvifUser;
   }
 
   async function populateCameraDropdown() {

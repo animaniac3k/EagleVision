@@ -1,5 +1,5 @@
 /**
- * Central Reactive State Store for EagleVision
+ * Central Reactive State Store for SPOTR
  */
 const listeners = new Set();
 

@@ -1,12 +1,12 @@
 @echo off
-title EagleVision Portable Launcher
+title SPOTR Portable Launcher
 cd /d "%~dp0"
 echo ============================================================
-echo   EAGLEVISION - PORTABLE USB CAMERA ^& OVERLAY SYSTEM
+echo   SPOTR - TACTICAL RECON ^& OVERLAY SYSTEM
 echo ============================================================
 echo.
 echo Starting local server at http://localhost:8080 ...
-echo Keep this window open while using EagleVision.
+echo Keep this window open while using SPOTR.
 echo.
 
 where python >nul 2>nul

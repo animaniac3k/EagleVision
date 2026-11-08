@@ -47,49 +47,50 @@
     SPOTR<tspan fill="#ffd166" font-size="14" font-weight="700" dy="-7">™</tspan><tspan fill="#f8fafc" font-size="22" font-weight="800" dy="7"> — SYSTEM ARCHITECTURE &amp; DATA FLOW</tspan>
   </text>
   <text x="54" y="76" fill="#94a3b8" font-family="'Segoe UI', -apple-system, Roboto, sans-serif" font-size="13" font-weight="500">
-    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT</tspan> — Beta 1 Release Architecture • Pure Browser Client • PWA Offline Precached
+    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — Revision 52 Architecture • Pure Browser Client &amp; OpenCV RTSP Gateway • PWA Precached
   </text>
   <rect x="1170" y="38" width="220" height="38" rx="6" fill="#18181b" stroke="#3f3f46"/>
-  <text x="1280" y="62" text-anchor="middle" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">BETA 1.0.0 (OFFLINE)</text>
+  <text x="1280" y="62" text-anchor="middle" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">REV 52.0 (OFFLINE)</text>
 
   <!-- ===================================================================== -->
   <!-- COLUMN 1: HARDWARE & INPUT BUS                                        -->
   <!-- ===================================================================== -->
   <g transform="translate(30, 110)">
     <!-- Column Header -->
-    <text x="0" y="0" fill="#2dd4bf" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" letter-spacing="1">1. HARDWARE INPUT &amp; CONTROLLERS</text>
+    <text x="0" y="0" fill="#2dd4bf" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" letter-spacing="1">1. DUAL CAMERA &amp; HARDWARE INPUT</text>
 
-    <!-- UVC Camera Box -->
+    <!-- Dual Camera Ingestion Box -->
     <g transform="translate(0, 15)">
-      <rect width="320" height="135" rx="6" fill="#18181b" stroke="#27272a" stroke-width="1.5"/>
-      <rect width="320" height="28" rx="6" fill="#202024"/>
-      <circle cx="16" cy="14" r="5" fill="#22c55e"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">UVC SCOPE / CAMERA INPUT</text>
+      <rect width="320" height="145" rx="6" fill="#18181b" stroke="#2dd4bf" stroke-width="1.5"/>
+      <rect width="320" height="28" rx="6" fill="#134e4a"/>
+      <circle cx="16" cy="14" r="5" fill="#2dd4bf"/>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">DUAL CAMERA INGESTION PIPELINE</text>
       
-      <text x="14" y="48" fill="#38bdf8" font-family="monospace" font-size="12" font-weight="bold">streamManager.js</text>
-      <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• 1080p60 / 720p60 USB Scope Stream</text>
-      <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Dynamic Hot-Plug (devicechange event)</text>
-      <text x="14" y="104" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Native Canvas Test Card Pattern Fallback</text>
-      <text x="14" y="122" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Live Resolution &amp; FPS Telemetry</text>
+      <text x="14" y="48" fill="#38bdf8" font-family="monospace" font-size="12" font-weight="bold">streamManager.js &amp; server.py</text>
+      <text x="14" y="66" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• UVC Scopes: 1080p/4K @ 60fps via getUserMedia</text>
+      <text x="14" y="84" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Bresser Wi-Fi Proxy: /api/rtsp/wake UDP packet</text>
+      <text x="14" y="102" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Channels: ch0 (1080p optics) &amp; ch1 (540p stream)</text>
+      <text x="14" y="120" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Threading Condition push with &lt;1ms latency</text>
+      <text x="14" y="136" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Synthetic Test Pattern fallback with calibrated hash lines</text>
     </g>
 
     <!-- WebHID & DualShock 4 Controller Box -->
-    <g transform="translate(0, 165)">
-      <rect width="320" height="235" rx="6" fill="#18181b" stroke="#3b82f6" stroke-width="1.5"/>
+    <g transform="translate(0, 175)">
+      <rect width="320" height="225" rx="6" fill="#18181b" stroke="#3b82f6" stroke-width="1.5"/>
       <rect width="320" height="28" rx="6" fill="#1e293b"/>
       <circle cx="16" cy="14" r="5" fill="#38bdf8"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">DUALSHOCK 4 &amp; WEBHID BUS</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">DUALSHOCK 4/5 &amp; WEBHID BUS</text>
 
       <text x="14" y="48" fill="#60a5fa" font-family="monospace" font-size="12" font-weight="bold">gamepadController.js</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#38bdf8" font-weight="bold">Touchpad (WebHID Report 0x11)</tspan>: 54-byte raw</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#38bdf8" font-weight="bold">Touchpad (WebHID Report 0x11)</tspan>: Capacitive</text>
       <text x="24" y="84" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">glide &amp; click → absolute/relative Virtual Mouse</text>
       <text x="14" y="102" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ffd166" font-weight="bold">L2 Trigger</tspan>: Left Mouse Click &amp; Drag</text>
       <text x="14" y="120" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ffd166" font-weight="bold">R2 Trigger</tspan>: Right Mouse Context Click</text>
-      <text x="14" y="138" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#2dd4bf" font-weight="bold">Left Stick</tspan>: Primary Reticle Aim (50% speed)</text>
-      <text x="14" y="156" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#2dd4bf" font-weight="bold">Right Stick</tspan>: PiP Zoom Window Pan &amp; ROI</text>
-      <text x="14" y="174" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#a78bfa" font-weight="bold">Buttons</tspan>: Circle (Replay), Cross (Play), D-Pad</text>
-      <text x="14" y="192" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ec4899" font-weight="bold">L3 / R3</tspan>: Tactical Themes &amp; Declutter Toggle</text>
-      <text x="14" y="214" fill="#38bdf8" font-family="monospace" font-size="10" font-weight="bold">→ Reticle Sculpting: direct stick editing in design mode</text>
+      <text x="14" y="138" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#2dd4bf" font-weight="bold">Left Stick</tspan>: Primary Reticle Aim (0.16 deadzone)</text>
+      <text x="14" y="156" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#2dd4bf" font-weight="bold">Right Stick</tspan>: Stream Pan when Zoom &gt; 1.0x</text>
+      <text x="14" y="174" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#a78bfa" font-weight="bold">Buttons</tspan>: Share (Replay), Square (Reticle Drawer)</text>
+      <text x="14" y="192" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ec4899" font-weight="bold">D-Pad</tspan>: Cyclic quick-tools &amp; FFP subtension spacing</text>
+      <text x="14" y="212" fill="#38bdf8" font-family="monospace" font-size="10" font-weight="bold">→ Zero-allocation polling loop with cached references</text>
     </g>
 
     <!-- Bluetooth Ring Box -->
@@ -97,12 +98,12 @@
       <rect width="320" height="105" rx="6" fill="#18181b" stroke="#27272a" stroke-width="1.5"/>
       <rect width="320" height="28" rx="6" fill="#202024"/>
       <circle cx="16" cy="14" r="5" fill="#a855f7"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">5-BUTTON BLUETOOTH RING</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">5-BUTTON BLUETOOTH REMOTE RING</text>
 
       <text x="14" y="48" fill="#c084fc" font-family="monospace" font-size="12" font-weight="bold">ringController.js</text>
-      <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Mode Cycle: AIM ROI → DIGITAL ZOOM → TOOLS</text>
+      <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Mode Cycle: AIM ROI → ZOOM → TOOLS → PLAYER</text>
       <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Double-Tap Center: Trigger Instant Replay</text>
-      <text x="14" y="102" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Live 5-Key Remapping in Options Dialog</text>
+      <text x="14" y="102" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Live interactive calibration stage in Settings</text>
     </g>
 
     <!-- Central State Bus Box -->
@@ -114,9 +115,9 @@
 
       <text x="14" y="48" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">js/state.js &amp; settingsStore.js</text>
       <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• updateState() / subscribeState() Unidirectional Flow</text>
-      <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Zoom, Pan, Heatmap, Ring Buffer, Voice Settings</text>
-      <text x="14" y="104" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Dual-Stick Sensitivity, Deadzones, Invert Y-axis</text>
-      <text x="14" y="122" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Reticle Parameters (geometry, color, lines, gap)</text>
+      <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• cameraSource (usb/rtsp), FFP lock, Reticle Config</text>
+      <text x="14" y="104" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Zoom, Pan, 20Hz Heatmap, RAM Buffer, Voice Settings</text>
+      <text x="14" y="122" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• 6 Tactical Color Themes (Emerald, Amber, Ruby...)</text>
       <text x="14" y="142" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">↔ IndexedDB &amp; LocalStorage Persistence</text>
     </g>
   </g>
@@ -136,14 +137,14 @@
       <!-- Sub-panel: Main Canvas -->
       <rect x="14" y="44" width="472" height="72" rx="4" fill="#202024" stroke="#27272a"/>
       <text x="24" y="62" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">PRIMARY VIEWPORT (#mainCanvas)</text>
-      <text x="24" y="80" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Aspect-ratio preserved camera rendering + Digital Zoom (1.0x - 8.0x)</text>
+      <text x="24" y="80" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Canvas 2D: alpha: false, desynchronized: true; contain: strict</text>
       <text x="24" y="98" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Real-time Touch &amp; Joystick Panning with Boundary Clamping</text>
 
       <!-- Sub-panel: Micro-Change Heatmap -->
       <rect x="14" y="124" width="472" height="74" rx="4" fill="#202024" stroke="#e11d48"/>
-      <text x="24" y="142" fill="#fb7185" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">THERMAL MICRO-CHANGE HEATMAP ENGINE</text>
-      <text x="24" y="160" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 160×90 downsampled luma matrix delta against sliding background</text>
-      <text x="24" y="178" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#f43f5e" font-weight="bold">&gt;18% Global Shift Cutoff</tspan> eliminates scope shake / wind / jitter</text>
+      <text x="24" y="142" fill="#fb7185" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">20Hz DECOUPLED MICRO-CHANGE HEATMAP</text>
+      <text x="24" y="160" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 50ms decoupled interval eliminates 60fps render loop stalls</text>
+      <text x="24" y="178" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#f43f5e" font-weight="bold">&gt;18% Global Shift Cutoff</tspan> rejects camera shake &amp; tripod bumps</text>
 
       <!-- Sub-panel: PiP Digital Loupe -->
       <rect x="14" y="206" width="472" height="66" rx="4" fill="#202024" stroke="#3b82f6"/>
@@ -157,12 +158,12 @@
       <rect width="500" height="155" rx="6" fill="#18181b" stroke="#ffd166" stroke-width="1.5"/>
       <rect width="500" height="28" rx="6" fill="#78350f"/>
       <circle cx="16" cy="14" r="5" fill="#ffd166"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">DIRECTIONAL SPEECH ANNOUNCER</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">STUDIO VOICE SYNTHESIZER &amp; TTS</text>
 
-      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">speechEngine.js &amp; Web Speech API</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Heatmap Centroid Vector → Relative Angle to Scope Reticle</text>
-      <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ffd166" font-weight="bold">Custom Keywords</tspan>: High / Low / Left / Right / Clock directions</text>
-      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Audio Throttling &amp; Queue Management: Prevents speech cascades</text>
+      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">voiceAudioEngine.js &amp; voiceManifest.js</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• High-fidelity Web Audio sprite (<tspan fill="#ffd166">voice-sprite.mp3</tspan>) with 0ms delay</text>
+      <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Local Web Speech API automatic fallback</text>
+      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Directional Announcements: Clock angle (1..12) &amp; reticle clicks</text>
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Quick Mute / Unmute Button on Main Header with State Synced Icon</text>
       <text x="14" y="140" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Audition Sample Test button in Options Panel</text>
     </g>
@@ -172,16 +173,16 @@
       <rect width="500" height="225" rx="6" fill="#18181b" stroke="#a855f7" stroke-width="1.5"/>
       <rect width="500" height="28" rx="6" fill="#581c87"/>
       <circle cx="16" cy="14" r="5" fill="#c084fc"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">RETICLE CUSTOMIZER &amp; CLICK CALIBRATION</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">PARAMETRIC RETICLE &amp; FIRST FOCAL PLANE</text>
 
-      <text x="14" y="48" fill="#c084fc" font-family="monospace" font-size="12" font-weight="bold">reticleManager.js &amp; reticleCustomizer.js</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#e9d5ff" font-weight="bold">Fullscreen Reticle Studio</tspan>: Dedicated interactive design screen</text>
-      <text x="14" y="88" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Parametric Geometry: Inner / Outer Ring, Gap, Crosshair Thickness</text>
-      <text x="14" y="106" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Circle &amp; Dot Toggles: Mil-dot style hashmarks, target bullseye</text>
-      <text x="14" y="124" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ffd166" font-weight="bold">Direct Controller Stick Sculpting</tspan>: Left stick alters thickness &amp; size</text>
-      <text x="14" y="142" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Right Stick adjusts open-center gap and ring diameter live</text>
-      <text x="14" y="162" fill="#38bdf8" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Click Calibration Engine: MOA / MRAD Turret Click Offset Calculator</text>
-      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">  (Calculates L/R &amp; Up/Down clicks from target POI to POE impact point)</text>
+      <text x="14" y="48" fill="#c084fc" font-family="monospace" font-size="12" font-weight="bold">overlayManager.js &amp; reticleScreen.js</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#e9d5ff" font-weight="bold">First Focal Plane (FFP)</tspan>: Subtensions scale with digital zoom</text>
+      <text x="14" y="88" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• 4 Center Point Styles: Empty, Precision Dot, Mini-Cross, Chevron</text>
+      <text x="14" y="106" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Up to 30 Clicks/indents, tick labels, brackets &amp; range rings</text>
+      <text x="14" y="124" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#ffd166" font-weight="bold">Reticle Quick Drawer</tspan>: Live drawer on feed with live FFP toggle</text>
+      <text x="14" y="142" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 6 Tactical Color Themes (Emerald, Amber, Ruby, Blue, White...)</text>
+      <text x="14" y="162" fill="#38bdf8" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Click Calibration Engine: MOA / MRAD Turret Click Calculator</text>
+      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">  (Calculates L/R &amp; Up/Down clicks from target POI to true center datum)</text>
       <text x="14" y="200" fill="#a855f7" font-family="'Segoe UI', sans-serif" font-size="11">• Custom Scope Image Overlay Loader (PNG / WebP / SVG transparent reticles)</text>
     </g>
   </g>
@@ -197,16 +198,16 @@
       <rect width="500" height="215" rx="6" fill="#18181b" stroke="#2dd4bf" stroke-width="2"/>
       <rect width="500" height="28" rx="6" fill="#134e4a"/>
       <circle cx="16" cy="14" r="5" fill="#2dd4bf"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">NATIVE-RES RAM RING BUFFER (ZERO DISK I/O)</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">DUAL NATIVE-RES RAM BUFFER (ZERO DISK I/O)</text>
 
       <text x="14" y="48" fill="#2dd4bf" font-family="monospace" font-size="12" font-weight="bold">memoryRingBuffer.js</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Uncompressed / Native-Res Circular Frame Queue in RAM</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Circular Frame Queue: Grabs from &lt;video&gt; or <tspan fill="#38bdf8">getRtspCanvas()</tspan></text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Configurable Buffer Duration: <tspan fill="#ffd166">5 to 60 seconds</tspan> rolling history</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Configurable Target Buffer Rate: <tspan fill="#ffd166">5 to 30 FPS</tspan></text>
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#38bdf8" font-weight="bold">Memory Guardrails</tspan>: Live RAM Budget Estimator (Used / Free MB)</text>
       <text x="14" y="140" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Automatic frame eviction prevents tab crash or OOM pressure</text>
       <text x="14" y="162" fill="#2dd4bf" font-family="monospace" font-size="11" font-weight="bold">→ snapshotMemoryBuffer(): Instant microsecond zero-copy snapshot</text>
-      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Triggers automatically on Ring Double-Tap, Controller Circle, or UI button</text>
+      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Triggers automatically on Ring Double-Tap, Controller Share, or UI button</text>
       <text x="14" y="198" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Auto-saves into permanent IndexedDB storage without UI hitch</text>
     </g>
 
@@ -220,8 +221,8 @@
       <text x="14" y="48" fill="#60a5fa" font-family="monospace" font-size="12" font-weight="bold">instantReplay.js &amp; #replayCanvas</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 100% Fullscreen playback with native video resolution</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Scrubbing Timeline Bar: drag / click to pinpoint exact impact frame</text>
-      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Variable Playback Rates: Normal 1.0x, Slow-Mo 0.25x &amp; 0.5x, Fast 2.0x</text>
-      <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Single-frame Step Forward / Backward for forensic shot analysis</text>
+      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Variable Playback Rates: Normal 1.0x &amp; <tspan fill="#ffd166" font-weight="bold">0.5x Slow-Motion</tspan></text>
+      <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Single-frame STEP -1 &amp; STEP +1 for forensic shot analysis</text>
       <text x="14" y="140" fill="#38bdf8" font-family="'Segoe UI', sans-serif" font-size="10" font-weight="bold">• Gamepad Playback Controls: D-pad scrub, Cross Play/Pause, Circle Exit</text>
     </g>
 
@@ -234,8 +235,8 @@
 
       <text x="14" y="48" fill="#34d399" font-family="monospace" font-size="12" font-weight="bold">videoStore.js &amp; videoBrowser.js</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• IndexedDB Object Store ("spotr-videos" / "clips")</text>
-      <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Collapsible Clips Drawer with thumbnail previews and timestamps</text>
-      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Fullscreen Analysis Player with Loop, Scrub, and Frame Stepping</text>
+      <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#f43f5e" font-weight="bold">Per-Video Quick Delete</tspan>: Individual red trash icon on each card</text>
+      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Fullscreen Analysis Player with Loop, Scrub, and Dual Frame Stepping</text>
       <text x="14" y="122" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• WebM Export Engine: Re-encodes native frames to standalone .webm</text>
       <text x="14" y="140" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• One-click download to local filesystem without cloud upload</text>
     </g>
@@ -247,51 +248,58 @@
       <circle cx="16" cy="14" r="5" fill="#ffd166"/>
       <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">PWA OFFLINE ARCHITECTURE (PORTABLE APP)</text>
 
-      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">sw.js (spotr-v31) &amp; manifest.json</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 29 Precached Core Assets: HTML, JS, CSS, SVG Icons, Manifest</text>
+      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">sw.js (spotr-v52) &amp; manifest.json</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Precached Core Assets: HTML, JS, CSS, SVG Icons, Audio Sprite</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Standalone &amp; Window-Controls-Overlay Display Modes</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 100% Offline Capable: Installs on Chromebook, Android, Windows, Mac</text>
-      <text x="14" y="118" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Zero cloud server requirements; zero npm dependencies at runtime</text>
+      <text x="14" y="118" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• One-click Windows launch via start_spotr.bat &amp; server.py</text>
     </g>
   </g>
 
   <!-- ===================================================================== -->
-  <!-- BOTTOM ROW: 4 FULLSCREEN SCREENS & USER INTERFACE TOPOLOGY            -->
+  <!-- BOTTOM ROW: 5 FULLSCREEN SCREENS & USER INTERFACE TOPOLOGY            -->
   <!-- ===================================================================== -->
   <g transform="translate(30, 840)">
     <rect width="1380" height="115" rx="8" fill="#18181b" stroke="#27272a" stroke-width="1.5" filter="url(#shadow)"/>
     <rect width="1380" height="28" rx="8" fill="#202024"/>
     <text x="20" y="19" fill="#f8fafc" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">4. APPLICATION VIEW MODES &amp; INTERFACE TOPOLOGY</text>
 
-    <!-- 4 Screens Grid -->
+    <!-- 5 Screens Grid -->
     <g transform="translate(20, 38)">
       <!-- View 1 -->
-      <rect x="0" y="0" width="315" height="65" rx="4" fill="#12131a" stroke="#2dd4bf" stroke-width="1"/>
+      <rect x="0" y="0" width="255" height="65" rx="4" fill="#12131a" stroke="#2dd4bf" stroke-width="1"/>
       <text x="10" y="18" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 1: LIVE TACTICAL VIEWPORT</text>
-      <text x="10" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 60 FPS Camera feed + Heatmap overlay</text>
+      <text x="10" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 60 FPS Camera feed + 20Hz Heatmap</text>
       <text x="10" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Resizable PiP Loupe + Declutter Mode</text>
-      <text x="10" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Floating Toolbars (Top-Left &amp; Bottom)</text>
+      <text x="10" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Reticle Quick Drawer with FFP Lock</text>
 
       <!-- View 2 -->
-      <rect x="335" y="0" width="315" height="65" rx="4" fill="#12131a" stroke="#3b82f6" stroke-width="1"/>
-      <text x="345" y="18" fill="#60a5fa" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 2: INSTANT REPLAY SCRUBBER</text>
-      <text x="345" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Direct RAM ring buffer playback</text>
-      <text x="345" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Scrubbing slider + 0.25x / 0.5x Slow-Mo</text>
-      <text x="345" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Single-frame step + Auto-save trigger</text>
+      <rect x="270" y="0" width="255" height="65" rx="4" fill="#12131a" stroke="#3b82f6" stroke-width="1"/>
+      <text x="280" y="18" fill="#60a5fa" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 2: INSTANT REPLAY</text>
+      <text x="280" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Direct RAM ring buffer playback</text>
+      <text x="280" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Scrubbing slider + 0.5x Slow-Mo</text>
+      <text x="280" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Dual-direction frame stepping</text>
 
       <!-- View 3 -->
-      <rect x="670" y="0" width="315" height="65" rx="4" fill="#12131a" stroke="#10b981" stroke-width="1"/>
-      <text x="680" y="18" fill="#34d399" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 3: VIDEO ARCHIVE &amp; EXPORTER</text>
-      <text x="680" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• IndexedDB persistent clip storage</text>
-      <text x="680" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Thumbnails list + deletion controls</text>
-      <text x="680" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Export native clips to disk (.webm)</text>
+      <rect x="540" y="0" width="255" height="65" rx="4" fill="#12131a" stroke="#10b981" stroke-width="1"/>
+      <text x="550" y="18" fill="#34d399" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 3: VIDEO ARCHIVE</text>
+      <text x="550" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• IndexedDB persistent clip storage</text>
+      <text x="550" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Per-video quick delete red trash</text>
+      <text x="550" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Export native clips to disk (.webm)</text>
 
       <!-- View 4 -->
-      <rect x="1005" y="0" width="335" height="65" rx="4" fill="#12131a" stroke="#a855f7" stroke-width="1"/>
-      <text x="1015" y="18" fill="#c084fc" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 4: RETICLE CUSTOMIZER &amp; CALIBRATION</text>
-      <text x="1015" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Live parametric crosshair sculpting</text>
-      <text x="1015" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Direct joystick tuning + D-Pad adjustments</text>
-      <text x="1015" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• MOA / MRAD Turret Click Offset Calculator</text>
+      <rect x="810" y="0" width="265" height="65" rx="4" fill="#12131a" stroke="#a855f7" stroke-width="1"/>
+      <text x="820" y="18" fill="#c084fc" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 4: RETICLE CUSTOMIZER</text>
+      <text x="820" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Live parametric crosshair sculpting</text>
+      <text x="820" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 4 Center symbols + tick numbering</text>
+      <text x="820" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• MOA / MRAD Turret Click Calculator</text>
+
+      <!-- View 5 -->
+      <rect x="1090" y="0" width="250" height="65" rx="4" fill="#12131a" stroke="#ffd166" stroke-width="1"/>
+      <text x="1100" y="18" fill="#ffd166" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 5: CONTROLLER SCREEN</text>
+      <text x="1100" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Fullscreen Gamepad config &amp; rebind</text>
+      <text x="1100" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Live button glow &amp; action banner</text>
+      <text x="1100" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Dual-stick calibration &amp; deadzones</text>
     </g>
   </g>
 

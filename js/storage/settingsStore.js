@@ -1,7 +1,7 @@
 /**
  * Persists user overlay, recording buffer, heatmap & theme preferences in localStorage
  */
-const STORAGE_KEY = 'eaglevision_settings_v2';
+const STORAGE_KEY = 'spotr_settings_v2';
 
 export function loadSavedSettings() {
   try {

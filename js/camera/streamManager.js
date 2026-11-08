@@ -201,7 +201,7 @@ function buildStaticBoardCanvas(w, h) {
 
   ctx.fillStyle = '#ccfbf1';
   ctx.font = 'bold 38px monospace';
-  ctx.fillText('EAGLE-SOC-X1', 960, 495);
+  ctx.fillText('SPOTR-SOC-X1', 960, 495);
   ctx.fillStyle = '#5eead4';
   ctx.font = '28px monospace';
   ctx.fillText('LENOVO DUET 3 UVC FEED', 960, 545);
@@ -270,7 +270,7 @@ function startSimulatedStream(videoEl) {
 }
 
 /**
- * Connect to an RTSP network stream via the EagleVision local Python streaming gateway
+ * Connect to an RTSP network stream via the SPOTR local Python streaming gateway
  */
 let rtspStatusPollTimer = null;
 

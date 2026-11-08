@@ -5,7 +5,7 @@
  * playback, slow-motion, and frame-stepping in the Stored Video Viewer, and
  * encodes a standard .webm video file when exporting to disk.
  */
-const DB_NAME = 'EagleVisionVideoDB';
+const DB_NAME = 'SPOTRVideoDB';
 const DB_VERSION = 3;
 const STORE_NAME = 'clips';
 

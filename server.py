@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-EagleVision High-Performance Portable Web Server & RTSP Streaming Gateway
+SPOTR High-Performance Portable Web Server & RTSP Streaming Gateway
 
 Combines:
 1. Static PWA HTTP Server (serves HTML, CSS, JS, audio sprites, service worker).
@@ -160,8 +160,8 @@ class RtspSession:
 rtsp_session = RtspSession()
 
 
-class EagleVisionRequestHandler(http.server.SimpleHTTPRequestHandler):
-    """Handles static PWA files and EagleVision RTSP Gateway API endpoints."""
+class SPOTRRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """Handles static PWA files and SPOTR RTSP Gateway API endpoints."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
@@ -376,9 +376,9 @@ def run_server():
     # On Windows, allow_reuse_address=True can cause multiple processes to bind
     # to the exact same port simultaneously, resulting in dropped connections.
     socketserver.ThreadingTCPServer.allow_reuse_address = (os.name != 'nt')
-    with socketserver.ThreadingTCPServer(("", PORT), EagleVisionRequestHandler) as httpd:
+    with socketserver.ThreadingTCPServer(("", PORT), SPOTRRequestHandler) as httpd:
         print("============================================================")
-        print("  EAGLEVISION PORTABLE SERVER & RTSP STREAMING GATEWAY")
+        print("  SPOTR PORTABLE SERVER & RTSP STREAMING GATEWAY")
         print("============================================================")
         print(f"[*] Local Web App:     http://localhost:{PORT}")
         print(f"[*] RTSP Gateway API:  http://localhost:{PORT}/api/rtsp/status")

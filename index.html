@@ -475,7 +475,7 @@
                   <span id="badgeRtspWake" style="font-family:var(--font-mono); font-size:10px; color:var(--radar-text-muted);">STANDBY</span>
                 </div>
                 <div style="display:flex; gap:6px;">
-                  <input id="inputBresserIp" type="text" value="192.168.0.1" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="192.168.0.1" title="Bresser Eyepiece Camera IP Address" />
+                  <input id="inputBresserIp" type="text" value="192.168.0.1" class="radar-text-input" style="flex:1;" placeholder="192.168.0.1" title="Bresser Eyepiece Camera IP Address" />
                   <button type="button" id="btnBresserWake" class="radar-btn radar-btn-sm" style="height:30px; padding:0 10px; font-size:11px; font-weight:700;" title="Wake camera DSP media pipeline and connect">⚡ WAKE & CONNECT</button>
                 </div>
 
@@ -492,22 +492,34 @@
                 <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
                   <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">RTSP STREAM URL / ENDPOINT</label>
                   <div style="display:flex; gap:6px;">
-                    <input id="inputBresserRtspUrl" type="text" class="radar-num-input" style="flex:1; text-align:left; padding:4px 8px; font-size:11px; height:28px;" value="rtsp://192.168.0.1/live/tcp/ch0" placeholder="rtsp://192.168.0.1/live/tcp/ch0" title="Direct RTSP Stream URL or Endpoint (editable for any device)" />
+                    <input id="inputBresserRtspUrl" type="text" class="radar-text-input" style="flex:1; height:28px; font-size:11px;" value="rtsp://192.168.0.1/live/tcp/ch0" placeholder="rtsp://192.168.0.1/live/tcp/ch0" title="Direct RTSP Stream URL or Endpoint (editable for any device)" />
                     <button type="button" id="btnConnectBresserEndpoint" class="radar-btn radar-btn-sm" style="height:28px; padding:0 8px; font-size:10px; font-weight:700;" title="Connect directly to this RTSP stream URL">CONNECT</button>
                   </div>
                 </div>
               </div>
 
               <!-- ONVIF IP Camera Configuration -->
-              <div id="secOnvifConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
-                <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">ONVIF / CCTV STREAM SETTINGS</div>
-                <div style="display:grid; grid-template-columns:2fr 1fr; gap:6px;">
-                  <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Camera IP" />
-                  <input id="inputOnvifPort" type="number" value="554" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="554" />
+              <div id="secOnvifConfig" style="display:none; flex-direction:column; gap:10px; padding:10px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
+                <div style="font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--radar-text-muted); letter-spacing:0.5px;">ONVIF / CCTV STREAM SETTINGS</div>
+                <div style="display:grid; grid-template-columns:1fr 90px; gap:8px;">
+                  <div style="display:flex; flex-direction:column; gap:3px;">
+                    <label for="inputOnvifIp" style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">CAMERA IP / HOST</label>
+                    <input id="inputOnvifIp" type="text" value="192.168.1.100" class="radar-text-input" placeholder="192.168.1.100" />
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:3px;">
+                    <label for="inputOnvifPort" style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">PORT</label>
+                    <input id="inputOnvifPort" type="number" value="554" class="radar-text-input" placeholder="554" />
+                  </div>
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                  <input id="inputOnvifUser" type="text" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Username (opt)" />
-                  <input id="inputOnvifPass" type="password" value="" class="radar-num-input" style="text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="Password (opt)" />
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                  <div style="display:flex; flex-direction:column; gap:3px;">
+                    <label for="inputOnvifUser" style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">USERNAME</label>
+                    <input id="inputOnvifUser" type="text" value="" class="radar-text-input" placeholder="admin (optional)" />
+                  </div>
+                  <div style="display:flex; flex-direction:column; gap:3px;">
+                    <label for="inputOnvifPass" style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">PASSWORD</label>
+                    <input id="inputOnvifPass" type="password" value="" class="radar-text-input" placeholder="•••••• (optional)" />
+                  </div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:4px;">
                   <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">ONVIF PROFILE / CHANNEL</label>
@@ -516,13 +528,13 @@
                     <button type="button" class="radar-btn radar-btn-sm btn-onvif-channel" data-path="/onvif2" data-label="ONVIF (Profile 2 - Sub)" style="height:26px; font-size:10px; padding:0 6px;">○ PROFILE 2 (Sub)</button>
                   </div>
                 </div>
-                <button type="button" id="btnOnvifConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT ONVIF STREAM</button>
+                <button type="button" id="btnOnvifConnect" class="radar-btn radar-btn-sm" style="width:100%; height:32px; font-size:11px; font-weight:700;">CONNECT ONVIF STREAM</button>
               </div>
 
               <!-- Custom RTSP URL Configuration -->
               <div id="secCustomRtspConfig" style="display:none; flex-direction:column; gap:8px; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--radar-border); border-radius:var(--radius-sm);">
                 <div style="font-family:var(--font-mono); font-size:11px; color:var(--radar-text-muted);">MANUAL RTSP URL</div>
-                <input id="inputCustomRtspUrl" type="text" value="" class="radar-num-input" style="width:100%; text-align:left; padding:4px 8px; font-size:12px; height:30px;" placeholder="rtsp://192.168.0.1:554/live/ch0" />
+                <input id="inputCustomRtspUrl" type="text" value="" class="radar-text-input" placeholder="rtsp://192.168.0.1:554/live/ch0" />
                 <button type="button" id="btnCustomRtspConnect" class="radar-btn radar-btn-sm" style="width:100%; height:30px; font-size:11px; font-weight:700;">CONNECT CUSTOM RTSP</button>
               </div>
 

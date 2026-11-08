@@ -1,5 +1,5 @@
 /**
- * EagleVision Main Entry Point
+ * SPOTR Main Entry Point
  */
 import { appState, updateState } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';

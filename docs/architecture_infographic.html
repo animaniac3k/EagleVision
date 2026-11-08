@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (Beta 1) — Architecture & Data Flow Infographic</title>
+  <title>SPOTR (Revision 52) — Architecture & Data Flow Infographic</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body {
@@ -55,9 +55,9 @@
     <!-- Top Banner -->
     <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • BETA 1</div>
-        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">SPOTR — RECON • DETECT • ALERT</h1>
-        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • WebHID BT Gamepad &amp; Virtual Mouse</p>
+        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • REVISION 52</div>
+        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
+        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • OpenCV RTSP Gateway &amp; WebHID Virtual Mouse</p>
       </div>
       <div class="flex gap-3 font-mono text-xs">
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
@@ -66,34 +66,38 @@
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
           <div class="text-[#5eead4]">VOICE SYNTHESIS</div>
-          <div class="text-base font-bold text-[#ccfbf1]">FEMALE DIRECTIONAL TTS</div>
+          <div class="text-base font-bold text-[#ccfbf1]">STUDIO SPRITE + WEB SPEECH</div>
         </div>
         <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
           <div class="text-[#5eead4]">RAM BUFFER</div>
-          <div class="text-base font-bold text-[#2dd4bf]">20s-60s ROLLING QUEUE</div>
+          <div class="text-base font-bold text-[#2dd4bf]">20s-60s (USB &amp; RTSP)</div>
         </div>
       </div>
     </header>
 
-    <!-- 4-Screen Navigation Overview Banner -->
+    <!-- 5-Screen Navigation Overview Banner -->
     <div class="node-card p-4">
       <div class="text-xs font-mono text-[#5eead4] uppercase tracking-wider mb-2 font-bold">APPLICATION SCREENS (currentScreen in js/state.js)</div>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono text-xs">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 font-mono text-xs">
         <div class="p-2.5 rounded bg-[#091a20] border border-[#2dd4bf]">
           <span class="text-[#2dd4bf] font-bold">1. LIVE FEED (#screenLive)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">60fps viewport, floating icon strips, PiP zoom loupe, 1-tap declutter &amp; virtual mouse.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">60fps viewport, FFP reticle drawer, PiP zoom loupe, 1-tap declutter &amp; virtual mouse.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">2. GALLERY (#screenGallery)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen native playback, STEP -1/+1, 0.5x slow-mo, clips drawer &amp; .webm export.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen native playback, STEP -1/+1, 0.5x slow-mo, per-video quick delete &amp; .webm export.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">3. SETTINGS (#screenSettings)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">System config, live RAM meter, voice sliders, touchpad sensitivity &amp; reticle aim speed.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Dual camera source, live RAM meter, voice sliders, touchpad sensitivity &amp; ring calibrate.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">4. RETICLE (#screenReticle)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Interactive graduated crosshair customizer, dual-stick sculpting &amp; voice audition stage.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Parametric crosshair customizer, 4 center styles, dual-stick sculpting &amp; voice audition stage.</p>
+        </div>
+        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
+          <span class="text-[#2dd4bf] font-bold">5. CONTROLLER (#screenController)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen Gamepad configuration, key rebinding matrix &amp; real-time input diagnostics.</p>
         </div>
       </div>
     </div>
@@ -116,11 +120,11 @@
               <li><strong class="text-[#ccfbf1]">Touchpad:</strong> Capacitive multi-touch Virtual Mouse cursor</li>
               <li><strong class="text-[#ccfbf1]">L2 Trigger:</strong> Left Mouse Click &amp; Drag</li>
               <li><strong class="text-[#ccfbf1]">R2 Trigger:</strong> Right Mouse Click (Context Menu)</li>
-              <li><strong class="text-[#ccfbf1]">Left Stick:</strong> Pinpoint ROI crosshair (50% max speed reduction + 1.8 power curve)</li>
+              <li><strong class="text-[#ccfbf1]">Left Stick:</strong> Pinpoint ROI crosshair (0.16 deadzone + 1.8 power curve)</li>
               <li><strong class="text-[#ccfbf1]">Right Stick:</strong> Smooth stream pan when zoomed in (&gt;1.0x)</li>
-              <li><strong class="text-[#ccfbf1]">Reticle Mode:</strong> L-Stick navigates/adjusts menu; R-Stick sculpts Gap &amp; Weight</li>
-              <li><strong class="text-[#ccfbf1]">L3 / R3:</strong> Cycle 6 Tactical GUI Themes on live feed</li>
-              <li><strong class="text-[#ccfbf1]">Options:</strong> Toggle Settings on / off</li>
+              <li><strong class="text-[#ccfbf1]">Reticle Mode:</strong> L-Stick navigates menu; R-Stick sculpts Gap &amp; Weight</li>
+              <li><strong class="text-[#ccfbf1]">D-Pad:</strong> Subtension adjustments &amp; cyclic quick tools</li>
+              <li><strong class="text-[#ccfbf1]">Share / Options:</strong> Instant Replay &amp; Settings modal</li>
             </ul>
           </div>
         </div>
@@ -133,12 +137,12 @@
           <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
             <div class="text-[#2dd4bf] font-bold">Unidirectional Pub/Sub Store</div>
             <div class="grid grid-cols-2 gap-1.5 pt-1">
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• currentScreen (1..4)<br/>• mainZoom / Pan</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• reticleConfig<br/>• reticleAimSpeed (50%)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• touchpadSens (50%)<br/>• heatmapSpeechEnabled</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• voiceAlertKeyword<br/>• voiceUnitKeyword</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• currentScreen (1..5)<br/>• cameraSource (usb/rtsp)</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• reticleConfig<br/>• reticleFfpMode (ON/OFF)</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• heatmapSpeechEnabled</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• voicePitch &amp; Rate<br/>• themeColor (6 HSL)</div>
               <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens &amp; Dur<br/>• bufferMaxSec / FPS</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• themeColor (6 HSL)<br/>• uiOpacity (15-100%)</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• uiOpacity (15-100%)<br/>• ringButtonMap</div>
             </div>
             <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
           </div>
@@ -146,42 +150,45 @@
 
         <div class="node-card">
           <div class="node-header">
-            <span>USB CAMERA &amp; TEST FEED</span>
-            <span class="badge">/js/camera</span>
+            <span>DUAL CAMERA INGESTION</span>
+            <span class="badge">streamManager + server.py</span>
           </div>
-          <div class="p-4 text-sm space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">streamManager.js</strong> &amp; <strong class="text-[#ccfbf1]">streamStats.js</strong></div>
+          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
+            <div><strong class="text-[#ccfbf1]">UVC USB &amp; OpenCV RTSP Gateway</strong></div>
             <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
-              <li>Enumerates UVC USB cameras via <code class="text-[#ccfbf1]">enumerateDevices()</code></li>
-              <li>Streams native 1080p/4K @ 60fps into hidden <code class="text-[#ccfbf1]">&lt;video&gt;</code></li>
-              <li>Synthetic test pattern fallback when no camera is connected</li>
+              <li><strong class="text-[#ccfbf1]">UVC Scopes:</strong> Driverless <code class="text-[#ccfbf1]">getUserMedia</code> 1080p/4K @ 60fps</li>
+              <li><strong class="text-[#ccfbf1]">Bresser Wi-Fi Camera:</strong> UDP wake proxy (<code class="text-[#ccfbf1]">/api/rtsp/wake</code> to port 65534) + 1080p (<code class="text-[#ccfbf1]">ch0</code>) and 540p (<code class="text-[#ccfbf1]">ch1</code>) streams</li>
+              <li><strong class="text-[#ccfbf1]">Push Event Pipeline:</strong> Threading condition frame push delivers frames with &lt;1ms latency</li>
+              <li>Synthetic test pattern fallback when no device connected</li>
             </ul>
           </div>
         </div>
       </div>
 
-      <!-- COLUMN 2: 60fps Renderer, Heatmap, Reticle & Female TTS -->
+      <!-- COLUMN 2: Compositor, Heatmap, Reticle & Studio Voice -->
       <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. Compositor, Heatmap &amp; Voice TTS</div>
+        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. Compositor, Heatmap &amp; Voice Engine</div>
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>DUAL-CANVAS + HEATMAP + TTS</span>
+            <span>CANVAS 2D + HEATMAP + AUDIO</span>
             <span class="badge">compositor.js</span>
           </div>
           <div class="p-4 text-xs space-y-3 font-mono">
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
               <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Heatmap</div>
-              <div class="text-[#99f6e4]">• 160×90 thermal grid with <strong class="text-[#ccfbf1]">&gt;18% Camera Shake Rejection</strong></div>
-              <div class="text-[#99f6e4]">• Sensitivity (10–95%) &amp; Duration (1s to <strong class="text-[#ccfbf1]">Infinity ∞</strong>)</div>
-              <div class="text-[#99f6e4]">• Fullscreen shader matrix (brightness, contrast, sat, invert, gray)</div>
+              <div class="text-[#99f6e4]">• Hardware-promoted canvas (<code class="text-[#ccfbf1]">alpha: false, desync</code>)</div>
+              <div class="text-[#99f6e4]">• 20Hz decoupled analysis with <strong class="text-[#ccfbf1]">&gt;18% Shake Rejection</strong></div>
+              <div class="text-[#99f6e4]">• Sensitivity (10–95%) &amp; Duration (0.5s to <strong class="text-[#ccfbf1]">Infinity ∞</strong>)</div>
+              <div class="text-[#99f6e4]">• GPU CSS filter matrix (brightness, contrast, sat, invert)</div>
             </div>
 
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">B. Directional Voice Callouts (Local TTS)</div>
-              <div class="text-[#99f6e4]">• Calculates clock angle ($1$ to $12$ o'clock) &amp; distance in <strong class="text-[#ccfbf1]">clicks</strong></div>
-              <div class="text-[#99f6e4]">• Dynamic keywords: <code class="text-[#5eead4]">"{Alert}! 11 o'clock, 3 {units}"</code></div>
-              <div class="text-[#99f6e4]">• Dedicated toolbar toggle with active/muted visual states</div>
+              <div class="text-sm font-bold text-[#2dd4bf]">B. Directional Voice Callouts (Studio Sprite)</div>
+              <div class="text-[#99f6e4]">• High-fidelity Web Audio sprite (<code class="text-[#5eead4]">voice-sprite.mp3</code>)</div>
+              <div class="text-[#99f6e4]">• Local Web Speech API automatic fallback</div>
+              <div class="text-[#99f6e4]">• Speaks clock-face ($1..12$ o'clock) &amp; reticle clicks</div>
+              <div class="text-[#99f6e4]">• Dynamic speech: <code class="text-[#5eead4]">"Detection! 11 o'clock, 3 clicks"</code></div>
             </div>
 
             <div class="p-3 rounded bg-[#091a20] border border-[#1b4d57] space-y-1">
@@ -194,14 +201,15 @@
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>PARAMETRIC RETICLE &amp; DESIGNER</span>
-            <span class="badge">overlayManager + reticleScreen</span>
+            <span>PARAMETRIC RETICLE &amp; FFP</span>
+            <span class="badge">overlayManager.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">buildGraduatedCrosshairSvg()</strong> creates scalable SVG crosshairs</div>
-            <div>• Configurable: clicks per arm (2-25), spacing, center gap, major intervals, labels &amp; concentric range rings</div>
-            <div>• <strong class="text-[#ccfbf1]">Dual-Stick Sculpting:</strong> Left Stick navigates drawer options, Right Stick sculpts gap &amp; stroke weight</div>
-            <div>• Interactive audition stage: click preview to test speech callouts</div>
+            <div>• <strong class="text-[#ccfbf1]">First Focal Plane (FFP):</strong> Subtensions scale with digital zoom</div>
+            <div>• <strong class="text-[#ccfbf1]">4 Center Symbols:</strong> Empty, Precision Dot, Mini-Cross, Chevron</div>
+            <div>• Configurable: clicks per arm (2-30), spacing, center gap, major intervals, tick labels &amp; concentric rings</div>
+            <div>• <strong class="text-[#ccfbf1]">6 Tactical Color Themes:</strong> Emerald, Amber, Ruby, Night Blue, Amethyst, White</div>
+            <div>• Quick Drawer on live feed for instantaneous field adjustments</div>
           </div>
         </div>
       </div>
@@ -212,14 +220,15 @@
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>CONFIGURABLE RAM RING BUFFER</span>
+            <span>DUAL RAM RING BUFFER</span>
             <span class="badge">memoryRingBuffer.js</span>
           </div>
           <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
             <div class="text-[#2dd4bf] font-bold">Zero-Disk Circular Video Buffer (5–60s @ 5–30 FPS)</div>
-            <div>• In-memory JPEG ArrayBuffer queue at exact camera resolution</div>
+            <div>• Dual ingestion: grabs from &lt;video&gt; or <code class="text-[#ccfbf1]">getRtspCanvas()</code></div>
+            <div>• In-memory JPEG ArrayBuffer queue at full camera resolution</div>
             <div>• Live <strong class="text-[#ccfbf1]">RAM Budget Meter</strong> in Settings (USED vs. EST vs. FREE)</div>
-            <div>• Auto-evicts oldest frames to maintain fixed memory limits</div>
+            <div>• Proactive memory guardrails prevent tab crash or OOM</div>
           </div>
         </div>
 
@@ -229,21 +238,22 @@
             <span class="badge">instantReplay.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button or controller Share button</div>
-            <div>• Instant scrub bar with <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong> single-frame stepping</div>
+            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button, ring double-tap, or gamepad Share</div>
+            <div>• Dedicated <strong class="text-[#2dd4bf]">0.5x Slow-Motion</strong> playback toggle</div>
+            <div>• Single-frame <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong> forensics</div>
             <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> clip to IndexedDB persistent archive</div>
           </div>
         </div>
 
         <div class="node-card">
           <div class="node-header">
-            <span>STORED VIDEO PLAYER (SCREEN 2)</span>
+            <span>STORED VIDEO BROWSER (SCREEN 2)</span>
             <span class="badge">videoStore + videoBrowser</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">100% Fullscreen</strong> native playback with floating GUI overlay</div>
-            <div>• Dual frame stepping: <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong></div>
-            <div>• Collapsible left clips drawer + 0.5x Slow-Motion</div>
+            <div>• <strong class="text-[#ccfbf1]">100% Fullscreen</strong> native playback with floating GUI</div>
+            <div>• <strong class="text-[#2dd4bf]">Per-Video Quick Delete</strong> red trash can icon on each card</div>
+            <div>• Collapsible left clips drawer + dual frame stepping</div>
             <div>• <strong class="text-[#2dd4bf]">EXPORT</strong> encodes and downloads full-resolution <code class="text-[#ccfbf1]">.webm</code></div>
           </div>
         </div>
@@ -254,12 +264,12 @@
     <!-- Bottom UI, Global Opacity & Controllers Bar -->
     <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
       <div>
-        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js):</span>
-        <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App. Pre-caches all shell assets, CSS, JS modules, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
+        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v52):</span>
+        <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App. Pre-caches shell assets, CSS, JS modules, audio sprites, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
       </div>
       <div>
-        <span class="text-[#2dd4bf] font-bold">CONTROLLER SCHEME (DualShock 4 &amp; 5-Button BT Ring):</span>
-        <span class="text-[#99f6e4] ml-2">Trackpad Virtual Mouse + L2 Left Click / Drag + R2 Right Click • Left Stick ROI aiming (50% max speed for pinpoint accuracy) • Right Stick stream pan • L3/R3 Theme cycle • D-Pad menu navigation.</span>
+        <span class="text-[#2dd4bf] font-bold">PORTABLE WINDOWS LAUNCHER (start_spotr.bat • server.py):</span>
+        <span class="text-[#99f6e4] ml-2">One-click portable launcher auto-detects Python, starts OpenCV RTSP gateway with condition-push streaming, and launches the browser interface.</span>
       </div>
     </div>
   </div>

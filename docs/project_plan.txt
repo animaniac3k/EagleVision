@@ -1,94 +1,121 @@
 ================================================================================
-EAGLEVISION - PROJECT PLAN & TECHNICAL DOCUMENTATION
+SPOTR - PROJECT PLAN & TECHNICAL DOCUMENTATION (REVISION 52)
 Target Platform: Progressive Web App (PWA) for ChromeOS / Android (Lenovo Duet 3)
-                 & Portable Desktop/Laptop Execution
+                 & Portable Windows/macOS/Linux Systems with RTSP Gateway
 ================================================================================
 
 1. OVERVIEW & DESIGN PHILOSOPHY
 -------------------------------
-EagleVision is an installable, offline-capable Progressive Web App (PWA) built
-for the Lenovo IdeaPad Duet 3 (10.95" 2000x1200 16:10 touch display, ChromeOS),
-Android tablets, and Windows/Linux/macOS laptops. It connects to external USB
-cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provides:
+SPOTR is an installable, offline-capable Progressive Web App (PWA) paired
+with a high-performance Python 3 RTSP streaming gateway. Built for tactical field
+use on the Lenovo IdeaPad Duet 3 (10.95" 2000x1200 touch display, ChromeOS),
+Android tablets, and Windows/Linux/macOS laptops, it connects to:
+  - Wired UVC USB cameras (webcams, microscopes, inspection scopes, capture cards)
+  - Network Wi-Fi / IP cameras (e.g., Bresser Full HD Wi-Fi Eyepiece Camera, ONVIF)
 
+Core Capabilities:
   - 100% Full-Screen Camera Viewport with minimal UI footprint
+  - Hardware-Promoted Graphics: Desynchronized Canvas 2D ({ alpha: false, desynchronized: true })
+    with GPU layer promotion (contain: strict; translateZ(0)) and touch-action: none
   - Touch-first controls (52px hit targets, 16px-18px high-contrast typography)
-  - Declutter Mode: Hide all interface chrome with one tap; single restore icon
-  - Top-Left Unified Toolbar: Settings Screen Shortcut, PiP Zoom Window Toggle,
-    Overlay Reticle Toggle, Micro-Change Heatmap Toggle, Telemetry HUD Toggle,
-    and Whole-Image Zoom Stepper (- / 1.0x / + / 1:1)
+  - 1-Tap Declutter Mode: Hide all interface chrome with one tap; single restore icon
+  - Top-Left Unified Toolbar: Settings Screen Shortcut, PiP Zoom Loupe Toggle,
+    Reticle Quick Drawer Toggle, Micro-Change Heatmap Toggle, Telemetry HUD Toggle,
+    Studio Voice Mute/Unmute, and Whole-Image Zoom Stepper (- / 1.0x / + / 1:1)
+  - Reticle Quick-Drawer:
+      * Instant First Focal Plane (FFP) Lock toggle
+      * Opacity (0% - 100%) and Reticle Scale (10% - 200%) sliders
+      * 6 Tactical Color Themes (Emerald Teal, Amber Gold, High-Vis White, Night Blue, Ruby Red, Amethyst)
+      * Center Aiming Point Selector (Empty, Dot, Cross, Chevron)
   - Dedicated Fullscreen Settings Screen (Screen 3):
-      * Clean multi-column tactical grid for camera source, memory buffer,
-        reticle overlay, heatmap & voice callouts, PS4 gamepad, image filters,
-        theme color & global opacity, and Bluetooth ring calibration
+      * Multi-column tactical grid for camera source (USB vs. RTSP Bresser/Custom),
+        memory buffer parameters, reticle overlay configuration, heatmap & voice callouts,
+        PS4/Bluetooth gamepad mapping, image filters, and Bluetooth ring calibration
   - Dedicated Fullscreen Reticle Customizer & Click Calibration (Screen 4):
-      * Live interactive SVG graduated reticle with configurable clicks/indents per arm,
-        click pixel spacing, unobstructed center gap for POI, center brackets, major ticks,
+      * Live interactive SVG graduated reticle with configurable clicks/indents per arm (2 to 30),
+        click pixel spacing, unobstructed center gap, center brackets, major ticks,
         number labels, concentric distance rings, and stroke weight
       * Interactive audition stage: click anywhere on the reticle stage to simulate detection
         and audition female robotic voice announcements
-  - Female Voice Detection Announcements (Text-to-Speech):
-      * Zero-dependency local Web Speech API synthesis
+  - High-Fidelity Studio Voice Synthesizer & Speech Engine:
+      * Web Audio API player (voiceAudioEngine.js) playing pre-recorded studio clips
+        from an audio sprite (voice-sprite.mp3, voiceManifest.js) with zero latency
+      * Local Web Speech API fallback for environments without audio sprite support
       * Speaks angle (1 to 12 o'clock) and distance in graduated reticle clicks:
         e.g., "Detection! 11 o'clock, 3 clicks"
-      * Dynamically adapts to custom reticle spacing and user overlay zoom scale
-      * Configurable voice pitch (female tone) and speech speed
-  - PS4 / Bluetooth Gamepad Support (HTML5 Gamepad API):
-      * Silent background controller integration for Sony DualShock 4 and standard gamepads
-      * Left Analog Stick: Smooth accelerated ROI crosshair aiming
+      * Dynamically adapts to custom reticle spacing, user overlay zoom scale, and FFP zoom
+  - PS4 / DualSense / Bluetooth Gamepad Support (WebHID & HTML5 Gamepad API):
+      * WebHID direct connection for Sony DualShock 4 / DualSense controllers
+      * Capacitive Touchpad Virtual Mouse cursor with L2 (left click/drag) and R2 (right click)
+      * Left Analog Stick: Smooth accelerated ROI crosshair aiming (0.16 deadzone + 1.8 power curve)
       * Right Analog Stick: Smooth camera pan when zoomed in (>1.0x)
       * L1 / R1: Zoom In / Out; L2 / R2: Step -1 / +1 Frame
-      * L3 / R3: Recenter ROI / Reset 1:1 Zoom
-      * D-Pad: Zoom Window magnification & Main Zoom / Step
-      * Cross (X): Play/Pause / Mode; Circle (O): Return to Live Feed
-      * Square: Reticle Toggle; Triangle: Heatmap Toggle
-      * Options: 20s Instant Replay (Auto-Save); Share: Settings Screen
-  - Localized Micro-Change Heatmap Engine:
-      * High-contrast thermal markings for subtle motion; global motion gate rejects camera shake
-      * Configurable sensitivity and display duration (custom seconds up to infinity ∞)
+      * L3 / R3: Theme cycle / Recenter
+      * D-Pad: Tool cycling & FFP subtension adjustments
+      * Options: Settings; Share: Instant Replay (Auto-Save)
+  - Decoupled 20Hz Micro-Change Heatmap Engine:
+      * Executes on an independent 50ms interval, decoupling computer vision from the 60fps compositor
+      * High-contrast thermal markings; global motion gate (>18%) rejects camera shake & tripod bumps
+      * Dirty checking state machine skips canvas rendering when scene is static
+      * Configurable sensitivity (10% - 95%) and display duration (0.5s - 10.0s up to infinity)
   - Native-Resolution In-Memory Video Buffer (5s-60s @ 5-30 FPS) with live RAM meter
-  - One-Tap Instant Replay with Auto-Save to IndexedDB Archive and Step -1 / +1 frame buttons
-  - Fullscreen Stored Video Player (Screen 2) with floating GUI overlay, collapsible
-    Clips drawer, 0.5x slow-motion, dual STEP -1 / STEP +1 frame buttons, and native-res .webm export
+      * Dual-source ingestion: grabs full-res frames from <video> (USB) or getRtspCanvas() (RTSP)
+  - One-Tap Instant Replay with Auto-Save to IndexedDB:
+      * 0.5x Slow-Motion button for bullet trajectory and impact forensics
+      * STEP -1 / STEP +1 dual-direction frame stepping
+  - Fullscreen Stored Video Player (Screen 2):
+      * Floating GUI overlay and collapsible Clips drawer
+      * Individual red trash icon on each clip card for rapid deletion without opening player
+      * Dual STEP -1 / STEP +1 frame buttons and native-res .webm export
 
 
 2. DIRECTORY & MODULE STRUCTURE
 -------------------------------
-/EagleVision
-├── index.html                        # App shell (Screens: 1 Live, 2 Gallery, 3 Settings, 4 Reticle)
+/SPOTR
+├── index.html                        # App shell (Screens: 1 Live, 2 Gallery, 3 Settings, 4 Reticle, 5 Controller)
 ├── manifest.json                     # PWA manifest (standalone, landscape)
-├── sw.js                             # Network-first Service Worker (eaglevision-v11)
-├── start_eaglevision.bat             # One-click portable USB launcher for Windows
-├── README.md                         # Quickstart & portable usage instructions
+├── sw.js                             # Network-first Service Worker (spotr-v52)
+├── server.py                         # OpenCV RTSP gateway, Condition-push stream & UDP wake proxy
+├── start_spotr.bat             # One-click portable launcher for Windows
+├── README.md                         # Quickstart & system documentation
 ├── /docs
-│   ├── project_plan.txt              # Complete technical documentation & specification
-│   ├── architecture_infographic.svg  # Standalone vector architecture infographic
+│   ├── ARCHITECTURE.md               # Complete technical architecture specification
+│   ├── project_plan.txt              # Project plan & subsystem design documentation
+│   ├── user_manual.html              # Tactical visual user manual (print & landscape view)
+│   ├── architecture_infographic.svg  # Vector architecture infographic
 │   └── architecture_infographic.html # Interactive HTML architecture infographic
 ├── /assets
-│   └── /icons
-│       └── icon.svg                  # Vector radar reticle PWA icon
+│   ├── /icons
+│   │   ├── icon.svg                  # Vector radar reticle PWA icon
+│   │   ├── icon-192.png              # Standard PWA icon (192px)
+│   │   └── icon-512.png              # High-res PWA icon (512px)
+│   └── /audio
+│       └── voice-sprite.mp3          # Studio recorded female voice speech sprite
 ├── /css
 │   ├── variables.css                 # Dynamic --radar-* HSL properties & --ui-opacity
-│   ├── layout.css                    # Screens 1-4 layout, floating strips, settings grid, reticle stage
-│   ├── viewport.css                  # Main canvas, PiP window, corner resize handles, ROI
+│   ├── layout.css                    # Screens 1-5 layout, floating strips, settings grid, reticle stage
+│   ├── viewport.css                  # Main canvas, PiP window, corner resize handles, ROI, hardware layers
 │   ├── controls.css                  # Touch buttons, sliders, memory meter, ring D-pad, gamepad telemetry
-│   └── gallery.css                   # Fullscreen Stored Video Player & floating drawer/bar
+│   └── gallery.css                   # Fullscreen Stored Video Player, floating drawer & quick-delete buttons
 └── /js
     ├── main.js                       # Application bootstrap, WakeLock, Gamepad & Reticle init
     ├── state.js                      # Central reactive state store (appState)
+    ├── /audio
+    │   ├── voiceManifest.js          # Audio sprite timecodes & phrase definitions
+    │   └── voiceAudioEngine.js       # Web Audio API buffer engine with Web Speech fallback
     ├── /camera
-    │   ├── streamManager.js          # USB camera enumeration, hot-plug & 1080p test signal
-    │   └── streamStats.js            # Real-time FPS & resolution telemetry tracker
+    │   ├── streamManager.js          # Dual source manager (UVC USB vs. RTSP gateway), wake proxy, hot-plug
+    │   └── streamStats.js            # Real-time FPS, jitter & resolution telemetry tracker
     ├── /input
-    │   └── gamepadController.js      # PS4 / Bluetooth gamepad integration via HTML5 Gamepad API
+    │   └── gamepadController.js      # WebHID DualShock 4/5 virtual mouse & HTML5 Gamepad API
     ├── /renderer
-    │   ├── compositor.js             # Dual-canvas renderer + Heatmap + Female voice speech synthesis
+    │   ├── compositor.js             # Dual-canvas renderer, 20Hz decoupled Heatmap, FFP reticle & voice calls
     │   ├── zoomWindow.js             # Draggable ROI crosshair, resizable PiP & resize clamp
     │   ├── imageFilters.js           # GPU CSS filter string builder
-    │   └── overlayManager.js         # Dynamic graduated reticle generator & click distance math
+    │   └── overlayManager.js         # Dynamic graduated reticle generator, FFP subtension math & center shapes
     ├── /recorder
-    │   ├── memoryRingBuffer.js       # Native-resolution configurable RAM JPEG ring buffer
-    │   └── instantReplay.js          # Native-res RAM replay player + Step -1/+1 + automatic archive save
+    │   ├── memoryRingBuffer.js       # Dual-source native-res RAM JPEG ring buffer (USB & getRtspCanvas)
+    │   └── instantReplay.js          # RAM replay player with 0.5x slow-mo, Step -1/+1 & automatic archive save
     ├── /storage
     │   ├── videoStore.js             # IndexedDB CRUD for frame archives + native .webm export
     │   └── settingsStore.js          # LocalStorage persistence for user UI, reticle & voice settings
@@ -96,7 +123,9 @@ cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provide
         ├── hudController.js          # Toggleable live telemetry overlay
         ├── sidebarControls.js        # Settings screen controller, memory meter, UI opacity, voice audition
         ├── reticleScreen.js          # Fullscreen Reticle Customizer & Click Calibration controller
-        ├── videoBrowser.js           # Fullscreen Stored Video Player & Step -1/+1 frame controls
+        ├── controllerScreen.js       # Fullscreen Gamepad configuration & rebinding matrix
+        ├── videoBrowser.js           # Fullscreen Stored Video Player, clips drawer & rapid deletion
+        ├── splashScreen.js           # Tactical boot splash sequence controller
         └── ringController.js         # 5-button Bluetooth scrolling ring remote & calibrator
 
 
@@ -104,58 +133,71 @@ cameras (UVC webcams, microscopes, inspection scopes, capture cards) and provide
 ------------------------------------
 
 3.1 Central Reactive State (js/state.js)
-  - Holds the single source of truth (`appState`) for all screens (`currentScreen`: 'live' | 'gallery' | 'settings' | 'reticle'),
-    zoom levels, ROI target `(roiX, roiY)`, overlay state, reticle configuration (`reticleConfig`),
-    heatmap sensitivity, duration (`heatmapDuration`), speech announcements (`heatmapSpeechEnabled`),
-    voice settings (`voicePitch`, `voiceRate`), gamepad telemetry, and ring bindings.
+  - Holds the single source of truth (`appState`) for all screens ('live' | 'gallery' | 'settings' | 'reticle' | 'controller'),
+    camera source mode (`cameraSource`: 'usb' | 'rtsp'), RTSP configurations, zoom levels, ROI target `(roiX, roiY)`,
+    overlay state, FFP lock mode (`reticleFfpMode`), reticle configuration (`reticleConfig`),
+    heatmap sensitivity, duration, speech announcements, voice settings, and gamepad telemetry.
   - Subscribed modules react immediately to state updates via `subscribeState(fn)`.
 
-3.2 Graduated Reticle & Click Distance Math (js/renderer/overlayManager.js)
+3.2 RTSP Gateway & Condition Push Pipeline (server.py)
+  - Employs an OpenCV (`cv2.VideoCapture`) worker thread continuously pulling network frames.
+  - Distribution uses `threading.Condition(frame_lock)` to immediately wake client HTTP stream threads
+    the exact microsecond a new frame arrives, eliminating polling sleep cycles and reducing latency to <1ms.
+  - Built-in UDP wake endpoint `/api/rtsp/wake` sends `b"bresser"` to `192.168.1.1:65534` to wake
+    Bresser Full HD Wi-Fi Eyepiece Cameras. Supports `ch0` (1080p) and `ch1` (540p) RTSP channels.
+
+3.3 Graduated Reticle & First Focal Plane Math (js/renderer/overlayManager.js)
   - Renders dynamic graduated reticle SVG based on `appState.reticleConfig`:
-      * `clickCount`: indents per arm (2 to 25)
+      * `clickCount`: indents per arm (2 to 30)
       * `clickSpacing`: pixel distance between clicks
       * `centerGap`: unobstructed central viewport area
+      * `centerPointStyle`: 'empty', 'dot', 'cross', or 'chevron'
       * `innerBrackets`: bounding POI crosshair brackets
       * `majorInterval`: longer tick lines every N clicks
       * `showLabels`: click distance number markings
       * `concentricRings`: circular distance rings
-  - Exports `getClickDistanceInPixels(viewportW, viewportH, overlayScale)` to calculate
-    the physical on-screen pixel distance represented by 1 click, factoring both SVG viewBox
-    scaling and user overlay scale.
+  - Implements First Focal Plane (FFP) scaling:
+      `scaleFactor = (overlayScale / 100) * (reticleFfpMode ? mainZoom : 1.0)`
+  - Exports `getClickDistanceInPixels()` to calculate the physical on-screen pixel distance
+    represented by 1 click, factoring both SVG viewBox scaling and user overlay scale.
 
-3.3 Female Voice Text-To-Speech Detection Announcements (js/renderer/compositor.js)
-  - `announceHeatmapDetection(detections, cw, ch)`:
-      * Finds the strongest cluster of localized motion from the heatmap grid.
-      * Calculates clockwise angle from the reticle center (0.5, 0.5) in 12 clock hours.
-      * Calculates Euclidean distance in clicks using `getClickDistanceInPixels()`.
-      * Generates phrases such as: "Detection! 11 o'clock, 3 clicks".
-  - `speakDetectionAnnouncement(text)`:
-      * Dispatches `SpeechSynthesisUtterance` via local browser speech engine.
-      * Auto-selects English female voices (e.g. Zira, Samantha, Victoria, Google UK English Female).
-      * Applies robotic/crisp female pitch (default 1.25x) and speed (1.10x).
-      * Debounces repeat alerts to prevent audio chatter.
+3.4 Studio Voice Synthesizer & Speech Engine (js/audio/voiceAudioEngine.js)
+  - Preloads studio recorded audio sprite (`voice-sprite.mp3`) using browser Web Audio API (`AudioContext`).
+  - Plays concatenated audio samples for clock coordinates and reticle clicks without speech synthesis latency.
+  - Automatically falls back to browser `SpeechSynthesisUtterance` if Web Audio assets fail.
+  - Generates announcements such as: "Detection! 11 o'clock, 3 clicks".
 
-3.4 PS4 / Bluetooth Gamepad Controller (js/input/gamepadController.js)
-  - Polled every animation frame using HTML5 `navigator.getGamepads()`.
-  - Analog stick deadzone filtering (0.16) and non-linear acceleration for precision ROI crosshair steering.
-  - Silently operates without modifying the screen unless buttons are triggered.
-  - Live connection status dot, device name, and last action are displayed in Settings.
+3.5 Decoupled 20Hz Heatmap Engine (js/renderer/compositor.js)
+  - Heatmap frame analysis runs on an independent 50ms interval, entirely decoupling heavy
+    matrix difference calculations from the 60fps main canvas compositor.
+  - Global Camera Shake Gate: Motion exceeding 18% of the frame is rejected to prevent false positives
+    caused by wind, tripod vibrations, or panning.
+  - Dirty checking state machine skips canvas draw commands when the scene is quiescent.
 
-3.5 Native Dual-Direction Frame Stepping (instantReplay.js, videoBrowser.js)
-  - Both Instant Replay and Saved Video Gallery provide:
-      * `STEP -1`: Steps backward exactly 1 frame (`playheadSec - frameStepSec`).
-      * `STEP +1`: Steps forward exactly 1 frame (`playheadSec + frameStepSec`).
-      * Pauses playback automatically and re-renders the exact decoded frame immediately.
+3.6 Native Dual-Source RAM Ring Buffer (js/recorder/memoryRingBuffer.js)
+  - Automatically captures full-resolution frames from `<video id="cameraVideo">` in USB mode,
+    or from the offscreen canvas helper `getRtspCanvas()` in RTSP mode.
+  - Maintains 5s to 60s rolling JPEG frames in memory with real-time heap guardrails.
+
+3.7 Instant Replay & Stored Video Player (instantReplay.js, videoBrowser.js)
+  - Instant Replay modal features a dedicated `0.5x` Slow-Motion button for detailed ballistic analysis.
+  - Fullscreen Stored Video Player provides a collapsible clips drawer with individual red trash icons
+    (`.btn-quick-delete-clip`) on each card for rapid one-tap deletion without loading the full video.
 
 
 4. PORTABLE USAGE GUIDE (USB STICK / LAPTOP / CHROMEBOOK)
 ---------------------------------------------------------
-Option A: Running Directly from a USB Stick on Any Laptop (Windows / Mac / Linux)
-  1. Copy the `/EagleVision` folder onto your USB drive.
-  2. On Windows: Double-click `start_eaglevision.bat` inside the folder.
-  3. On macOS / Linux terminal: Run `python3 -m http.server 8080` and open
-     `http://localhost:8080` in Chrome, Edge, or Brave.
+Option A: Running Locally on Windows
+  1. Double-click `start_spotr.bat` in the root folder.
+  2. The batch script automatically starts `python server.py 8080` (with RTSP gateway and UDP wake support)
+     and launches `http://localhost:8080` in your default browser.
 
-Option B: Installing as a 100% Offline App on Lenovo Duet 3 / Laptop
-  1. Open `http://localhost:8080` in Chrome and click "Install EagleVision" in the address bar.
-  2. Once installed, launch EagleVision from the app shelf anytime 100% offline.
+Option B: Running on macOS / Linux Terminal
+  1. Open a terminal in the SPOTR directory.
+  2. Run `python3 server.py 8080` (or `python3 -m http.server 8080` for UVC-only mode).
+  3. Open `http://localhost:8080` in Chrome, Edge, or Brave.
+
+Option C: Installing as a 100% Offline App on Chromebook / Android / Laptop
+  1. Open `http://localhost:8080` in Chrome or Edge.
+  2. Click the "Install SPOTR" icon in the omnibox (or "Add to Home Screen" on mobile).
+  3. Launch SPOTR from your app launcher anytime with complete 100% offline functionality.

@@ -1,41 +1,44 @@
-# SPOTR Software Architecture Document (Beta 1)
+# SPOTR Software Architecture Document (Revision 52)
 
 ## 1. Executive Overview
 
-**SPOTR** (*Recon • Detect • Alert*) is an ultra-low latency, driverless, offline-first Progressive Web Application (PWA) designed for tactical camera stream analysis, optical target pinpointing, hardware-assisted reticle calibration, micro-motion detection, and rolling circular memory video buffering.
+**SPOTR** (*Recon • Detect • Alert • Optical Precision*) is an ultra-low latency, driverless, offline-first Progressive Web Application (PWA) with a high-throughput Python 3 RTSP streaming gateway. It is engineered for tactical camera stream analysis, optical target pinpointing, hardware-assisted reticle calibration, micro-motion detection, directional voice callouts, and rolling circular memory video buffering.
 
 ```
-+-----------------------------------------------------------------------------+
-|                                SPOTR PWA                                    |
-|   (Pure Browser-Native ES2022 • Zero NPM Runtime Dependencies • 60 FPS)     |
-+-----------------------------------------------------------------------------+
-       │                             │                              │
-       ▼                             ▼                              ▼
-+──────────────+              +──────────────+              +───────────────+
-| Hardware HID |              | UVC Cameras  |              | Web Speech    |
-| • WebHID BT  |              | • 1080p/4K   |              | • Local TTS   |
-| • DualShock4 |              | • USB Scopes |              | • Callouts    |
-| • 5-Btn Ring |              | • Webcams    |              | • Real-time   |
-+──────────────+              +──────────────+              +───────────────+
++---------------------------------------------------------------------------------------------------------+
+|                                             SPOTR PWA                                                   |
+|                     (Pure Browser-Native ES2022 • Zero NPM Runtime Dependencies • 60 FPS)               |
++---------------------------------------------------------------------------------------------------------+
+       │                                     │                                    │
+       ▼                                     ▼                                    ▼
++──────────────────────────+       +───────────────────────────────────+       +──────────────────────────+
+| Hardware HID & Inputs    |       | Dual Camera Ingestion Pipeline    |       | Dual Voice Synthesizer   |
+| • WebHID (DualShock 4/5) |       | • UVC USB (1080p/4K Scopes)       |       | • Web Audio Studio Voice |
+| • Capacitive Virt. Mouse |       | • RTSP Gateway (server.py OpenCV) |       | • Browser Web Speech API |
+| • HTML5 Gamepad API      |       | • Bresser Wi-Fi Wake Proxy (UDP)  |       | • Directional Callouts   |
+| • 5-Btn Bluetooth Ring   |       | • Sub-ms Condition Frame Push     |       | • Reticle Click Distance |
++──────────────────────────+       +───────────────────────────────────+       +──────────────────────────+
 ```
 
-### Design Principles
-1. **Zero External Runtime Dependencies**: Pure ES2022 modules running natively in modern Chromium-based browsers (Chrome, Edge, ChromeOS).
-2. **Deterministic 60 FPS Pipeline**: Double-buffered `requestAnimationFrame` composition separating input polling, thermal diffing, and canvas rendering.
-3. **Driverless Hardware Control**: Direct low-level USB/Bluetooth Human Interface Device (WebHID) access for DualShock 4/DualSense controllers, decoding raw capacitive touchpad packets into a hardware-accelerated Virtual Mouse with L2/R2 trigger integration.
-4. **Zero-Disk In-Memory Buffer**: Rolling circular RAM ring buffer storing up to 60 seconds of full-resolution JPEG frames with real-time budget guardrails.
+### Core Design Principles
+1. **Zero External Runtime Dependencies**: Pure ES2022 modules running natively in modern Chromium-based browsers (Chrome, Edge, ChromeOS) paired with a lightweight, standalone Python 3 streaming gateway (`server.py`).
+2. **Deterministic 60 FPS Graphics Pipeline**: Desynchronized 2D canvas contexts (`{ alpha: false, desynchronized: true }`), GPU hardware layer promotion (`translateZ(0)`, `contain: strict`), and `touch-action: none` gesture suppression for zero input latency.
+3. **Dual Ingestion Video Architecture**: Seamlessly handles direct browser UVC USB cameras via `getUserMedia` as well as network IP/Wi-Fi RTSP cameras (e.g., Bresser Full HD Eyepiece Camera) via an asynchronous OpenCV FFmpeg bridge with sub-millisecond push-event frame distribution.
+4. **Driverless Hardware Control**: Direct low-level USB/Bluetooth Human Interface Device (WebHID) access for DualShock 4/DualSense controllers, decoding raw capacitive touchpad packets into a hardware-accelerated Virtual Mouse with L2/R2 trigger integration.
+5. **Decoupled 20Hz Computer Vision**: Micro-change heatmap runs on an independent 50ms interval with global camera-shake rejection (>18%) and dirty-checking to eliminate zero-op canvas redraws.
+6. **Zero-Disk In-Memory Buffer**: Rolling circular RAM ring buffer storing up to 60 seconds of full-resolution JPEG frames from either USB or RTSP feeds with real-time budget guardrails.
 
 ---
 
 ## 2. High-Level System Architecture
 
-The application is structured around a centralized reactive unidirectional state store (`state.js`) decoupling hardware input devices, camera acquisition, computer vision analysis, canvas compositing, and user interface rendering:
+The application is structured around a centralized reactive unidirectional state store (`state.js`) decoupling hardware input devices, dual-stream camera acquisition, computer vision analysis, canvas compositing, audio synthesis, and user interface rendering:
 
 ```mermaid
 flowchart TD
     subgraph Inputs["1. Hardware Input Subsystems"]
         BT["WebHID Bluetooth<br/>(DualShock 4 / DualSense)"]
-        GP["HTML5 Gamepad API<br/>(DirectInput / XInput Fallback)"]
+        GP["HTML5 Gamepad API<br/>(Standard Gamepads)"]
         RING["5-Button Bluetooth Ring<br/>(Keyboard/HID Emulation)"]
         MOUSE["Touch / Mouse / Pointer Events"]
     end
@@ -46,38 +49,44 @@ flowchart TD
         SUB["subscribeState(listener)"]
     end
 
-    subgraph CameraEngine["3. Camera & Video Pipeline"]
-        MEDIA["navigator.mediaDevices<br/>(UVC / Webcams / Scopes)"]
-        STREAM["StreamManager<br/>(Stream Negotiation)"]
-        STATS["StreamStats<br/>(Live FPS & Jitter)"]
+    subgraph CameraEngine["3. Dual Camera Ingestion Pipeline"]
+        MEDIA["navigator.mediaDevices<br/>(UVC Scopes / Webcams)"]
+        RTSP_GW["OpenCV Gateway (server.py)<br/>(Bresser Wi-Fi / ONVIF / RTSP)"]
+        WAKE["UDP Wake Proxy<br/>(/api/rtsp/wake -> 65534)"]
+        STREAM["StreamManager<br/>(Source Arbitration)"]
+        STATS["StreamStats<br/>(Live FPS & Jitter HUD)"]
     end
 
-    subgraph CompositorEngine["4. Dual-Canvas Compositor & CV"]
-        MAIN_C["Main Viewport Canvas<br/>(Filter Shaders & Pan/Zoom)"]
-        PIP_C["Digital Zoom Loupe Canvas<br/>(1.5x - 12.0x Magnification)"]
-        HEAT["Thermal Micro-Change Engine<br/>(Global Shake Gate)"]
-        TTS["Web Speech API<br/>(Directional Callouts)"]
+    subgraph CompositorEngine["4. Compositor & Computer Vision"]
+        MAIN_C["Main Viewport Canvas<br/>(alpha: false, desync)"]
+        PIP_C["Digital Zoom Loupe<br/>(1.5x - 12.0x Magnification)"]
+        HEAT["20Hz Heatmap Engine<br/>(Shake Gate > 18%)"]
+        AUDIO["Dual Voice Engine<br/>(Studio Sprite + TTS)"]
     end
 
     subgraph MemoryEngine["5. RAM Buffer & Storage"]
-        RAM["Circular Memory Ring Buffer<br/>(20s-60s RAM Queue)"]
-        REPLAY["Instant Replay Modal<br/>(Auto-Save & Frame Scrubber)"]
-        IDB[("IndexedDB Archive<br/>(Persistent Video Clips)")]
+        RAM["Circular Memory Ring Buffer<br/>(USB & RTSP getRtspCanvas())"]
+        REPLAY["Instant Replay Modal<br/>(0.5x Slow-Mo & Stepping)"]
+        IDB[("IndexedDB Archive<br/>(Clips with Quick Delete)")]
         LOCAL[("LocalStorage<br/>(User Config & Reticle)")]
     end
 
-    subgraph UISubsystem["6. View Shell & Screens"]
+    subgraph UISubsystem["6. View Shell & Drawers"]
         S_LIVE["Screen 1: Live Feed View"]
         S_GALLERY["Screen 2: Stored Video Browser"]
         S_SETTINGS["Screen 3: Fullscreen Settings"]
         S_RETICLE["Screen 4: Reticle Customizer"]
-        S_CONTROLLER["Screen 5: Controller & Key Mapping"]
-        V_MOUSE["Virtual Mouse Cursor Overlay"]
+        S_CONTROLLER["Screen 5: Controller Screen"]
+        D_RETICLE["Reticle Quick Drawer<br/>(Live FFP & 6 Themes)"]
+        V_MOUSE["Virtual Mouse Overlay"]
     end
 
     Inputs -->|Raw Reports| UPDATE
-    CameraEngine -->|HTMLVideoElement| CompositorEngine
-    CameraEngine -->|Raw Frame Capture| RAM
+    WAKE -.-> RTSP_GW
+    RTSP_GW -->|MJPEG Frame Push| STREAM
+    MEDIA -->|HTMLVideoElement| STREAM
+    STREAM --> CompositorEngine
+    STREAM -->|Raw Frame Capture| RAM
     UPDATE --> STATE
     STATE --> SUB
     SUB --> UISubsystem
@@ -93,104 +102,132 @@ flowchart TD
 ## 3. Subsystem Breakdown
 
 ### 3.1 Unidirectional State Store (`js/state.js`)
-* **State Topology**: Plain JavaScript dictionary holding viewport coordinates (`roiX`, `roiY`), zoom parameters, filters, reticle geometry, memory buffer status, and controller telemetry.
-* **Reactivity**: `updateState(patch)` shallow-merges properties and synchronizes all subscribed components via `listeners.forEach()`.
-* **Instant Mount Sync**: `subscribeState(fn)` executes the subscriber callback immediately with the current state upon mounting to guarantee instant UI synchronization.
+* **State Topology**: Holds all mutable application properties including viewport coordinates (`roiX`, `roiY`), digital zoom level (`mainZoom`), active camera source (`cameraSource`: `'usb'` | `'rtsp'`), RTSP endpoint configuration, reticle geometry (`reticleConfig`), First Focal Plane lock (`reticleFfpMode`), memory buffer telemetry, and controller bindings.
+* **Reactivity**: `updateState(patch)` performs shallow property merges and dispatches updates to all registered listeners (`listeners.forEach()`).
+* **Instant Mount Sync**: `subscribeState(fn)` executes the subscriber callback immediately with current state upon subscription to guarantee instantaneous UI synchronization.
 
-### 3.2 Hardware Controller Subsystem (`js/input/gamepadController.js`)
-* **DualShock 4 Bluetooth WebHID Protocol**:
-  * Scans for Sony Interactive Entertainment devices (`vendorId: 0x054c`, `productId: 0x05c4` / `0x09cc`).
-  * Unlocks full 78-byte telemetry report by sending initialization output report `0x11` with hardware CRC32.
-  * Decodes capacitive multi-touch trackpad bytes (2 contacts, 12-bit X/Y coordinates, touch timestamps, finger tracking IDs).
-* **Virtual Mouse Engine**:
-  * Trackpad finger velocity mapped through dynamic acceleration curve.
-  * **Left Trigger (`L2`)**: Left Mouse Click & Drag. Pulling L2 initiates pointer down / drag at the virtual cursor coordinates; releasing L2 ends drag and commits clicks.
-  * **Right Trigger (`R2`)**: Dispatches right-click (`button: 2`, `contextmenu`).
-* **Dual Thumbstick Tuning**:
-  * **Deadzone**: Hardware threshold of `0.16` eliminates resting analog stick drift.
-  * **Aiming Curve**: Non-linear power curve $v_{out} = \text{sign}(v) \cdot |v|^{1.8}$ reduces low-deflection speed by 50–70% for sub-millimeter tick aiming.
-  * **Reduced Maximum Speed**: Base ROI traverse speed reduced by 50% (`BASE_ROI_SPEED = 0.012` scaled by `reticleAimSpeed ?? 50%` $\to 0.006$ per frame) to prevent overshooting targets.
-  * **Reticle Customizer Mode**:
-    * Left Stick UP / DOWN: Cycles menu focus through drawer controls (`cycleFocus`).
-    * Left Stick LEFT / RIGHT: Adjusts selected slider or toggle switch (`adjust`).
-    * Right Stick X / Y: Directly sculpts Center Gap and Stroke Weight on the preview reticle.
+### 3.2 Dual Camera Ingestion Pipeline (`js/camera/streamManager.js` & `server.py`)
+* **UVC Camera Subsystem**:
+  * Ingests local USB scopes and webcams via `navigator.mediaDevices.getUserMedia`.
+  * Renders into hidden `<video id="cameraVideo">` at full sensor resolution (1080p, 4K).
+  * Automatically switches to an animated synthetic test pattern card with calibrated hash lines if no camera is connected.
+* **Network RTSP & Wi-Fi Gateway (`server.py`)**:
+  * Employs an OpenCV (`cv2.VideoCapture`) FFmpeg worker thread capturing raw H.264/H.265 RTSP streams.
+  * **Threading Condition Push Distribution**: Worker acquires frames and signals client threads via `threading.Condition(frame_lock).notify_all()`. Eliminates polling latency and delivers sub-millisecond MJPEG streaming to `/api/rtsp/stream`.
+  * **Bresser Wi-Fi Eyepiece Camera Proxy**:
+    * Proxies `/api/rtsp/wake` to send the required UDP magic wake packet (`b"bresser"`) to `192.168.1.1:65534`.
+    * Supports Anyka DSP multi-channel streaming: Channel 0 (`rtsp://192.168.1.1:554/live/ch0`) for 1080p high-resolution optics, and Channel 1 (`rtsp://192.168.1.1:554/live/ch1`) for 540p high-framerate feed.
+  * **Custom RTSP / ONVIF Endpoints**: Ingests arbitrary user-specified network RTSP URLs via simple UI configuration.
+* **Live Telemetry Tracker (`streamStats.js` & `hudController.js`)**:
+  * Measures rolling frame delivery times, computing instantaneous FPS, frame time jitter (ms), and native sensor resolution.
 
 ### 3.3 Dual-Canvas Compositor & Computer Vision (`js/renderer/compositor.js`)
-* **Primary Viewport**: Draws full-resolution camera frame with real-time CSS filter matrix (brightness, contrast, saturation, inversion, grayscale) and hardware-accelerated 2D transforms.
+* **GPU-Optimized 2D Viewport**:
+  * Main Viewport Canvas rendered with `getContext('2d', { alpha: false, desynchronized: true })`.
+  * Hardware promoted with `contain: strict; will-change: transform; transform: translateZ(0);` and `touch-action: none` to eliminate mobile browser gesture stalls.
+  * Real-time CSS filter matrix (brightness, contrast, saturation, inversion, grayscale) with hardware acceleration.
 * **Digital Zoom Loupe (PiP)**:
-  * Crop source bounding box centered at normalized $(\text{roiX}, \text{roiY})$.
-  * Canvas-rendered with sub-pixel interpolation and reticle alignment.
-* **Thermal Micro-Change Heatmap Engine**:
-  * Samples consecutive camera frames at $160 \times 90$ grid resolution ($14,400$ cells).
-  * Computes pixel-wise luminance differences $\Delta L = |L_t - L_{t-1}|$.
-  * **Global Camera-Shake Gate**: If more than 18% of the scene changes simultaneously, motion is rejected as physical camera vibration or pan, suppressing false alarms.
-  * Persistent decay overlay with adjustable duration ($1\text{s}$ to $\infty$).
-* **Voice Speech Callout Synthesizer**:
-  * Converts detection centroid coordinates into clock-face angle ($1$ to $12$ o'clock) and graduated reticle click distance.
-  * Emits natural voice alerts: *"Detection! 11 o'clock, 3 clicks"* via local `SpeechSynthesisUtterance`.
-  * Customizable alert and unit keywords via Settings.
+  * Dedicated picture-in-picture canvas displaying cropped region centered on normalized $(\text{roiX}, \text{roiY})$.
+  * Interactive corner-resize handles and smooth sub-pixel interpolation.
+* **Decoupled 20Hz Micro-Change Heatmap Engine**:
+  * Runs on an independent 50ms timer (`setInterval`) decoupled from the 60fps render loop, eliminating frame drops.
+  * Samples downscaled $160 \times 90$ luminance grid ($14,400$ cells) and computes pixel-wise delta $\Delta L = |L_t - L_{t-1}|$.
+  * **Global Camera-Shake Gate**: If more than 18% of cells detect motion simultaneously, the frame is classified as camera vibration, wind buffeting, or panning, suppressing false alarms.
+  * **Dirty-Checking State Machine**: When the scene is static or in full-frame shake, canvas operations are bypassed entirely, minimizing CPU and battery consumption.
 
-### 3.4 In-Memory Circular Video Buffer (`js/recorder/memoryRingBuffer.js`)
-* **Architecture**: Array of binary JPEG Blobs with timestamps maintained as a ring buffer in RAM.
-* **Zero Disk Footprint**: Does not write to disk while monitoring, avoiding flash memory degradation on embedded tablets (ChromeOS / Android).
-* **RAM Guardrails**: Computes browser heap budget via `performance.memory` (or fallback heuristics), displaying real-time memory usage and limiting buffer duration (5s to 60s).
-* **Instant Replay**: Captures RAM buffer state, presents an instant replay scrubber bar, single-frame stepper buttons, 0.5x slow-motion playback, and auto-saves the clip to IndexedDB.
+### 3.4 Dual Voice Synthesizer Subsystem (`js/audio/voiceAudioEngine.js` & `voiceManifest.js`)
+* **High-Fidelity Studio Voice Sprite Engine**:
+  * Uses the browser Web Audio API (`AudioContext`, `AudioBufferSourceNode`, `GainNode`) playing pre-recorded studio female voice samples from `assets/audio/voice-sprite.mp3`.
+  * Scheduled with sample-accurate playback offsets defined in `voiceManifest.js`.
+  * Zero-delay vocalization: phrases are assembled dynamically (e.g. *"Detection"*, *"11 o'clock"*, *"3 clicks"*).
+* **Browser Web Speech API Fallback**:
+  * Seamlessly activates if Web Audio samples are unavailable or in environments lacking MP3 decode support.
+  * Selects natural female voices with configurable pitch (1.25x) and speech rate (1.10x).
 
 ### 3.5 Parametric Reticle Engine (`js/renderer/overlayManager.js`)
-* Dynamically constructs scalable SVG graduated crosshairs with:
-  * **Extended Click Count**: Up to 30 clicks/indents per arm (2 to 30) on both vertical and horizontal axes for long-range elevation and BDC ladders.
-  * **Optical Dead-Center Measurement**: Turret click adjustments and voice callouts are computed strictly from true optical dead-center $(0, 0)$, unaffected by center gap width.
-  * **4 Selectable Center Aiming Symbols**:
-    * `empty`: Clean, unobstructed open center gap.
-    * `dot`: Sharp precision aiming dot centered at $(0, 0)$.
-    * `cross`: Fine center mini-crosshair meeting at the exact dead-center intersection.
-    * `chevron`: Tactical inverted-V caret ($\land$) whose sharp apex points directly to the exact center pixel from which click distances are measured.
-  * Click distance in SVG/pixel spacing (8px to 100px with 1-pixel precision).
-  * Center POI unobstructed gap (0px to 140px).
-  * Inner alignment brackets and major tick intervals with numerical labels (every 5 or 10 clicks).
-  * Concentric range circles corresponding directly to labeled click rings.
+* Dynamically generates scalable SVG graduated crosshairs with:
+  * **First Focal Plane (FFP) Scaling Mode**: Locks reticle subtensions to the optical digital zoom (`scaleFactor = (overlayScale / 100) * (reticleFfpMode ? mainZoom : 1.0)`), maintaining angular mil/MOA accuracy across all zoom steps.
+  * **6 Tactical Color Themes**: Cyan (`#2dd4bf`), Amber (`#ffd166`), Emerald (`#10b981`), High-Vis White (`#f8fafc`), Red (`#f87171`), Blue (`#60a5fa`) driven by dynamic HSL CSS custom properties.
+  * **4 Center Aiming Symbols**:
+    * `empty`: Clean, unobstructed center window.
+    * `dot`: Sharp center aiming dot precisely at $(0, 0)$.
+    * `cross`: Ultra-fine center mini-crosshair meeting at the true optical intersection.
+    * `chevron`: Tactical inverted-V caret ($\land$) whose sharp apex points directly to the center measurement datum.
+  * Configurable click count (2 to 30 per arm), SVG click pixel spacing (8px to 100px), center gap (0px to 140px), major tick intervals with numerical labels, and concentric range rings.
+  * Optical turret click adjustments and voice callouts are computed strictly from true optical dead-center $(0, 0)$.
 
-### 3.7 Controller & Key Mapping Subsystem (`js/ui/controllerScreen.js`)
-* **Dedicated Fullscreen Configuration Matrix**: Provides visual representation of connected DualShock 4 / Gamepad with real-time input glowing and live action banner readout.
-* **Flexible Rebinding Pipeline**: Supports interactive capturing of gamepad buttons, triggers, stick-clicks, and keyboard keys with conflict resolution and profile presets (*Default DualShock 4*, *Simplified Field Mode*, *Flight / Arcade Stick*).
-* **Analog Fine-Tuning**: Real-time stick deadzone sliders (5% to 40%), Invert Y-Axis toggles for independent left/right thumbsticks, aim speed attenuation (10% to 100%), and capacitive touchpad sensitivity.
-* **Cyclic Quick-Tool Selector**: Ergonomic cycling dock on the live feed (D-Pad ◀ / ▶) enabling instant toggling (Cross ✕) of secondary operational tools (*Heatmap Detection*, *Voice Announcements*, *Reticle Overlay*, *FFP Zoom Lock*, *PiP Loupe*, *Declutter Sight*, *Telemetry HUD*) without screen navigation.
+### 3.6 In-Memory Circular Video Buffer (`js/recorder/memoryRingBuffer.js`)
+* **Dual-Source Ingestion**: Automatically reads full-resolution frames from `<video id="cameraVideo">` in UVC mode, or from the offscreen canvas helper `getRtspCanvas()` in RTSP mode.
+* **Zero-Disk In-Memory Queue**: Rolling ring of binary JPEG ArrayBuffers in RAM (5s to 60s @ 5 to 30 FPS). Eliminates solid-state drive wear and thermal throttling on mobile tablets.
+* **Live Memory Budget Meter**: Real-time RAM utilization tracking via `performance.memory` and budget estimation (`USED` vs. `EST` vs. `FREE MB`).
+* **Instant Replay Modal (`instantReplay.js`)**:
+  * Instant RAM snapshot playback with interactive scrubber.
+  * **0.5x Slow-Motion Playback**: Dedicated slow-mo toggle for shot trajectory and bullet impact forensics.
+  * **Single-Frame Stepping**: Dedicated `STEP -1` and `STEP +1` buttons for frame-by-frame analysis.
+  * **Auto-Save**: Automatically commits replay clips into IndexedDB without interrupting live monitoring.
 
-### 3.8 First Focal Plane (FFP) Reticle Optical Engine (`js/renderer/overlayManager.js` & `compositor.js`)
-* **Proportional Subtension Scaling**: Matches optical scope First Focal Plane mechanics by automatically scaling reticle markings and hashmark spacing in lockstep with whole-image digital zoom: `scaleFactor = (overlayScale / 100) * (reticleFfpMode ? mainZoom : 1.0)`.
-* **Dynamic Click Distance Measurement**: Integrates FFP scaling directly into bullet impact / micro-motion distance computation (`getClickDistanceInPixels`), guaranteeing that angular measurements (mils/MOA) and directional voice announcements ("*3 clicks*", "*2 mils*") remain physically accurate across all magnification levels.
-* **Rapid Joypad Subtension Spacing**: Dedicated D-Pad ▲ (widen +5%) and D-Pad ▼ (tighten −5%) adjustments with tactical on-screen display (OSD) HUD feedback for instant field calibration to known target distances.
+### 3.7 Stored Video Browser & Archive (`js/ui/videoBrowser.js` & `videoStore.js`)
+* **IndexedDB Persistent Storage**: Stores recorded video clips with metadata (timestamp, resolution, duration, frame count).
+* **Collapsible Clips Drawer with Quick Deletion**:
+  * Displays thumbnail previews and recording timestamps.
+  * **Per-Video Quick Delete**: Each clip card features a dedicated red trash icon (`.btn-quick-delete-clip`) allowing immediate deletion without opening the full replay player.
+  * Clear All button for bulk archive management.
+* **Standalone Fullscreen Player**:
+  * Fullscreen review with play/pause, looping, scrubber, and 0.5x slow-motion.
+  * **Native WebM Export**: Encodes stored frames into standalone `.webm` video files and triggers browser download.
+
+### 3.8 Hardware Controller & Remote Subsystems (`js/input/gamepadController.js` & `ringController.js`)
+* **DualShock 4 / DualSense WebHID Protocol**:
+  * Scans for Sony Interactive Entertainment devices (`vendorId: 0x054c`).
+  * Unlocks 78-byte telemetry report via initialization report `0x11` with hardware CRC32.
+  * Decodes capacitive multi-touch trackpad bytes into a responsive Virtual Mouse cursor overlay.
+  * **Left Trigger (`L2`)**: Left Mouse Click & Drag. Pulling L2 initiates pointer down / drag; releasing commits click.
+  * **Right Trigger (`R2`)**: Dispatches right-click (`button: 2`, `contextmenu`).
+* **Dual Thumbstick Tuning**:
+  * **Hardware Deadzone**: Threshold of `0.16` completely eliminates resting analog stick drift.
+  * **Non-Linear Aiming Curve**: $v_{out} = \text{sign}(v) \cdot |v|^{1.8}$ reduces low-deflection speed by 50–70% for sub-millimeter tick precision.
+  * **Zero-Allocation Polling**: Gamepad loop uses cached object references to avoid garbage collection pauses.
+* **5-Button Bluetooth Scrolling Ring Remote (`ringController.js`)**:
+  * Supports ultra-compact wireless finger rings simulating keyboard/multimedia keys.
+  * Modes: `AIM ROI`, `ZOOM`, `TOOLS`, and `PLAYER`.
+  * Interactive key rebinding and calibration tool in Settings.
 
 ---
 
-## 4. Screen State Transition Diagram
+## 4. Screen State Transition Topology
 
 ```mermaid
 stateDiagram-v2
     [*] --> SplashScreen: Initial App Launch
-    SplashScreen --> LiveScreen: Auto-dismiss (3.5s) / Any Key / Tap
+    SplashScreen --> LiveScreen: Auto-dismiss (3.5s) / Key / Tap
     
-    LiveScreen --> SettingsScreen: Tap Settings Icon / Controller Options Button
-    SettingsScreen --> LiveScreen: Tap Back Icon / Controller Options or Circle Button
+    LiveScreen --> SettingsScreen: Tap Settings Icon / Gamepad Options
+    SettingsScreen --> LiveScreen: Tap Back Icon / Gamepad Options or Circle
     
+    LiveScreen --> ReticleDrawer: Tap Reticle Quick-Toggle / Gamepad Square
+    ReticleDrawer --> LiveScreen: Close Drawer / Tap Backdrop
+
     SettingsScreen --> ReticleScreen: Tap "Customize Graduated Reticle"
-    ReticleScreen --> LiveScreen: Tap "← Live Feed" / Controller Circle or Options
+    ReticleScreen --> LiveScreen: Tap "← Live Feed" / Gamepad Circle
     ReticleScreen --> SettingsScreen: Tap "⚙ Settings"
 
     SettingsScreen --> ControllerScreen: Tap "🎮 Configure Controller & Keys"
-    ControllerScreen --> SettingsScreen: Tap "← Settings" / Controller Circle Button
-    ControllerScreen --> LiveScreen: Tap "Exit to Live" / Controller Options Button
+    ControllerScreen --> SettingsScreen: Tap "← Settings" / Gamepad Circle
+    ControllerScreen --> LiveScreen: Tap "Exit to Live" / Gamepad Options
     
     LiveScreen --> GalleryScreen: Tap Stored Clips Icon / Ring Replay
-    GalleryScreen --> LiveScreen: Tap "← Live Feed" / Controller Circle
+    GalleryScreen --> LiveScreen: Tap "← Live Feed" / Gamepad Circle
     
-    LiveScreen --> InstantReplayModal: Tap "20s Replay" / Controller Share Button
-    InstantReplayModal --> LiveScreen: Tap "Live" / Controller Circle
+    LiveScreen --> InstantReplayModal: Tap "20s Replay" / Gamepad Share
+    InstantReplayModal --> LiveScreen: Tap "Live" / Gamepad Circle
 ```
 
 ---
 
 ## 5. Security & Privacy Model
-* **100% Client-Side Execution**: All processing, video stream ingestion, computer vision diffing, speech synthesis, and video storage occur locally on the client device. No telemetry, audio, or video data is transmitted over external networks.
-* **Camera Privacy**: Operates exclusively under standard browser camera permissions (`getUserMedia`).
+
+* **100% Client-Side Processing**: All video ingestion, computer vision diffing, speech synthesis, and video storage occur locally on the host device. No telemetry, audio, or video data is transmitted to external servers.
+* **Local RTSP Gateway Boundary**: The Python gateway (`server.py`) binds strictly to the local network interface, translating local camera streams into MJPEG without external cloud intermediaries.
+* **Camera Privacy**: Operates under standard browser camera permissions (`getUserMedia`).
 * **WebHID Device Isolation**: Hardware access is explicitly granted per device through Chrome's native security picker prompt.
+* **Offline-First PWA Pre-Caching**: All application assets, scripts, stylesheets, audio sprites, and vector icons are cached by Service Worker (`spotr-v52`), ensuring complete functionality in offline environments.

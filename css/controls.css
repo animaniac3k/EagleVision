@@ -164,6 +164,33 @@
   cursor: not-allowed;
 }
 
+.radar-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 30px;
+  background: #051216;
+  color: var(--radar-text);
+  border: 1px solid var(--radar-border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  outline: none;
+}
+
+.radar-text-input:focus {
+  border-color: var(--radar-border-strong);
+  box-shadow: 0 0 6px var(--radar-glow);
+}
+
+.radar-text-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 input[type="range"].radar-slider {
   -webkit-appearance: none;
   appearance: none;
