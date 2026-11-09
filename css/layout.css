@@ -782,10 +782,10 @@
 }
 
 .controller-screen-header {
-  height: 60px;
+  min-height: 60px;
   background: var(--radar-panel);
   border-bottom: 1px solid var(--radar-border);
-  padding: 0 20px;
+  padding: 8px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -793,6 +793,72 @@
   flex-shrink: 0;
   box-shadow: var(--shadow-panel);
   z-index: 20;
+}
+
+.cm-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cm-profile-bar .radar-btn-sm {
+  height: 30px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.cm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.cm-modal-backdrop.hidden {
+  display: none !important;
+}
+
+.cm-modal-box {
+  background: #14161d;
+  border: 1px solid rgba(255, 107, 0, 0.4);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 25px rgba(255, 107, 0, 0.2);
+  width: 90%;
+  max-width: 440px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.cm-modal-title {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--radar-primary);
+  letter-spacing: 0.5px;
+}
+
+.cm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .cm-toast-banner {
@@ -887,7 +953,8 @@
   display: none !important;
 }
 
-/* 7-Button Wireless Bluetooth Remote Visualizer & Calibrator */
+/* Unified Bluetooth Ring & Remote Visualizer & Calibrator (Option B: Tactical Matrix) */
+
 .remote-device-box {
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--radar-border);
@@ -918,15 +985,38 @@
 }
 
 .remote-visual-btn.remote-active-glow {
+  filter: drop-shadow(0 0 12px rgba(255, 107, 0, 0.95)) !important;
+}
+
+.remote-visual-btn.remote-active-glow rect,
+.remote-visual-btn.remote-active-glow circle {
   fill: var(--radar-primary) !important;
-  stroke: #FF8533 !important;
-  filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.95)) !important;
+  stroke: #ff944d !important;
 }
 
 .remote-visual-btn.remote-active-glow text,
+.remote-visual-btn.remote-active-glow polygon,
 .remote-visual-btn.remote-active-glow path {
-  fill: #0D0E12 !important;
-  stroke: #0D0E12 !important;
+  fill: #0d0e12 !important;
+  stroke: #0d0e12 !important;
+}
+
+.remote-visual-btn.remote-learning-pulse {
+  animation: remoteLearnPulse 0.85s infinite alternate ease-in-out;
+}
+
+.remote-visual-btn.remote-learning-pulse rect,
+.remote-visual-btn.remote-learning-pulse circle {
+  stroke: #f59e0b !important;
+}
+
+@keyframes remoteLearnPulse {
+  0% {
+    filter: drop-shadow(0 0 4px #f59e0b) brightness(1.2);
+  }
+  100% {
+    filter: drop-shadow(0 0 16px #f59e0b) brightness(1.7);
+  }
 }
 
 .remote-led-dot {

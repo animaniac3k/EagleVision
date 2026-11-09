@@ -21,6 +21,7 @@ export const appState = {
   rtspOnvifUser: '',
   rtspOnvifPass: '',
   rtspCustomUrl: '',
+  rtspGatewayHost: '',         // Optional gateway host/IP (e.g. 'http://192.168.0.50:8080')
   rtspWakeStatus: 'idle',      // 'idle' | 'waking' | 'live' | 'error'
   rtspAvailableChannels: [],
 
@@ -36,7 +37,7 @@ export const appState = {
   roiX: 0.5,
   roiY: 0.5,
 
-  // UI Windows Visibility & Active Screen ('live' | 'gallery' | 'settings' | 'reticle')
+  // UI Windows Visibility & Active Screen ('live' | 'gallery' | 'settings' | 'reticle' | 'controller')
   optionsOpen: false,
   hudOpen: false,
   currentScreen: 'live',
@@ -90,7 +91,7 @@ export const appState = {
   bufferBytes: 0,
   replayActive: false,
 
-  // Interface Theme Color, Global UI Opacity, Declutter Mode, Gamepad & 5-Button Bluetooth Ring
+  // Interface Theme Color, Global UI Opacity, Declutter Mode, Gamepad & Remote / Ring Controls
   themeColor: '#f97316',
   uiOpacity: 100,
   uiDecluttered: false,
@@ -100,9 +101,10 @@ export const appState = {
   rightStickDeadzone: 16,  // 5% to 30% deadzone
   leftStickInvertY: false, // Invert left stick vertical axis
   rightStickInvertY: false,// Invert right stick vertical axis
-  activeControllerProfile: 'default', // 'default' | 'simplified' | 'flight'
-  controllerBindings: null,// User-configured controller & key mappings
-  ringKeyMap: {},
+  activeControllerProfile: 'default', // 'default' | 'simplified' | 'flight' | custom profile ID
+  customControllerProfiles: {},       // User custom profiles: Record<id, ProfileObject>
+  controllerBindings: null,           // User-configured active controller & key mappings
+  ringKeyMap: {},                     // User-configured active Bluetooth Ring / Remote mappings
   gamepadConnected: false,
   gamepadName: '',
   lastGamepadAction: ''

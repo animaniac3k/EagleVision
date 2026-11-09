@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v53';
+const CACHE_NAME = 'spotr-v56';
 const ASSETS = [
   './',
   './index.html',
@@ -52,27 +52,79 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first strategy so updates load immediately, with offline cache fallback
+function fetchWithTimeout(request, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { signal: controller.signal })
+    .then((res) => {
+      clearTimeout(timeoutId);
+      return res;
+    })
+    .catch((err) => {
+      clearTimeout(timeoutId);
+      throw err;
+    });
+}
+
+// Cache-First strategy with Stale-While-Revalidate for robust offline & camera Wi-Fi operation
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
     return;
   }
 
-  // Bypass service worker caching for RTSP live streams and local API calls
+  // Bypass service worker caching for RTSP live streams and local API endpoints
   const reqUrl = new URL(event.request.url);
   if (reqUrl.pathname.startsWith('/api/')) {
     return;
   }
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+      // 1. If asset is in cache, serve immediately (0ms instant boot, works offline on camera Wi-Fi)
+      if (cachedResponse) {
+        // In the background, refresh cache only if browser reports internet connectivity
+        if (navigator.onLine) {
+          fetch(event.request)
+            .then((networkResponse) => {
+              if (
+                networkResponse &&
+                networkResponse.status === 200 &&
+                (networkResponse.type === 'basic' || networkResponse.type === 'cors')
+              ) {
+                const clone = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+              }
+            })
+            .catch(() => {});
         }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+        return cachedResponse;
+      }
+
+      // 2. Navigation fallback for PWA home-screen launches or reloads when offline
+      if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+        return caches.match('./index.html', { ignoreSearch: true }).then((indexCached) => {
+          if (indexCached) return indexCached;
+          return caches.match('./', { ignoreSearch: true }).then((rootCached) => {
+            if (rootCached) return rootCached;
+            return fetchWithTimeout(event.request, 2500);
+          });
+        });
+      }
+
+      // 3. Fallback to network with short timeout so requests never hang when on local camera Wi-Fi without internet
+      return fetchWithTimeout(event.request, 2500)
+        .then((networkResponse) => {
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            (networkResponse.type === 'basic' || networkResponse.type === 'cors')
+          ) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request, { ignoreSearch: true }));
+    })
   );
 });

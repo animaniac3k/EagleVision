@@ -50,6 +50,30 @@ export function setRemoteMode(idx) {
   modeIndex = ((idx % REMOTE_MODES.length) + REMOTE_MODES.length) % REMOTE_MODES.length;
 }
 
+export function getLearningAction() {
+  return learningAction;
+}
+
+export function setLearningAction(act) {
+  learningAction = act;
+  const ringLastSignalEl = document.getElementById('ringLastSignal');
+  if (ringLastSignalEl) {
+    ringLastSignalEl.textContent = learningAction
+      ? `WAITING FOR [${learningAction}] PRESS ON RING/REMOTE... (ESC TO CANCEL)`
+      : 'READY (CLICK ANY BUTTON TO CALIBRATE)';
+  }
+  document.querySelectorAll('.remote-learn-btn').forEach((btn) => {
+    const a = btn.dataset.remoteAct;
+    const isLearning = learningAction === a;
+    btn.classList.toggle('radar-btn-active', isLearning);
+    btn.textContent = isLearning ? 'WAITING...' : 'LEARN';
+  });
+  document.querySelectorAll('.remote-visual-btn').forEach((vBtn) => {
+    const a = vBtn.dataset.remoteAct;
+    vBtn.classList.toggle('remote-learning-pulse', learningAction === a);
+  });
+}
+
 export function initRingController() {
   const customMap = appState.ringKeyMap || {};
 
@@ -57,8 +81,6 @@ export function initRingController() {
   const ringModeBadge = document.getElementById('ringModeBadge');
   const ringActionText = document.getElementById('ringActionText');
   const ringLastSignalEl = document.getElementById('ringLastSignal');
-  const btnResetRingMap = document.getElementById('btnResetRingMap');
-  const learnButtons = document.querySelectorAll('.ring-learn-btn');
 
   function flashRingHud(actionSummary) {
     const modeName = getActiveRemoteMode();
@@ -82,74 +104,6 @@ export function initRingController() {
     if (mode === 'ZOOM VIEW') return `[ 2/3 ZOOM ] ▲▼ ZOOM FEED • ● 1:1 RESET ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`;
     if (mode === 'RETICLE CAL') return `[ 3/3 RETICLE ] ▲▼ MILS • ● ${appState.reticleFfpMode ? 'FFP LOCKED 🔒' : 'LOCK FFP'}`;
     return '● PLAY/PAUSE • ◀▶ STEP 1 FRAME • BTN1 EXIT';
-  }
-
-  function updateLearnButtonsUI() {
-    learnButtons.forEach((btn) => {
-      const act = btn.dataset.ringAct;
-      const isLearning = learningAction === act;
-      btn.classList.toggle('radar-btn-active', isLearning);
-      const customCode = customMap[act];
-      const baseLabel = btn.dataset.baseLabel || act;
-      btn.textContent = isLearning
-        ? 'PRESS REMOTE...'
-        : customCode
-          ? `${baseLabel} [${customCode.replace('Key', '').replace('Arrow', '')}]`
-          : baseLabel;
-    });
-
-    // Also update remote tab calibration buttons if present
-    const remoteLearnBtns = document.querySelectorAll('.remote-learn-btn');
-    remoteLearnBtns.forEach((btn) => {
-      const act = btn.dataset.remoteAct;
-      const isLearning = learningAction === act;
-      btn.classList.toggle('radar-btn-active', isLearning);
-      const customCode = customMap[act];
-      const currentLabel = btn.querySelector('.btn-bound-key');
-      if (currentLabel) {
-        currentLabel.textContent = isLearning
-          ? 'PRESS REMOTE...'
-          : customCode
-            ? customCode.replace('Key', '').replace('Arrow', '')
-            : (DEFAULT_KEY_MAP[act]?.[0] || 'NONE');
-      }
-    });
-  }
-
-  // Allow clicking the top Ring HUD pill to manually cycle modes too
-  if (ringHudPill) {
-    ringHudPill.addEventListener('click', () => {
-      if (appState.currentScreen === 'gallery' || appState.replayActive) return;
-      modeIndex = (modeIndex + 1) % REMOTE_MODES.length;
-      flashRingHud(getModeHint(REMOTE_MODES[modeIndex]));
-    });
-  }
-
-  // Set up interactive "Learn Ring Buttons"
-  learnButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const act = btn.dataset.ringAct;
-      learningAction = learningAction === act ? null : act;
-      if (ringLastSignalEl) {
-        ringLastSignalEl.textContent = learningAction
-          ? `WAITING FOR [${learningAction}] PRESS ON REMOTE...`
-          : 'READY (7-BTN REMOTE)';
-      }
-      updateLearnButtonsUI();
-    });
-  });
-
-  if (btnResetRingMap) {
-    btnResetRingMap.addEventListener('click', () => {
-      learningAction = null;
-      Object.keys(customMap).forEach((k) => delete customMap[k]);
-      updateState({ ringKeyMap: {} });
-      saveSettings(appState);
-      if (ringLastSignalEl) {
-        ringLastSignalEl.textContent = 'DEFAULT MAPPINGS RESTORED';
-      }
-      updateLearnButtonsUI();
-    });
   }
 
   function resolveRingAction(codeOrKey) {
@@ -392,7 +346,7 @@ export function initRingController() {
       ringLastSignalEl.textContent = `SIGNAL: ${signalCode}`;
     }
 
-    // If user is currently calibrating/learning a button in Controller Screen or Settings
+    // If user is currently calibrating/learning a button in Controller Screen
     if (learningAction) {
       customMap[learningAction] = signalCode;
       updateState({ ringKeyMap: { ...customMap } });
@@ -401,8 +355,7 @@ export function initRingController() {
         ringLastSignalEl.textContent = `BOUND [${learningAction}] → ${signalCode}`;
       }
       const actLearned = learningAction;
-      learningAction = null;
-      updateLearnButtonsUI();
+      setLearningAction(null);
 
       // Dispatch event so UI can flash success
       window.dispatchEvent(
@@ -452,6 +405,19 @@ export function initRingController() {
         e.preventDefault();
         e.stopPropagation();
         dismissSplashScreen('ring');
+        return;
+      }
+
+      // Cancel learning mode on Escape key
+      if (learningAction && (e.key === 'Escape' || e.code === 'Escape')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLearningAction(null);
+        window.dispatchEvent(
+          new CustomEvent('spotr-remote-button', {
+            detail: { action: null, signalCode: 'ESC', isCancelled: true }
+          })
+        );
         return;
       }
 
@@ -519,5 +485,4 @@ export function initRingController() {
     }
   });
 
-  updateLearnButtonsUI();
 }

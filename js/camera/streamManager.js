@@ -12,27 +12,73 @@ let rtspCanvas = null;
 let rtspAnimTimer = null;
 let rtspDrawLoopActive = false;
 
+export function getGatewayBaseUrl() {
+  const host = (appState.rtspGatewayHost || '').trim();
+  if (!host) return '';
+  return host.replace(/\/+$/, '');
+}
+
 /**
  * Wake the camera hardware media pipeline (e.g. Bresser Eyepiece HD /app/getmediainfo)
  */
 export async function wakeCameraPipeline(ip = '192.168.0.1', path = '/app/getmediainfo') {
+  const gatewayBase = getGatewayBaseUrl();
+  const wakeUrl = `${gatewayBase}/api/rtsp/wake?ip=${encodeURIComponent(ip)}&path=${encodeURIComponent(path)}`;
+
+  // 1. First attempt trigger via RTSP Gateway server
   try {
-    const res = await fetch(`/api/rtsp/wake?ip=${encodeURIComponent(ip)}&path=${encodeURIComponent(path)}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(wakeUrl, { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
   } catch (err) {
-    console.warn('[streamManager] RTSP Wake failed:', err);
-    return { success: false, error: err.message };
+    console.warn('[streamManager] RTSP Gateway wake attempt failed or timed out:', err);
   }
+
+  // 2. Direct Camera HTTP Trigger fallback (useful when device is directly on Bresser Wi-Fi)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const directUrl = `http://${ip}${path.startsWith('/') ? path : '/' + path}`;
+    const directRes = await fetch(directUrl, { signal: controller.signal }).catch(() => null);
+    clearTimeout(timer);
+    if (directRes && directRes.ok) {
+      const data = await directRes.json().catch(() => null);
+      return {
+        success: true,
+        ip,
+        message: 'Camera pipeline awakened directly',
+        declaredRtsp: data?.info?.rtsp,
+        channels: [
+          { id: 'ch0', name: 'Main Stream (1080p Full HD)', url: `rtsp://${ip}/live/tcp/ch0` },
+          { id: 'ch1', name: 'Sub Stream (540p High Speed)', url: `rtsp://${ip}/live/tcp/ch1` }
+        ]
+      };
+    }
+  } catch (directErr) {
+    console.warn('[streamManager] Direct camera wake attempt failed:', directErr);
+  }
+
+  return {
+    success: false,
+    error: `Could not reach Gateway or Camera at ${ip}. Ensure device is connected to camera Wi-Fi and server.py is running if using RTSP bridge.`
+  };
 }
 
 /**
  * Check if the Python RTSP streaming gateway is active on the host
  */
 export async function checkRtspGatewayStatus() {
+  const gatewayBase = getGatewayBaseUrl();
   try {
-    const res = await fetch('/api/rtsp/status', { cache: 'no-store' });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`${gatewayBase}/api/rtsp/status`, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timer);
     if (!res.ok) return { available: false };
     return await res.json();
   } catch {
@@ -354,7 +400,8 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   }, 1000);
 
   // Connect to the gateway multipart stream endpoint
-  const streamApiUrl = `/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
+  const gatewayBase = getGatewayBaseUrl();
+  const streamApiUrl = `${gatewayBase}/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
   rtspImg.src = streamApiUrl;
 
   const stream = rtspCanvas.captureStream(30);
@@ -401,7 +448,8 @@ export function stopCurrentStream() {
   // Only notify local Python server to release RTSP socket if an RTSP stream was active
   if (appState.isRtspStream) {
     updateState({ isRtspStream: false });
-    fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
+    const gatewayBase = getGatewayBaseUrl();
+    fetch(`${gatewayBase}/api/rtsp/stop`, { method: 'POST' }).catch(() => {});
   }
 }
 

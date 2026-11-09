@@ -12,7 +12,7 @@
 import { appState, updateState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
-import { REMOTE_MODES, getActiveRemoteMode, setRemoteMode } from './ringController.js';
+import { REMOTE_MODES, getActiveRemoteMode, setRemoteMode, getLearningAction, setLearningAction } from './ringController.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [
@@ -259,72 +259,96 @@ export const ACTION_DEFINITIONS = [
   }
 ];
 
-// 7-Button Wireless Remote Action Definitions
+// Unified Bluetooth Ring & Remote Button Definitions (Option B: Tactical Grid Matrix)
 export const REMOTE_BUTTON_DEFS = [
-  {
-    id: 'BTN1',
-    name: 'BUTTON 1 (PWR 1)',
-    badge: 'REPLAY',
-    desc: 'Instant Replay In / Out (1-click trigger in/out from any mode)',
-    defaultCodes: 'AudioVolumeUp, KeyX, KeyR, F12'
-  },
-  {
-    id: 'BTN2',
-    name: 'BUTTON 2 (2)',
-    badge: 'MODE',
-    desc: 'Discrete Mode Switcher (PAN → ZOOM → RETICLE) • Slow-Mo in Replay',
-    defaultCodes: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
-  },
-  {
-    id: 'CENTER',
-    name: 'CENTER (▶||)',
-    badge: 'ACTION',
-    desc: 'Context Action: Re-center Pan (0,0) • Reset Zoom (1.0x) • Lock/Unlock FFP 🔒 • Play/Pause Video',
-    defaultCodes: 'Enter, Space, MediaPlayPause, KeyF'
-  },
   {
     id: 'UP',
     name: 'UP (▲)',
-    badge: 'D-PAD',
+    badge: 'DIRECTION',
     desc: 'Pan Up • Zoom In (+0.25x) • Reticle Spacing +1px • Replay Restart',
     defaultCodes: 'ArrowUp, PageUp, KeyW'
   },
   {
     id: 'DOWN',
     name: 'DOWN (▼)',
-    badge: 'D-PAD',
+    badge: 'DIRECTION',
     desc: 'Pan Down • Zoom Out (-0.25x) • Reticle Spacing -1px • Replay Exit to Live',
     defaultCodes: 'ArrowDown, PageDown, KeyS'
   },
   {
     id: 'LEFT',
     name: 'LEFT (◀)',
-    badge: 'D-PAD',
-    desc: 'Pan Left • Zoom Coarse Step Down • Reticle Spacing -5px • Replay Step -1 Frame',
+    badge: 'DIRECTION',
+    desc: 'Pan Left • Zoom Coarse (-0.5x) • Reticle Spacing -5px • Replay Step -1 Frame',
     defaultCodes: 'ArrowLeft, MediaTrackPrevious, KeyA'
   },
   {
     id: 'RIGHT',
     name: 'RIGHT (▶)',
-    badge: 'D-PAD',
-    desc: 'Pan Right • Zoom Coarse Step Up • Reticle Spacing +5px • Replay Step +1 Frame',
+    badge: 'DIRECTION',
+    desc: 'Pan Right • Zoom Coarse (+0.5x) • Reticle Spacing +5px • Replay Step +1 Frame',
     defaultCodes: 'ArrowRight, MediaTrackNext, KeyD'
+  },
+  {
+    id: 'CENTER',
+    name: 'CENTER (●)',
+    badge: 'ACTION / MODE',
+    desc: 'Context Action: Re-center Pan (0,0) • Reset Zoom (1.0x) • Lock/Unlock FFP 🔒 • Play/Pause Video',
+    defaultCodes: 'Enter, Space, MediaPlayPause, KeyF'
+  },
+  {
+    id: 'BTN1',
+    name: 'BUTTON 1 (⏻ 1)',
+    badge: 'AUX 1 (REPLAY)',
+    desc: 'Instant Replay In / Out (1-click trigger in/out from any mode)',
+    defaultCodes: 'AudioVolumeUp, KeyX, KeyR, F12'
+  },
+  {
+    id: 'BTN2',
+    name: 'BUTTON 2 (2)',
+    badge: 'AUX 2 (MODE)',
+    desc: 'Discrete Mode Switcher (PAN → ZOOM → RETICLE) • Slow-Mo in Replay',
+    defaultCodes: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
   }
 ];
 
-// Profile Presets
-export const PROFILES = {
+// Default Bluetooth Ring & Remote Key Map
+export const DEFAULT_RING_KEY_MAP = {
+  UP: 'ArrowUp, PageUp, KeyW',
+  DOWN: 'ArrowDown, PageDown, KeyS',
+  LEFT: 'ArrowLeft, MediaTrackPrevious, KeyA',
+  RIGHT: 'ArrowRight, MediaTrackNext, KeyD',
+  CENTER: 'Enter, Space, MediaPlayPause, KeyF',
+  BTN1: 'AudioVolumeUp, KeyX, KeyR, F12',
+  BTN2: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
+};
+
+// Built-in Factory Profile Presets
+export const BUILT_IN_PROFILES = {
   default: {
+    id: 'default',
     name: 'Default DualShock 4',
     description: 'Balanced tactical layout optimized for precision optical scoping.',
+    isBuiltIn: true,
     bindings: ACTION_DEFINITIONS.reduce((acc, act) => {
       acc[act.id] = { gamepad: act.defaultGamepad, key: act.defaultKey };
       return acc;
-    }, {})
+    }, {}),
+    ringKeyMap: { ...DEFAULT_RING_KEY_MAP },
+    calibration: {
+      leftStickDeadzone: 16,
+      rightStickDeadzone: 16,
+      leftStickInvertY: false,
+      rightStickInvertY: false,
+      touchpadSensitivity: 50,
+      reticleAimSpeed: 50
+    }
   },
   simplified: {
+    id: 'simplified',
     name: 'Simplified Field Mode',
     description: 'Essential controls only; minimizes accidental button presses during observation.',
+    isBuiltIn: true,
     bindings: {
       aim_reticle: { gamepad: 'left-stick', key: 'ArrowKeys' },
       pan_view: { gamepad: 'right-stick', key: 'KeyW/A/S/D' },
@@ -355,13 +379,32 @@ export const PROFILES = {
       quick_tool_cycle_next: { gamepad: 'dpad-right', key: 'Period' },
       quick_tool_cycle_prev: { gamepad: 'dpad-left', key: 'Comma' },
       quick_tool_toggle: { gamepad: 'cross', key: 'Enter' }
+    },
+    ringKeyMap: {
+      UP: 'ArrowUp',
+      DOWN: 'ArrowDown',
+      LEFT: 'ArrowLeft',
+      RIGHT: 'ArrowRight',
+      CENTER: 'Enter',
+      BTN1: 'KeyX',
+      BTN2: 'KeyM'
+    },
+    calibration: {
+      leftStickDeadzone: 20,
+      rightStickDeadzone: 20,
+      leftStickInvertY: false,
+      rightStickInvertY: false,
+      touchpadSensitivity: 40,
+      reticleAimSpeed: 40
     }
   },
   flight: {
+    id: 'flight',
     name: 'Flight / Arcade Stick',
     description: 'Designed for single-stick throttles and digital D-pad steering.',
+    isBuiltIn: true,
     bindings: {
-      aim_reticle: { gamepad: 'dpad-up', key: 'ArrowKeys' }, // D-pad aiming fallback
+      aim_reticle: { gamepad: 'dpad-up', key: 'ArrowKeys' },
       pan_view: { gamepad: 'right-stick', key: 'KeyW/A/S/D' },
       zoom_in: { gamepad: 'r1', key: 'Equal' },
       zoom_out: { gamepad: 'l1', key: 'Minus' },
@@ -390,17 +433,44 @@ export const PROFILES = {
       quick_tool_cycle_next: { gamepad: 'none', key: 'Period' },
       quick_tool_cycle_prev: { gamepad: 'none', key: 'Comma' },
       quick_tool_toggle: { gamepad: 'square', key: 'Enter' }
+    },
+    ringKeyMap: {
+      UP: 'ArrowUp',
+      DOWN: 'ArrowDown',
+      LEFT: 'ArrowLeft',
+      RIGHT: 'ArrowRight',
+      CENTER: 'Space',
+      BTN1: 'KeyR',
+      BTN2: 'Tab'
+    },
+    calibration: {
+      leftStickDeadzone: 10,
+      rightStickDeadzone: 10,
+      leftStickInvertY: true,
+      rightStickInvertY: false,
+      touchpadSensitivity: 60,
+      reticleAimSpeed: 60
     }
   }
 };
+
+// Backwards-compatibility export
+export const PROFILES = BUILT_IN_PROFILES;
+
+export function getProfile(id) {
+  const profileKey = id || appState.activeControllerProfile || 'default';
+  if (appState.customControllerProfiles && appState.customControllerProfiles[profileKey]) {
+    return appState.customControllerProfiles[profileKey];
+  }
+  return BUILT_IN_PROFILES[profileKey] || BUILT_IN_PROFILES.default;
+}
 
 export function getActiveBindings() {
   if (appState.controllerBindings && typeof appState.controllerBindings === 'object') {
     return appState.controllerBindings;
   }
-  const profileKey = appState.activeControllerProfile || 'default';
-  const profile = PROFILES[profileKey] || PROFILES.default;
-  return Object.assign({}, profile.bindings);
+  const prof = getProfile(appState.activeControllerProfile);
+  return Object.assign({}, prof.bindings);
 }
 
 let activeRebindActionId = null;
@@ -420,6 +490,21 @@ export function initControllerScreen() {
   const btnBackToLive = document.getElementById('btnControllerBackToLive');
   const btnResetDefaults = document.getElementById('btnResetControllerBindings');
   const selectProfile = document.getElementById('selectControllerProfile');
+  const btnNewProfile = document.getElementById('btnNewProfile');
+  const btnSaveProfile = document.getElementById('btnSaveProfile');
+  const btnDeleteProfile = document.getElementById('btnDeleteProfile');
+  const btnExportProfile = document.getElementById('btnExportProfile');
+  const btnImportProfile = document.getElementById('btnImportProfile');
+  const inputImportProfile = document.getElementById('inputImportProfile');
+
+  // Modal dialog elements
+  const modalProfileName = document.getElementById('modalProfileName');
+  const btnCloseProfileModal = document.getElementById('btnCloseProfileModal');
+  const btnCancelProfileModal = document.getElementById('btnCancelProfileModal');
+  const btnConfirmProfileModal = document.getElementById('btnConfirmProfileModal');
+  const inputNewProfileName = document.getElementById('inputNewProfileName');
+
+  let isProfileDirty = false;
 
   // Stick calibration sliders
   const sliderLeftDeadzone = document.getElementById('sliderLeftStickDeadzone');
@@ -454,27 +539,326 @@ export function initControllerScreen() {
     updateState({ currentScreen: 'live' });
   });
 
-  // Profile selection
-  selectProfile?.addEventListener('change', (e) => {
-    const profKey = e.target.value;
-    if (PROFILES[profKey]) {
-      const newBindings = Object.assign({}, PROFILES[profKey].bindings);
-      updateState({
-        activeControllerProfile: profKey,
-        controllerBindings: newBindings
-      });
-      saveSettings(appState);
-      renderMappingTable();
-      showToastBanner(`PROFILE LOADED: ${PROFILES[profKey].name.toUpperCase()}`);
+  // -------------------------------------------------------------------------
+  // UNIFIED PROFILE MANAGEMENT (Gamepad + BT Remote + Calibration)
+  // -------------------------------------------------------------------------
+
+  function markProfileDirty() {
+    if (!isProfileDirty) {
+      isProfileDirty = true;
+      refreshProfileDropdown();
     }
+  }
+
+  function refreshProfileDropdown() {
+    if (!selectProfile) return;
+    const optBuiltIn = document.getElementById('optgroupBuiltInProfiles') || selectProfile;
+    const optCustom = document.getElementById('optgroupCustomProfiles');
+
+    const activeId = appState.activeControllerProfile || 'default';
+    const customMap = appState.customControllerProfiles || {};
+
+    // Update Built-in options
+    if (optBuiltIn) {
+      Object.keys(BUILT_IN_PROFILES).forEach((k) => {
+        const opt = optBuiltIn.querySelector(`option[value="${k}"]`);
+        if (opt) {
+          const baseName = BUILT_IN_PROFILES[k].name;
+          opt.textContent = (k === activeId && isProfileDirty) ? `${baseName} *` : baseName;
+        }
+      });
+    }
+
+    // Populate Custom options
+    if (optCustom) {
+      const customKeys = Object.keys(customMap);
+      if (customKeys.length === 0) {
+        optCustom.innerHTML = '<option value="" disabled>(No custom profiles yet)</option>';
+      } else {
+        optCustom.innerHTML = customKeys.map((k) => {
+          const p = customMap[k];
+          const isMod = (k === activeId && isProfileDirty);
+          return `<option value="${k}">${p.name || 'Untitled Profile'}${isMod ? ' *' : ''}</option>`;
+        }).join('');
+      }
+    }
+
+    selectProfile.value = activeId;
+
+    // Delete button: enabled ONLY for custom profiles (protect built-in factory presets)
+    if (btnDeleteProfile) {
+      const isCustom = Boolean(customMap[activeId]);
+      btnDeleteProfile.disabled = !isCustom;
+      btnDeleteProfile.style.opacity = isCustom ? '1' : '0.45';
+      btnDeleteProfile.style.cursor = isCustom ? 'pointer' : 'not-allowed';
+    }
+
+    // Save button: pulse highlight when unsaved changes exist
+    if (btnSaveProfile) {
+      btnSaveProfile.classList.toggle('radar-btn-active', isProfileDirty);
+    }
+  }
+
+  function loadProfile(profileId, showToast = true) {
+    const prof = getProfile(profileId);
+    if (!prof) return;
+
+    const newBindings = JSON.parse(JSON.stringify(prof.bindings || {}));
+    const newRingMap = JSON.parse(JSON.stringify(prof.ringKeyMap || DEFAULT_RING_KEY_MAP));
+    const cal = prof.calibration || {};
+
+    updateState({
+      activeControllerProfile: profileId,
+      controllerBindings: newBindings,
+      ringKeyMap: newRingMap,
+      leftStickDeadzone: cal.leftStickDeadzone ?? 16,
+      rightStickDeadzone: cal.rightStickDeadzone ?? 16,
+      leftStickInvertY: Boolean(cal.leftStickInvertY),
+      rightStickInvertY: Boolean(cal.rightStickInvertY),
+      touchpadSensitivity: cal.touchpadSensitivity ?? 50,
+      reticleAimSpeed: cal.reticleAimSpeed ?? 50
+    });
+
+    saveSettings(appState);
+    isProfileDirty = false;
+
+    refreshProfileDropdown();
+    syncCalibrationSliders();
+    renderMappingTable();
+    renderRemoteTable();
+
+    if (showToast) {
+      showToastBanner(`PROFILE LOADED: "${prof.name.toUpperCase()}"`);
+    }
+  }
+
+  function handleSaveProfile() {
+    const activeId = appState.activeControllerProfile || 'default';
+    const customMap = appState.customControllerProfiles || {};
+
+    // If active profile is a built-in factory preset, prompt user to Save as New Custom Profile
+    if (!customMap[activeId]) {
+      const builtIn = BUILT_IN_PROFILES[activeId] || BUILT_IN_PROFILES.default;
+      openProfileModal(`${builtIn.name} (Custom)`);
+      return;
+    }
+
+    // Save changes back to the active custom profile
+    const prof = customMap[activeId];
+    prof.bindings = JSON.parse(JSON.stringify(getActiveBindings()));
+    prof.ringKeyMap = JSON.parse(JSON.stringify(appState.ringKeyMap || {}));
+    prof.calibration = {
+      leftStickDeadzone: appState.leftStickDeadzone ?? 16,
+      rightStickDeadzone: appState.rightStickDeadzone ?? 16,
+      leftStickInvertY: Boolean(appState.leftStickInvertY),
+      rightStickInvertY: Boolean(appState.rightStickInvertY),
+      touchpadSensitivity: appState.touchpadSensitivity ?? 50,
+      reticleAimSpeed: appState.reticleAimSpeed ?? 50
+    };
+    prof.updatedAt = Date.now();
+
+    updateState({ customControllerProfiles: { ...customMap } });
+    saveSettings(appState);
+    isProfileDirty = false;
+
+    refreshProfileDropdown();
+    showToastBanner(`PROFILE SAVED: "${prof.name.toUpperCase()}"`);
+  }
+
+  function openProfileModal(defaultName = '') {
+    if (!modalProfileName || !inputNewProfileName) return;
+    const count = Object.keys(appState.customControllerProfiles || {}).length + 1;
+    inputNewProfileName.value = defaultName || `Custom Profile ${count}`;
+    modalProfileName.classList.remove('hidden');
+    setTimeout(() => {
+      inputNewProfileName.focus();
+      inputNewProfileName.select();
+    }, 60);
+  }
+
+  function closeProfileModal() {
+    if (modalProfileName) {
+      modalProfileName.classList.add('hidden');
+    }
+  }
+
+  function confirmCreateProfile() {
+    if (!inputNewProfileName) return;
+    const name = inputNewProfileName.value.trim();
+    if (!name) {
+      showToastBanner('PLEASE ENTER A VALID PROFILE NAME');
+      return;
+    }
+
+    const id = `custom_${Date.now()}`;
+    const customMap = appState.customControllerProfiles || {};
+
+    customMap[id] = {
+      id,
+      name,
+      isBuiltIn: false,
+      createdAt: Date.now(),
+      bindings: JSON.parse(JSON.stringify(getActiveBindings())),
+      ringKeyMap: JSON.parse(JSON.stringify(appState.ringKeyMap || {})),
+      calibration: {
+        leftStickDeadzone: appState.leftStickDeadzone ?? 16,
+        rightStickDeadzone: appState.rightStickDeadzone ?? 16,
+        leftStickInvertY: Boolean(appState.leftStickInvertY),
+        rightStickInvertY: Boolean(appState.rightStickInvertY),
+        touchpadSensitivity: appState.touchpadSensitivity ?? 50,
+        reticleAimSpeed: appState.reticleAimSpeed ?? 50
+      }
+    };
+
+    updateState({
+      customControllerProfiles: { ...customMap },
+      activeControllerProfile: id
+    });
+    saveSettings(appState);
+    isProfileDirty = false;
+
+    closeProfileModal();
+    refreshProfileDropdown();
+    showToastBanner(`CREATED PROFILE: "${name.toUpperCase()}"`);
+  }
+
+  function handleDeleteProfile() {
+    const activeId = appState.activeControllerProfile;
+    const customMap = appState.customControllerProfiles || {};
+    const prof = customMap[activeId];
+    if (!prof) {
+      showToastBanner('CANNOT DELETE BUILT-IN FACTORY PRESETS');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete profile "${prof.name}"?`);
+    if (!confirmed) return;
+
+    delete customMap[activeId];
+    updateState({
+      customControllerProfiles: { ...customMap },
+      activeControllerProfile: 'default'
+    });
+    saveSettings(appState);
+    loadProfile('default', false);
+    showToastBanner(`DELETED PROFILE: "${prof.name.toUpperCase()}"`);
+  }
+
+  function exportProfilesJson() {
+    const exportData = {
+      app: 'SPOTR',
+      type: 'controller_profiles',
+      version: '2.0',
+      exportedAt: new Date().toISOString(),
+      activeProfile: appState.activeControllerProfile || 'default',
+      customProfiles: appState.customControllerProfiles || {},
+      activeConfiguration: {
+        bindings: getActiveBindings(),
+        ringKeyMap: appState.ringKeyMap || {},
+        calibration: {
+          leftStickDeadzone: appState.leftStickDeadzone ?? 16,
+          rightStickDeadzone: appState.rightStickDeadzone ?? 16,
+          leftStickInvertY: Boolean(appState.leftStickInvertY),
+          rightStickInvertY: Boolean(appState.rightStickInvertY),
+          touchpadSensitivity: appState.touchpadSensitivity ?? 50,
+          reticleAimSpeed: appState.reticleAimSpeed ?? 50
+        }
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `spotr-controller-profiles-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToastBanner('EXPORTED PROFILES TO JSON FILE');
+  }
+
+  function handleImportFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        let importedCount = 0;
+        const customMap = appState.customControllerProfiles || {};
+
+        if (data.customProfiles && typeof data.customProfiles === 'object') {
+          Object.entries(data.customProfiles).forEach(([id, prof]) => {
+            if (prof && prof.name && (prof.bindings || prof.ringKeyMap)) {
+              customMap[id] = prof;
+              importedCount++;
+            }
+          });
+        } else if (data.bindings || data.ringKeyMap) {
+          const id = `custom_${Date.now()}`;
+          customMap[id] = {
+            id,
+            name: data.name || file.name.replace(/\.json$/i, ''),
+            isBuiltIn: false,
+            createdAt: Date.now(),
+            bindings: data.bindings || {},
+            ringKeyMap: data.ringKeyMap || {},
+            calibration: data.calibration || {}
+          };
+          importedCount = 1;
+        }
+
+        if (importedCount === 0) {
+          showToastBanner('NO VALID PROFILES FOUND IN FILE');
+          return;
+        }
+
+        updateState({ customControllerProfiles: { ...customMap } });
+        saveSettings(appState);
+        refreshProfileDropdown();
+        showToastBanner(`IMPORTED ${importedCount} PROFILE${importedCount > 1 ? 'S' : ''} SUCCESSFULLY`);
+      } catch (err) {
+        showToastBanner('ERROR: FAILED TO PARSE JSON FILE');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // Profile Event Listeners
+  selectProfile?.addEventListener('change', (e) => {
+    loadProfile(e.target.value);
+  });
+
+  btnNewProfile?.addEventListener('click', () => openProfileModal());
+  btnSaveProfile?.addEventListener('click', () => handleSaveProfile());
+  btnDeleteProfile?.addEventListener('click', () => handleDeleteProfile());
+  btnExportProfile?.addEventListener('click', () => exportProfilesJson());
+  btnImportProfile?.addEventListener('click', () => inputImportProfile?.click());
+  inputImportProfile?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImportFile(file);
+      e.target.value = '';
+    }
+  });
+
+  // Modal dialog listeners
+  btnCloseProfileModal?.addEventListener('click', () => closeProfileModal());
+  btnCancelProfileModal?.addEventListener('click', () => closeProfileModal());
+  btnConfirmProfileModal?.addEventListener('click', () => confirmCreateProfile());
+  inputNewProfileName?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmCreateProfile();
+    if (e.key === 'Escape') closeProfileModal();
   });
 
   // Reset to default
   btnResetDefaults?.addEventListener('click', () => {
-    const defaultBindings = Object.assign({}, PROFILES.default.bindings);
+    const defaultBindings = JSON.parse(JSON.stringify(BUILT_IN_PROFILES.default.bindings));
+    const defaultRingMap = JSON.parse(JSON.stringify(DEFAULT_RING_KEY_MAP));
     updateState({
       activeControllerProfile: 'default',
       controllerBindings: defaultBindings,
+      ringKeyMap: defaultRingMap,
       leftStickDeadzone: 16,
       rightStickDeadzone: 16,
       leftStickInvertY: false,
@@ -483,10 +867,12 @@ export function initControllerScreen() {
       reticleAimSpeed: 50
     });
     saveSettings(appState);
-    if (selectProfile) selectProfile.value = 'default';
+    isProfileDirty = false;
+    refreshProfileDropdown();
     syncCalibrationSliders();
     renderMappingTable();
-    showToastBanner('CONTROLLER MAPPINGS RESET TO FACTORY DEFAULTS');
+    renderRemoteTable();
+    showToastBanner('ALL MAPPINGS & CALIBRATION RESET TO FACTORY DEFAULTS');
   });
 
   // Category filter buttons
@@ -505,6 +891,7 @@ export function initControllerScreen() {
     if (valLeftDeadzone) valLeftDeadzone.textContent = `${v}%`;
     updateState({ leftStickDeadzone: v });
     saveSettings(appState);
+    markProfileDirty();
   });
 
   sliderRightDeadzone?.addEventListener('input', (e) => {
@@ -512,6 +899,7 @@ export function initControllerScreen() {
     if (valRightDeadzone) valRightDeadzone.textContent = `${v}%`;
     updateState({ rightStickDeadzone: v });
     saveSettings(appState);
+    markProfileDirty();
   });
 
   btnInvertLeftY?.addEventListener('click', () => {
@@ -520,6 +908,7 @@ export function initControllerScreen() {
     btnInvertLeftY.textContent = nextVal ? 'INVERTED (ON)' : 'NORMAL (OFF)';
     btnInvertLeftY.classList.toggle('radar-btn-active', nextVal);
     saveSettings(appState);
+    markProfileDirty();
   });
 
   btnInvertRightY?.addEventListener('click', () => {
@@ -528,6 +917,7 @@ export function initControllerScreen() {
     btnInvertRightY.textContent = nextVal ? 'INVERTED (ON)' : 'NORMAL (OFF)';
     btnInvertRightY.classList.toggle('radar-btn-active', nextVal);
     saveSettings(appState);
+    markProfileDirty();
   });
 
   sliderTouchpadSens?.addEventListener('input', (e) => {
@@ -535,6 +925,7 @@ export function initControllerScreen() {
     if (valTouchpadSens) valTouchpadSens.textContent = `${v}%`;
     updateState({ touchpadSensitivity: v });
     saveSettings(appState);
+    markProfileDirty();
   });
 
   sliderAimSpeed?.addEventListener('input', (e) => {
@@ -542,6 +933,7 @@ export function initControllerScreen() {
     if (valAimSpeed) valAimSpeed.textContent = `${v}%`;
     updateState({ reticleAimSpeed: v });
     saveSettings(appState);
+    markProfileDirty();
   });
 
   function syncCalibrationSliders() {
@@ -669,6 +1061,7 @@ export function initControllerScreen() {
           current[actId] = { gamepad: actDef.defaultGamepad, key: actDef.defaultKey };
           updateState({ controllerBindings: current });
           saveSettings(appState);
+          markProfileDirty();
           renderMappingTable();
           showToastBanner(`RESET "${actDef.name.toUpperCase()}" TO DEFAULT`);
         }
@@ -721,6 +1114,7 @@ export function initControllerScreen() {
 
     updateState({ controllerBindings: current });
     saveSettings(appState);
+    markProfileDirty();
     renderMappingTable();
     showToastBanner(`BOUND ${rawValue.toUpperCase()} TO "${actDef.name.toUpperCase()}"`);
   }
@@ -753,7 +1147,8 @@ export function initControllerScreen() {
   renderMappingTable();
 
   // -------------------------------------------------------------------------
-  // 7-BUTTON WIRELESS BLUETOOTH REMOTE TAB INTEGRATION
+  // -------------------------------------------------------------------------
+  // CONSOLIDATED BLUETOOTH RING & REMOTE INTEGRATION (Option B: Tactical Matrix)
   // -------------------------------------------------------------------------
   const tabBtnGamepad = document.getElementById('tabBtnGamepad');
   const tabBtnRemote = document.getElementById('tabBtnRemote');
@@ -764,8 +1159,22 @@ export function initControllerScreen() {
   const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
   const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
   const remoteLastSignalText = document.getElementById('remoteLastSignalText');
+  const remoteSvgContainer = document.getElementById('remoteSvgContainer');
 
-  let activeLearningRemoteAct = null;
+  // Wire interactive click listeners to all buttons on the unified Option B schematic
+  remoteSvgContainer?.querySelectorAll('.remote-visual-btn').forEach((vBtn) => {
+    vBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const act = vBtn.dataset.remoteAct;
+      if (getLearningAction() === act) {
+        setLearningAction(null);
+      } else {
+        setLearningAction(act);
+        showToastBanner(`PRESS BUTTON [${act}] ON RING TO BIND (ESC TO CANCEL)`);
+      }
+      renderRemoteTable();
+    });
+  });
 
   function syncRemoteStateUI() {
     const activeMode = getActiveRemoteMode();
@@ -782,15 +1191,16 @@ export function initControllerScreen() {
   function renderRemoteTable() {
     if (!remoteMappingTableBody) return;
     const customMap = appState.ringKeyMap || {};
+    const activeLearningAct = getLearningAction();
 
     remoteMappingTableBody.innerHTML = REMOTE_BUTTON_DEFS.map((def) => {
       const isCustom = Boolean(customMap[def.id]);
       const boundKey = customMap[def.id] || def.defaultCodes;
-      const isLearning = activeLearningRemoteAct === def.id;
+      const isLearning = activeLearningAct === def.id;
 
       let keyPillsHtml = '';
       if (isLearning) {
-        keyPillsHtml = '<span class="remote-key-tag learning">PRESS KEY ON REMOTE...</span>';
+        keyPillsHtml = '<span class="remote-key-tag learning">PRESS KEY ON RING/REMOTE...</span>';
       } else {
         const keyList = boundKey.split(',').map((k) => k.trim()).filter(Boolean);
         keyPillsHtml = keyList.map((k, idx) => {
@@ -827,11 +1237,11 @@ export function initControllerScreen() {
     remoteMappingTableBody.querySelectorAll('.remote-learn-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const act = btn.dataset.remoteAct;
-        if (activeLearningRemoteAct === act) {
-          activeLearningRemoteAct = null;
+        if (getLearningAction() === act) {
+          setLearningAction(null);
         } else {
-          activeLearningRemoteAct = act;
-          showToastBanner(`PRESS BUTTON [${act}] ON YOUR REMOTE TO CALIBRATE`);
+          setLearningAction(act);
+          showToastBanner(`PRESS BUTTON [${act}] ON RING TO CALIBRATE (ESC TO CANCEL)`);
         }
         renderRemoteTable();
       });
@@ -875,27 +1285,26 @@ export function initControllerScreen() {
   });
 
   btnResetRemoteTabMap?.addEventListener('click', () => {
-    activeLearningRemoteAct = null;
+    setLearningAction(null);
     updateState({ ringKeyMap: {} });
     saveSettings(appState);
+    markProfileDirty();
     renderRemoteTable();
-    showToastBanner('REMOTE BUTTON MAPPINGS RESET TO DEFAULTS');
+    showToastBanner('RING & REMOTE BUTTON MAPPINGS RESET TO DEFAULTS');
   });
 
   // Listen for real-time remote button signals
   window.addEventListener('spotr-remote-button', (e) => {
-    const { action, signalCode } = e.detail;
+    const { action, signalCode, isLearned, isCancelled } = e.detail;
 
-    // A. If learning a button in the Remote table
-    if (activeLearningRemoteAct) {
-      const act = activeLearningRemoteAct;
-      activeLearningRemoteAct = null;
-      const customMap = appState.ringKeyMap || {};
-      customMap[act] = signalCode;
-      updateState({ ringKeyMap: { ...customMap } });
-      saveSettings(appState);
+    // A. Re-render table if button was learned or cancelled
+    if (isLearned) {
+      markProfileDirty();
       renderRemoteTable();
-      showToastBanner(`REMOTE [${act}] BOUND TO ${signalCode}`);
+      showToastBanner(`BOUND [${action}] TO ${signalCode}`);
+    } else if (isCancelled) {
+      renderRemoteTable();
+      showToastBanner('LEARNING CANCELLED');
     }
 
     // B. Real-time visual button glow on SVG schematic
@@ -926,7 +1335,8 @@ export function initControllerScreen() {
     syncRemoteStateUI();
   });
 
-  // Initial render of remote table and state
+  // Initial render of profiles, remote table and state
+  refreshProfileDropdown();
   renderRemoteTable();
   syncRemoteStateUI();
 }

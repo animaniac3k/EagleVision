@@ -272,6 +272,7 @@ export function initSidebarAndTopControls(videoEl) {
 
   const inputCustomRtspUrl = document.getElementById('inputCustomRtspUrl');
   const btnCustomRtspConnect = document.getElementById('btnCustomRtspConnect');
+  const inputRtspGatewayHost = document.getElementById('inputRtspGatewayHost');
 
   const textRtspStatus = document.getElementById('textRtspStatus');
   const textRtspFps = document.getElementById('textRtspFps');
@@ -515,6 +516,13 @@ export function initSidebarAndTopControls(videoEl) {
   if (inputCustomRtspUrl && appState.rtspCustomUrl) {
     inputCustomRtspUrl.value = appState.rtspCustomUrl;
   }
+  if (inputRtspGatewayHost && appState.rtspGatewayHost) {
+    inputRtspGatewayHost.value = appState.rtspGatewayHost;
+  }
+  inputRtspGatewayHost?.addEventListener('input', () => {
+    updateState({ rtspGatewayHost: inputRtspGatewayHost.value.trim() });
+    saveSettings(appState);
+  });
   if (inputOnvifIp && appState.rtspOnvifIp) {
     inputOnvifIp.value = appState.rtspOnvifIp;
   }

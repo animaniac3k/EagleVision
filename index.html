@@ -8,6 +8,9 @@
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./assets/icons/icon.svg" />
   <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SPOTR" />
   <link rel="stylesheet" href="./css/variables.css" />
   <link rel="stylesheet" href="./css/layout.css" />
   <link rel="stylesheet" href="./css/viewport.css" />
@@ -488,6 +491,15 @@
                   </div>
                 </div>
 
+                <!-- Optional RTSP Gateway Server Host / IP (Enables iOS & remote devices on camera Wi-Fi) -->
+                <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">RTSP GATEWAY HOST (LEAVE BLANK IF LOCAL)</label>
+                    <span style="font-size:10px; font-family:var(--font-mono); color:var(--radar-primary);">FOR IOS / REMOTE USE</span>
+                  </div>
+                  <input id="inputRtspGatewayHost" type="text" class="radar-text-input" style="height:28px; font-size:11px;" placeholder="e.g. http://192.168.0.50:8080 (optional)" title="Host & port of the Python server.py gateway when using iOS on camera Wi-Fi" />
+                </div>
+
                 <!-- Direct / Editable RTSP Stream URL or Endpoint -->
                 <div style="display:flex; flex-direction:column; gap:4px; margin-top:2px;">
                   <label style="font-size:10px; font-family:var(--font-mono); color:var(--radar-text-muted);">RTSP STREAM URL / ENDPOINT</label>
@@ -715,25 +727,7 @@
             </div>
           </div>
 
-          <!-- 8. 5-Button Bluetooth Scrolling Ring Controller Mapping / Calibration -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">BT Ring Remote</span>
-              <button id="btnResetRingMap" class="radar-btn radar-btn-sm" title="Reset Ring Button Mapping">DEFAULT</button>
-            </div>
-            <div id="ringLastSignal" class="ring-signal-readout">READY (TAP BUTTON TO BIND)</div>
-            <div class="ring-dpad-grid">
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="UP" data-base-label="▲ UP">▲ UP</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="LEFT" data-base-label="◀ LEFT">◀ LEFT</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="CENTER" data-base-label="● MODE">● MODE</button>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="RIGHT" data-base-label="▶ RIGHT">▶ RIGHT</button>
-              <div></div>
-              <button class="radar-btn radar-btn-sm ring-learn-btn" data-ring-act="DOWN" data-base-label="▼ DOWN">▼ DOWN</button>
-              <div></div>
-            </div>
-          </div>
+
         </div>
       </div>
     </section>
@@ -967,14 +961,24 @@
           <span>CONTROLLER & KEY MAPPING CONFIGURATOR</span>
         </span>
 
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="cm-profile-bar" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">PROFILE:</label>
-          <select id="selectControllerProfile" class="radar-select" style="min-width:160px; height:30px; font-size:12px;">
-            <option value="default">Default DualShock 4</option>
-            <option value="simplified">Simplified Field Mode</option>
-            <option value="flight">Flight / Arcade Stick</option>
+          <select id="selectControllerProfile" class="radar-select" style="min-width:170px; height:30px; font-size:12px;">
+            <optgroup label="BUILT-IN PRESETS" id="optgroupBuiltInProfiles">
+              <option value="default">Default DualShock 4</option>
+              <option value="simplified">Simplified Field Mode</option>
+              <option value="flight">Flight / Arcade Stick</option>
+            </optgroup>
+            <optgroup label="MY CUSTOM PROFILES" id="optgroupCustomProfiles">
+            </optgroup>
           </select>
-          <button id="btnResetControllerBindings" class="radar-btn radar-btn-sm" title="Reset all mappings and stick calibration to factory default">RESET DEFAULTS</button>
+          <button id="btnNewProfile" class="radar-btn radar-btn-sm" title="Create new custom profile from current configuration">+ NEW</button>
+          <button id="btnSaveProfile" class="radar-btn radar-btn-sm" title="Save current mappings and calibration to active profile">💾 SAVE</button>
+          <button id="btnDeleteProfile" class="radar-btn radar-btn-sm" title="Delete active custom profile" disabled>🗑 DEL</button>
+          <button id="btnExportProfile" class="radar-btn radar-btn-sm" title="Export profiles to JSON file">📥 EXPORT</button>
+          <button id="btnImportProfile" class="radar-btn radar-btn-sm" title="Import profiles from JSON file">📤 IMPORT</button>
+          <input type="file" id="inputImportProfile" accept=".json" style="display:none;" />
+          <button id="btnResetControllerBindings" class="radar-btn radar-btn-sm" title="Reset all mappings and stick calibration to factory default">↺ RESET</button>
         </div>
       </header>
 
@@ -993,14 +997,13 @@
           </svg>
           <span>GAMEPAD / JOYSTICK</span>
         </button>
-        <button id="tabBtnRemote" class="cm-tab-btn" title="7-Button Wireless Bluetooth Remote / Ring">
+        <button id="tabBtnRemote" class="cm-tab-btn" title="Bluetooth Remote & Ring Controllers">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="6" y="2" width="12" height="20" rx="3"/>
-            <circle cx="12" cy="10" r="3.5"/>
-            <circle cx="9.5" cy="17" r="1.2"/>
-            <circle cx="14.5" cy="17" r="1.2"/>
+            <circle cx="12" cy="12" r="7"/>
+            <circle cx="12" cy="12" r="3"/>
+            <path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
           </svg>
-          <span>7-BTN BLUETOOTH REMOTE / RING</span>
+          <span>BLUETOOTH RING & REMOTE</span>
         </button>
       </div>
 
@@ -1198,81 +1201,90 @@
         <!-- TAB 2: 7-BUTTON BLUETOOTH REMOTE / RING WORKSPACE -->
         <div id="viewRemoteConfig" class="cm-view-tab hidden">
           <div class="controller-workspace-grid">
-            <!-- Left Column: Visual Remote Representation & Live Signal Diagnostics -->
+            <!-- Left Column: Unified Visual Remote & Live Signal Diagnostics -->
             <div class="cm-hardware-col">
               <div class="settings-card">
                 <div class="settings-card-header">
-                  <span class="settings-label">Live Remote Monitor</span>
+                  <span class="settings-label">Live Ring & Remote Monitor</span>
                   <div style="display:flex; align-items:center; gap:6px;">
                     <span id="remoteStatusDot" class="gamepad-dot" style="background:#10B981; box-shadow:0 0 8px #10B981;"></span>
                     <span id="remoteStatusText" style="font-size:11px; font-family:var(--font-mono); color:var(--radar-text-muted);">BLUETOOTH HID LISTENING</span>
                   </div>
                 </div>
 
-                <!-- Remote Hardware Schematic Box -->
-                <div class="remote-device-box">
-                  <svg class="remote-device-svg" viewBox="0 0 280 330" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Type-C Port at Top -->
-                    <rect x="110" y="6" width="60" height="10" rx="4" fill="#0A0A0C" stroke="#3F3F46" stroke-width="1.5"/>
+                <!-- Unified Bluetooth Remote & Ring Schematic (Option B: Tactical Grid Matrix) -->
+                <div class="remote-device-box" id="remoteSvgContainer">
+                  <svg id="remoteDeviceSvg" class="remote-device-svg" viewBox="0 0 280 360" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Outer Chassis -->
+                    <rect x="16" y="14" width="248" height="332" rx="32" fill="#18191e" stroke="#2c2d35" stroke-width="2.5"/>
+                    <rect x="22" y="20" width="236" height="320" rx="26" fill="#121316" stroke="#1f2026" stroke-width="1.2"/>
 
-                    <!-- Main Remote Body -->
-                    <rect x="15" y="20" width="250" height="295" rx="38" fill="#1C1D22" stroke="#2C2D35" stroke-width="3"/>
-                    <rect x="22" y="27" width="236" height="281" rx="32" fill="#141518" stroke="#1F2026" stroke-width="1"/>
+                    <!-- Top LED & Status -->
+                    <circle id="remoteLedDot" class="remote-led-dot" cx="48" cy="44" r="5" fill="#3f3f46" stroke="#27272a" stroke-width="1"/>
+                    <text x="48" y="58" fill="#71717a" font-family="monospace" font-size="7" text-anchor="middle">LED</text>
+                    <text x="140" y="44" fill="#38bdf8" font-family="monospace" font-size="9" font-weight="700" text-anchor="middle" letter-spacing="1">TACTICAL MATRIX</text>
 
-                    <!-- Top LED Status Indicator -->
-                    <circle id="remoteLedDot" class="remote-led-dot" cx="54" cy="74" r="5" fill="#3F3F46" stroke="#27272A" stroke-width="1"/>
-                    <text x="54" y="90" fill="#71717A" font-family="monospace" font-size="7" text-anchor="middle">LED</text>
-
-                    <!-- Center Action Button (Play / Pause / Lock) -->
-                    <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
-                      <circle cx="140" cy="132" r="26" fill="#2B2C33" stroke="#3E3F4A" stroke-width="2"/>
-                      <polygon points="132,125 132,139 142,132" fill="#F8FAFC"/>
-                      <line x1="145" y1="125" x2="145" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
-                      <line x1="149" y1="125" x2="149" y2="139" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round"/>
-                    </g>
-
-                    <!-- D-Pad Directional Cluster (Radial symmetry, uniform 8px gap) -->
-                    <!-- Up Sector Button -->
+                    <!-- D-PAD CLUSTER (Cross Layout) -->
+                    <!-- UP BUTTON -->
                     <g id="rBtnUP" class="remote-visual-btn" data-remote-act="UP">
-                      <path d="M 100.0 77.0 A 68 68 0 0 1 180.0 77.0 L 160.0 104.5 A 34 34 0 0 0 120.0 104.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="140,75 134,84 146,84" fill="#E2E8F0"/>
+                      <rect x="114" y="68" width="52" height="52" rx="11" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,80 131,92 149,92" fill="#e2e8f0"/>
+                      <text x="140" y="107" fill="#94a3b8" font-family="monospace" font-size="8" font-weight="bold" text-anchor="middle">UP</text>
                     </g>
 
-                    <!-- Down Sector Button -->
-                    <g id="rBtnDOWN" class="remote-visual-btn" data-remote-act="DOWN">
-                      <path d="M 180.0 187.0 A 68 68 0 0 1 100.0 187.0 L 120.0 159.5 A 34 34 0 0 0 160.0 159.5 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="140,189 134,180 146,180" fill="#E2E8F0"/>
-                    </g>
-
-                    <!-- Left Sector Button -->
+                    <!-- LEFT BUTTON -->
                     <g id="rBtnLEFT" class="remote-visual-btn" data-remote-act="LEFT">
-                      <path d="M 85.0 172.0 A 68 68 0 0 1 85.0 92.0 L 112.5 112.0 A 34 34 0 0 0 112.5 152.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="83,132 92,126 92,138" fill="#E2E8F0"/>
+                      <rect x="54" y="126" width="52" height="52" rx="11" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="66,152 78,143 78,161" fill="#e2e8f0"/>
+                      <text x="90" y="155" fill="#94a3b8" font-family="monospace" font-size="8" font-weight="bold" text-anchor="middle">LEFT</text>
                     </g>
 
-                    <!-- Right Sector Button -->
+                    <!-- CENTER BUTTON -->
+                    <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
+                      <rect x="114" y="126" width="52" height="52" rx="13" fill="#2b2c34" stroke="#ff6b00" stroke-width="1.8"/>
+                      <circle cx="140" cy="150" r="7" fill="#ff6b00"/>
+                      <text x="140" y="167" fill="#f8fafc" font-family="monospace" font-size="7.5" font-weight="bold" text-anchor="middle">MODE</text>
+                    </g>
+
+                    <!-- RIGHT BUTTON -->
                     <g id="rBtnRIGHT" class="remote-visual-btn" data-remote-act="RIGHT">
-                      <path d="M 195.0 92.0 A 68 68 0 0 1 195.0 172.0 L 167.5 152.0 A 34 34 0 0 0 167.5 112.0 Z" fill="#25262C" stroke="#353640" stroke-width="1.5"/>
-                      <polygon points="197,132 188,126 188,138" fill="#E2E8F0"/>
+                      <rect x="174" y="126" width="52" height="52" rx="11" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="214,152 202,143 202,161" fill="#e2e8f0"/>
+                      <text x="190" y="155" fill="#94a3b8" font-family="monospace" font-size="8" font-weight="bold" text-anchor="middle">RIGHT</text>
                     </g>
 
-                    <!-- Bottom Left Button (⏻ 1 - Instant Replay) -->
+                    <!-- DOWN BUTTON -->
+                    <g id="rBtnDOWN" class="remote-visual-btn" data-remote-act="DOWN">
+                      <rect x="114" y="184" width="52" height="52" rx="11" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <polygon points="140,218 131,206 149,206" fill="#e2e8f0"/>
+                      <text x="140" y="199" fill="#94a3b8" font-family="monospace" font-size="8" font-weight="bold" text-anchor="middle">DOWN</text>
+                    </g>
+
+                    <!-- DIVIDER LINE -->
+                    <line x1="38" y1="248" x2="242" y2="248" stroke="#25262c" stroke-width="1.5" stroke-dasharray="3,3"/>
+                    <text x="140" y="244" fill="#64748b" font-family="monospace" font-size="7" font-weight="700" text-anchor="middle" letter-spacing="1">AUXILIARY FUNCTIONS</text>
+
+                    <!-- SIDE-BY-SIDE AUX TILES -->
+                    <!-- BTN 1 (Instant Replay) -->
                     <g id="rBtnBTN1" class="remote-visual-btn" data-remote-act="BTN1">
-                      <circle cx="86" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
-                      <!-- Vector Power Symbol -->
-                      <path d="M 86 238 L 86 245 M 80.5 242 A 6.5 6.5 0 1 0 91.5 242" stroke="#FF8533" stroke-width="2" fill="none" stroke-linecap="round"/>
-                      <text x="86" y="265" fill="#E2E8F0" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">1</text>
-                      <text x="86" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">REPLAY</text>
+                      <rect x="36" y="258" width="98" height="68" rx="12" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <text x="85" y="282" fill="#ff6b00" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">⏻ BTN 1</text>
+                      <text x="85" y="302" fill="#38bdf8" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">REPLAY</text>
+                      <text x="85" y="316" fill="#64748b" font-family="monospace" font-size="7.5" text-anchor="middle">1-TAP IN/OUT</text>
                     </g>
 
-                    <!-- Bottom Right Button (2 - Mode Switcher) -->
+                    <!-- BTN 2 (Mode Switcher) -->
                     <g id="rBtnBTN2" class="remote-visual-btn" data-remote-act="BTN2">
-                      <circle cx="194" cy="252" r="26" fill="#25262C" stroke="#353640" stroke-width="2"/>
-                      <text x="194" y="258" fill="#F8FAFC" font-family="monospace" font-size="20" font-weight="bold" text-anchor="middle">2</text>
-                      <text x="194" y="292" fill="#71717A" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">MODE</text>
+                      <rect x="146" y="258" width="98" height="68" rx="12" fill="#202128" stroke="#353640" stroke-width="1.5"/>
+                      <text x="195" y="282" fill="#ff6b00" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">2 BTN 2</text>
+                      <text x="195" y="302" fill="#38bdf8" font-family="monospace" font-size="9" font-weight="bold" text-anchor="middle">CYCLE MODE</text>
+                      <text x="195" y="316" fill="#64748b" font-family="monospace" font-size="7.5" text-anchor="middle">PAN/ZOOM/RET</text>
                     </g>
                   </svg>
                 </div>
+
+                <!-- Live Signal Readout / Interactive Calibration Bar -->
+                <div id="ringLastSignal" class="ring-signal-readout" style="margin-top:10px; width:100%;">READY (CLICK ANY BUTTON TO CALIBRATE)</div>
               </div>
 
               <!-- Live Remote State Card -->
@@ -1350,6 +1362,25 @@
           </div>
         </div>
       </div>
+      <!-- Custom Profile Name Modal Dialog -->
+      <div id="modalProfileName" class="cm-modal-backdrop hidden">
+        <div class="cm-modal-box">
+          <div class="cm-modal-header">
+            <span class="cm-modal-title">NEW CONTROLLER PROFILE</span>
+            <button id="btnCloseProfileModal" class="radar-btn radar-btn-sm" title="Close">✕</button>
+          </div>
+          <div class="cm-modal-body">
+            <p style="font-size:12px; color:var(--radar-text-muted); margin-bottom:12px; line-height:1.4;">
+              Enter a name for this profile. It will store Gamepad mappings, Bluetooth Ring & Remote actions, and stick calibration.
+            </p>
+            <input id="inputNewProfileName" type="text" class="radar-input" placeholder="e.g. Field Digiscoper Ring" style="width:100%; height:34px; font-size:13px; font-family:var(--font-mono); box-sizing:border-box;" maxlength="32" />
+          </div>
+          <div class="cm-modal-footer">
+            <button id="btnCancelProfileModal" class="radar-btn radar-btn-sm">CANCEL</button>
+            <button id="btnConfirmProfileModal" class="radar-btn radar-btn-sm radar-btn-active">SAVE PROFILE</button>
+          </div>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -1360,6 +1391,6 @@
     <div class="vm-dot"></div>
   </div>
 
-  <script type="module" src="./js/main.js?v=51"></script>
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
