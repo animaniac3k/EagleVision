@@ -4,3 +4,14 @@ __pycache__/
 *.pyd
 .DS_Store
 Thumbs.db
+
+# Android build outputs & local config
+.gradle/
+**/build/
+local.properties
+*.apk
+*.aab
+.idea/
+*.iml
+platforms/android/app/src/main/assets/
+
