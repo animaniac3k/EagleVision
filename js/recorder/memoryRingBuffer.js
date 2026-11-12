@@ -4,12 +4,14 @@
  * Captures frames at the camera stream's native resolution (e.g. 1920×1080)
  * and stores only compressed JPEG ArrayBuffers in RAM.
  * Supports user-adjustable duration (seconds) and frame rate (FPS) with live
- * RAM usage and available memory budget reporting.
+ * RAM usage, audio amplitude sampling, and external event recording.
  */
 import { appState, updateState } from '../state.js';
 import { getRtspCanvas } from '../camera/streamManager.js';
+import { getSoundPeak, initSoundSampler } from '../audio/soundSampler.js';
 
-let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height }
+let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height, soundPeak }
+let ringEvents = []; // Array of { timestampMs, type }
 let totalBytes = 0;
 let captureInterval = null;
 let captureCanvas = null;
@@ -17,6 +19,19 @@ let captureCtx = null;
 let encodingInProgress = false;
 let currentVideoEl = null;
 let lastBufferStateUpdateTime = 0;
+
+/**
+ * Records an external detection event (e.g. Micro-Change Heatmap target hit)
+ * into the rolling in-memory timeline.
+ */
+export function recordEvent(type = 'event') {
+  if (!appState.bufferEnabled) return;
+  const now = performance.now();
+  ringEvents.push({ timestampMs: now, type });
+  const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
+  const cutoff = now - maxSec * 1000;
+  ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
+}
 
 /**
  * Estimates the maximum safe RAM budget (in MB) for in-memory video buffering
@@ -61,6 +76,9 @@ export function startMemoryBuffer(videoEl) {
   }
   if (!appState.bufferEnabled || !currentVideoEl) return;
 
+  // Initialize sound sampler if mic available
+  initSoundSampler().catch(() => {});
+
   if (!captureCanvas) {
     captureCanvas = document.createElement('canvas');
     captureCtx = captureCanvas.getContext('2d');
@@ -91,6 +109,7 @@ export function startMemoryBuffer(videoEl) {
 
     encodingInProgress = true;
     const capturedAt = performance.now();
+    const currentPeak = getSoundPeak();
 
     try {
       captureCtx.drawImage(source, 0, 0, nativeW, nativeH);
@@ -104,7 +123,8 @@ export function startMemoryBuffer(videoEl) {
               timestampMs: capturedAt,
               jpegBuffer,
               width: nativeW,
-              height: nativeH
+              height: nativeH,
+              soundPeak: currentPeak
             });
             totalBytes += jpegBuffer.byteLength;
 
@@ -121,6 +141,9 @@ export function startMemoryBuffer(videoEl) {
               const old = frameRing.shift();
               totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
             }
+
+            // Prune events outside rolling window
+            ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
 
             const spanSec =
               frameRing.length > 1
@@ -166,6 +189,7 @@ export function stopMemoryBuffer() {
     captureInterval = null;
   }
   frameRing = [];
+  ringEvents = [];
   totalBytes = 0;
   encodingInProgress = false;
   lastBufferStateUpdateTime = 0;
@@ -183,12 +207,45 @@ export async function snapshotMemoryBuffer() {
 
   const jpegFrames = frameRing.map((f) => f.jpegBuffer.slice(0));
 
+  // Downsample sound peaks to up to 80 bins across duration
+  const rawPeaks = frameRing.map((f) => f.soundPeak || 0);
+  const targetBins = Math.min(80, Math.max(1, rawPeaks.length));
+  const step = rawPeaks.length / targetBins;
+  const soundPeaks = [];
+  for (let i = 0; i < targetBins; i++) {
+    const start = Math.floor(i * step);
+    const end = Math.min(rawPeaks.length, Math.floor((i + 1) * step));
+    let maxP = 0;
+    for (let j = start; j < end; j++) {
+      if (rawPeaks[j] > maxP) maxP = rawPeaks[j];
+    }
+    soundPeaks.push(Number(maxP.toFixed(2)));
+  }
+
+  // Calculate events relative to the start of the recording in seconds
+  // Group events occurring within the same second into a single event timestamp
+  const rawEvents = ringEvents
+    .filter((e) => e.timestampMs >= firstTs && e.timestampMs <= lastTs)
+    .map((e) => Number(((e.timestampMs - firstTs) / 1000).toFixed(2)))
+    .sort((a, b) => a - b);
+
+  const events = [];
+  for (const t of rawEvents) {
+    if (!events.length || t - events[events.length - 1] > 1.0) {
+      events.push(t);
+    }
+  }
+
   return {
     jpegFrames,
     fps: appState.bufferTargetFps || 15,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: totalBytes,
     width: lastFrame.width || appState.streamWidth || 1920,
-    height: lastFrame.height || appState.streamHeight || 1080
+    height: lastFrame.height || appState.streamHeight || 1080,
+    timeline: {
+      soundPeaks,
+      events
+    }
   };
 }

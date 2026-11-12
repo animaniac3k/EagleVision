@@ -6,6 +6,7 @@
  */
 import { appState, updateState } from '../state.js';
 import { listVideoClips, getVideoClip, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
+import { renderCctvTrack } from './cctvScrubBar.js';
 
 let cachedClips = [];
 let selectedClipId = null;
@@ -20,6 +21,7 @@ let lastDrawnIdx = -1;
 let galleryZoom = 1.0;
 let galleryPanX = 0;
 let galleryPanY = 0;
+let galleryEventNavHelper = null;
 
 const galleryImg = new Image();
 
@@ -79,7 +81,7 @@ function renderGalleryFrame() {
   }
 
   scrubber.value = String(playheadSec.toFixed(2));
-  timeReadout.textContent = `${playheadSec.toFixed(2)}s / ${clipDuration.toFixed(1)}s (F ${idx + 1}/${frameUrls.length})`;
+  timeReadout.textContent = `${playheadSec.toFixed(1)}s / ${clipDuration.toFixed(1)}s`;
   btnPlayPause.textContent = isPlaying ? 'PAUSE ⏸' : 'PLAY ▶';
 }
 
@@ -230,6 +232,22 @@ async function selectClip(clip, autoPlay = true) {
     URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }))
   );
 
+  // Render CCTV Waveform & Event Markers for this stored recording
+  const waveformEl = document.getElementById('galleryWaveform');
+  const markersEl = document.getElementById('galleryMarkers');
+  const timeline = fullClip.timeline || clip.timeline || { soundPeaks: [], events: [] };
+  galleryEventNavHelper = renderCctvTrack({
+    waveformEl,
+    markersEl,
+    timeline,
+    durationSec: clipDuration,
+    onSeek: (t) => {
+      playheadSec = t;
+      lastTickMs = performance.now();
+      renderGalleryFrame();
+    }
+  });
+
   renderGalleryFrame();
   rafId = requestAnimationFrame(galleryTickLoop);
 }
@@ -376,13 +394,35 @@ export function initVideoBrowser() {
     galleryImg.src = frameUrls[nextIdx];
 
     scrubber.value = String(playheadSec.toFixed(2));
-    timeReadout.textContent = `${playheadSec.toFixed(2)}s / ${clipDuration.toFixed(1)}s (F ${nextIdx + 1}/${totalFrames})`;
+    timeReadout.textContent = `${playheadSec.toFixed(1)}s / ${clipDuration.toFixed(1)}s`;
     btnPlayPause.textContent = 'PLAY ▶';
     lastTickMs = performance.now();
   }
 
   btnStepBack?.addEventListener('click', () => stepGalleryFrame(-1));
   btnStep?.addEventListener('click', () => stepGalleryFrame(1));
+
+  const btnPrevEvt = document.getElementById('btnGalleryPrevEvt');
+  const btnNextEvt = document.getElementById('btnGalleryNextEvt');
+  btnPrevEvt?.addEventListener('click', () => {
+    if (!galleryEventNavHelper) return;
+    const prev = galleryEventNavHelper.getPrevEvent(playheadSec);
+    if (prev !== null) {
+      playheadSec = prev;
+      lastTickMs = performance.now();
+      renderGalleryFrame();
+    }
+  });
+
+  btnNextEvt?.addEventListener('click', () => {
+    if (!galleryEventNavHelper) return;
+    const next = galleryEventNavHelper.getNextEvent(playheadSec);
+    if (next !== null) {
+      playheadSec = next;
+      lastTickMs = performance.now();
+      renderGalleryFrame();
+    }
+  });
 
   scrubber.addEventListener('input', (e) => {
     playheadSec = parseFloat(e.target.value) || 0;

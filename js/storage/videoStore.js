@@ -36,7 +36,7 @@ function openDB() {
   });
 }
 
-export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, width, height }) {
+export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, width, height, timeline }) {
   const db = await openDB();
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -51,7 +51,8 @@ export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, w
     sizeBytes: sizeBytes || jpegFrames.reduce((acc, b) => acc + b.byteLength, 0),
     width: width || 1920,
     height: height || 1080,
-    jpegFrames
+    jpegFrames,
+    timeline: timeline || { soundPeaks: [], events: [] }
   };
 
   return new Promise((resolve, reject) => {
@@ -175,4 +176,30 @@ export async function exportClipToDisk(clip) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+  // Export companion sidecar metadata JSON if timeline data exists
+  if (clip.timeline && (clip.timeline.soundPeaks?.length || clip.timeline.events?.length)) {
+    const metaJson = JSON.stringify(
+      {
+        name: clip.name,
+        createdAt: clip.createdAt,
+        fps: clip.fps,
+        durationSec: clip.durationSec,
+        width: clip.width,
+        height: clip.height,
+        timeline: clip.timeline
+      },
+      null,
+      2
+    );
+    const metaBlob = new Blob([metaJson], { type: 'application/json' });
+    const metaUrl = URL.createObjectURL(metaBlob);
+    const metaLink = document.createElement('a');
+    metaLink.href = metaUrl;
+    metaLink.download = filename.replace(/\.webm$/i, '') + '.meta.json';
+    document.body.appendChild(metaLink);
+    metaLink.click();
+    metaLink.remove();
+    setTimeout(() => URL.revokeObjectURL(metaUrl), 5000);
+  }
 }

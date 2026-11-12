@@ -13,6 +13,7 @@ import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
 import { getClickDistanceInPixels } from './overlayManager.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
+import { recordEvent } from '../recorder/memoryRingBuffer.js';
 
 export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
 
@@ -186,6 +187,7 @@ export function initCompositor(videoEl) {
         const centroidNormX = (spikeSumX / spikeWeightSum + 0.5) / HEAT_W;
         const centroidNormY = (spikeSumY / spikeWeightSum + 0.5) / HEAT_H;
         announceHeatmapDetection(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
+        recordEvent('heatmap');
       }
     }
 

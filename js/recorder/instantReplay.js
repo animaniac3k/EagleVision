@@ -13,6 +13,7 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { saveVideoClip } from '../storage/videoStore.js';
 import { refreshGalleryClips } from '../ui/videoBrowser.js';
+import { renderCctvTrack } from '../ui/cctvScrubBar.js';
 
 let activeFrameUrls = [];
 let activeDuration = 20;
@@ -22,6 +23,7 @@ let playbackSpeed = 1.0;
 let lastTickMs = 0;
 let rafId = null;
 let lastRenderedIdx = -1;
+let eventNavHelper = null;
 
 const decoderImg = new Image();
 
@@ -33,6 +35,11 @@ export function initInstantReplay() {
   const btnPlayPause = document.getElementById('btnReplayPlayPause');
   const btnStepBack = document.getElementById('btnReplayStepBack');
   const btnStep = document.getElementById('btnReplayStep');
+  const btnPrevEvt = document.getElementById('btnReplayPrevEvt');
+  const btnNextEvt = document.getElementById('btnReplayNextEvt');
+  const btnBackToLive = document.getElementById('btnReplayBackToLive');
+  const waveformEl = document.getElementById('replayWaveform');
+  const markersEl = document.getElementById('replayMarkers');
   const scrubber = document.getElementById('replayScrubber');
   const timeText = document.getElementById('replayTimeText');
   const bannerText = document.getElementById('replayBannerText');
@@ -137,7 +144,7 @@ export function initInstantReplay() {
     }
 
     scrubber.value = String(playheadSec.toFixed(2));
-    timeText.textContent = `${playheadSec.toFixed(2)}s / ${activeDuration.toFixed(1)}s (F ${idx + 1}/${activeFrameUrls.length})`;
+    timeText.textContent = `${playheadSec.toFixed(1)}s / ${activeDuration.toFixed(1)}s`;
     btnPlayPause.textContent = isPlaying ? '⏸' : '▶';
   }
 
@@ -181,6 +188,19 @@ export function initInstantReplay() {
     scrubber.value = '0';
     bannerText.textContent = `INSTANT REPLAY — AUTO-SAVED ${activeDuration.toFixed(1)}s (${snap.width}×${snap.height} @ ${snap.fps} FPS)`;
 
+    // Render CCTV Waveform & Event Markers
+    eventNavHelper = renderCctvTrack({
+      waveformEl,
+      markersEl,
+      timeline: snap.timeline,
+      durationSec: activeDuration,
+      onSeek: (t) => {
+        playheadSec = t;
+        lastTickMs = performance.now();
+        renderCurrentFrame();
+      }
+    });
+
     document.getElementById('screenLive')?.classList.add('replay-active');
     modal.classList.remove('hidden');
     replayBar.classList.remove('hidden');
@@ -189,7 +209,7 @@ export function initInstantReplay() {
     renderCurrentFrame();
     rafId = requestAnimationFrame(tickLoop);
 
-    // Automatically persist this native-resolution clip to IndexedDB Archive
+    // Automatically persist this native-resolution clip with its timeline to IndexedDB Archive
     try {
       await saveVideoClip({
         jpegFrames: snap.jpegFrames,
@@ -197,7 +217,8 @@ export function initInstantReplay() {
         durationSec: snap.durationSec,
         sizeBytes: snap.sizeBytes,
         width: snap.width,
-        height: snap.height
+        height: snap.height,
+        timeline: snap.timeline
       });
       await refreshGalleryClips();
     } catch (err) {
@@ -243,13 +264,33 @@ export function initInstantReplay() {
     decoderImg.src = activeFrameUrls[nextIdx];
 
     scrubber.value = String(playheadSec.toFixed(2));
-    timeText.textContent = `${playheadSec.toFixed(2)}s / ${activeDuration.toFixed(1)}s (F ${nextIdx + 1}/${totalFrames})`;
+    timeText.textContent = `${playheadSec.toFixed(1)}s / ${activeDuration.toFixed(1)}s`;
     btnPlayPause.textContent = '▶';
     lastTickMs = performance.now();
   }
 
   btnStepBack?.addEventListener('click', () => stepReplayFrame(-1));
   btnStep?.addEventListener('click', () => stepReplayFrame(1));
+
+  btnPrevEvt?.addEventListener('click', () => {
+    if (!eventNavHelper) return;
+    const prev = eventNavHelper.getPrevEvent(playheadSec);
+    if (prev !== null) {
+      playheadSec = prev;
+      lastTickMs = performance.now();
+      renderCurrentFrame();
+    }
+  });
+
+  btnNextEvt?.addEventListener('click', () => {
+    if (!eventNavHelper) return;
+    const next = eventNavHelper.getNextEvent(playheadSec);
+    if (next !== null) {
+      playheadSec = next;
+      lastTickMs = performance.now();
+      renderCurrentFrame();
+    }
+  });
 
   scrubber.addEventListener('input', (e) => {
     playheadSec = parseFloat(e.target.value) || 0;
@@ -266,4 +307,5 @@ export function initInstantReplay() {
   });
 
   btnClose.addEventListener('click', closeReplay);
+  btnBackToLive?.addEventListener('click', closeReplay);
 }
