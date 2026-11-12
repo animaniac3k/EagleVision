@@ -43,6 +43,7 @@ export function saveSettings(state) {
       overlayOpacity: state.overlayOpacity,
       overlayScale: state.overlayScale,
       reticleFfpMode: state.reticleFfpMode !== false,
+      reticleBackdrop: state.reticleBackdrop || 'night',
       reticleConfig: state.reticleConfig || {},
       brightness: state.brightness ?? 100,
       contrast: state.contrast ?? 100,

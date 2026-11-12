@@ -41,7 +41,8 @@ export const appState = {
   optionsOpen: false,
   hudOpen: false,
   currentScreen: 'live',
-  galleryDrawerOpen: true,
+  galleryDrawerOpen: false,
+  reticleBackdrop: 'night',
 
   // Superimposed Overlay Guide & Reticle Customization
   overlayEnabled: true,

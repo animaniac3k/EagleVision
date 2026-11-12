@@ -20,6 +20,10 @@ export function initReticleScreen() {
   const screenReticle = document.getElementById('screenReticle');
   const screenLive = document.getElementById('screenLive');
   const screenSettings = document.getElementById('screenSettings');
+  const screenController = document.getElementById('screenController');
+  const btnReticleToController = document.getElementById('btnReticleToController');
+  const btnToggleReticleShortcuts = document.getElementById('btnToggleReticleShortcuts');
+  const reticleGamepadLegend = document.getElementById('reticleGamepadLegend');
 
   const btnReticleBackToLive = document.getElementById('btnReticleBackToLive');
   const btnReticleToSettings = document.getElementById('btnReticleToSettings');
@@ -151,7 +155,7 @@ export function initReticleScreen() {
 
     if (btnLabels) {
       const showLabels = cfg.showLabels !== false;
-      btnLabels.textContent = showLabels ? 'ON' : 'OFF';
+      btnLabels.textContent = showLabels ? 'Labels: ON' : 'Labels: OFF';
       btnLabels.classList.toggle('radar-btn-active', showLabels);
     }
     if (sliderMajor && valMajor) {
@@ -159,7 +163,7 @@ export function initReticleScreen() {
       valMajor.textContent = cfg.majorInterval === 0 ? 'NONE' : `EVERY ${cfg.majorInterval}`;
     }
     if (btnRings) {
-      btnRings.textContent = cfg.concentricRings ? 'ON' : 'OFF';
+      btnRings.textContent = cfg.concentricRings ? 'Rings: ON' : 'Rings: OFF';
       btnRings.classList.toggle('radar-btn-active', Boolean(cfg.concentricRings));
     }
     if (sliderStroke && valStroke) {
@@ -348,6 +352,39 @@ export function initReticleScreen() {
     updateState({ currentScreen: 'live', replayActive: false });
   });
 
+  // Stage Scene Backdrop Switcher (Jungle / Desert / Arctic / Night)
+  const backdropBtns = Array.from(document.querySelectorAll('.reticle-bg-btn[data-backdrop]'));
+  const applyReticleBackdrop = (mode, persist = true) => {
+    const valid = ['jungle', 'desert', 'arctic', 'night'].includes(mode) ? mode : 'night';
+    if (previewStage) previewStage.dataset.backdrop = valid;
+    backdropBtns.forEach((b) => b.classList.toggle('active', b.dataset.backdrop === valid));
+    if (appState.reticleBackdrop !== valid) {
+      updateState({ reticleBackdrop: valid });
+      if (persist) saveSettings(appState);
+    }
+  };
+  applyReticleBackdrop(appState.reticleBackdrop || 'night', false);
+  backdropBtns.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applyReticleBackdrop(btn.dataset.backdrop, true);
+    });
+  });
+
+  // Toggle floating shortcuts overlay
+  btnToggleReticleShortcuts?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!reticleGamepadLegend) return;
+    const isNowOpen = reticleGamepadLegend.classList.toggle('hidden') === false;
+    btnToggleReticleShortcuts.classList.toggle('active', isNowOpen);
+  });
+
+  btnReticleToController?.addEventListener('click', () => {
+    screenReticle?.classList.add('hidden');
+    screenController?.classList.remove('hidden');
+    updateState({ currentScreen: 'controller', replayActive: false });
+  });
+
   btnReticleToSettings?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
@@ -501,6 +538,7 @@ export function initReticleScreen() {
 
   // Interactive Click on the Preview Stage to test arbitrary angle & clicks
   previewStage?.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.reticle-stage-controls, .reticle-gamepad-legend')) return;
     if (!previewSvg || !appState.overlayEnabled) return;
     const stageRect = previewStage.getBoundingClientRect();
     const svgRect = previewSvg.getBoundingClientRect();

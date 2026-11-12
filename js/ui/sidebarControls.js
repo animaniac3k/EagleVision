@@ -51,17 +51,18 @@ export function applyThemeColor(hex) {
   const root = document.documentElement.style;
 
   // Background and panels
-  root.setProperty('--radar-bg-deep', `hsl(${h}, ${surfSat}%, 3%)`);
-  root.setProperty('--radar-bg', `hsl(${h}, ${surfSat}%, 5%)`);
-  root.setProperty('--radar-panel', `hsla(${h}, ${surfSat}%, 8%, 0.94)`);
-  root.setProperty('--radar-header', `hsl(${h}, ${surfSat}%, 11%)`);
-  root.setProperty('--radar-surface', `hsl(${h}, ${surfSat}%, 9%)`);
-  root.setProperty('--radar-surface-hover', `hsl(${h}, ${surfSat}%, 15%)`);
+  // Neutral dark glass surfaces & legible slate text regardless of accent hue
+  root.setProperty('--radar-bg-deep', '#06090d');
+  root.setProperty('--radar-bg', '#0b1016');
+  root.setProperty('--radar-panel', 'rgba(13, 19, 26, 0.84)');
+  root.setProperty('--radar-header', 'rgba(17, 24, 33, 0.90)');
+  root.setProperty('--radar-surface', 'rgba(255, 255, 255, 0.04)');
+  root.setProperty('--radar-surface-hover', 'rgba(255, 255, 255, 0.08)');
 
   // Text and accents
-  root.setProperty('--radar-text', `hsl(${h}, ${Math.min(85, sat)}%, 92%)`);
-  root.setProperty('--radar-text-secondary', `hsl(${h}, ${Math.min(80, sat)}%, 80%)`);
-  root.setProperty('--radar-text-muted', `hsl(${h}, ${Math.min(75, sat)}%, 66%)`);
+  root.setProperty('--radar-text', '#f8fafc');
+  root.setProperty('--radar-text-secondary', '#cbd5e1');
+  root.setProperty('--radar-text-muted', '#94a3b8');
   root.setProperty('--radar-accent', hex);
 
   if (l < 0.15) {
@@ -80,7 +81,7 @@ export function applyThemeColor(hex) {
     root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85))');
   } else {
     // Chromatic Schemes (Orange, Green, Red, Blue)
-    root.setProperty('--radar-border', `hsl(${h}, ${Math.min(60, sat)}%, 24%)`);
+    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.14)');
     root.setProperty('--radar-border-strong', hex);
     const contrastColor = (l > 0.55 && h > 35 && h < 185) ? `hsl(${h}, ${surfSat}%, 5%)` : '#ffffff';
     root.setProperty('--radar-accent-contrast', contrastColor);
@@ -123,7 +124,41 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ uiDecluttered: false });
   });
 
-  // 1. Fullscreen Settings Screen Navigation
+  // 1. Fullscreen Settings Screen & Setup Sub-tab Navigation
+  const setupSubTabs = {
+    camera: document.getElementById('setupTabCamera'),
+    detection: document.getElementById('setupTabDetection'),
+    display: document.getElementById('setupTabDisplay')
+  };
+
+  function switchSettingsSubTab(tabName = 'camera') {
+    const activeTab = setupSubTabs[tabName] ? tabName : 'camera';
+    Object.entries(setupSubTabs).forEach(([key, panel]) => {
+      panel?.classList.toggle('hidden', key !== activeTab);
+    });
+    screenSettings?.querySelectorAll('.setup-nav-tab[data-setup-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.setupTab === activeTab);
+    });
+  }
+
+  screenSettings?.querySelectorAll('.setup-nav-tab[data-setup-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      switchSettingsSubTab(btn.dataset.setupTab);
+    });
+  });
+
+  document.querySelectorAll('.setup-jump-settings[data-setup-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      screenReticle?.classList.add('hidden');
+      screenController?.classList.add('hidden');
+      screenLive?.classList.add('hidden');
+      screenSettings?.classList.remove('hidden');
+      switchSettingsSubTab(btn.dataset.setupTab);
+      updateState({ currentScreen: 'settings', replayActive: false });
+    });
+  });
+
+  switchSettingsSubTab('camera');
   btnToggleOptions?.addEventListener('click', () => {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
@@ -225,7 +260,7 @@ export function initSidebarAndTopControls(videoEl) {
 
   const replayBtnLabel = document.getElementById('replayBtnLabel');
   const updateReplayBtnLabel = (sec) => {
-    if (replayBtnLabel) replayBtnLabel.textContent = `REPLAY (${sec}s)`;
+    if (replayBtnLabel) replayBtnLabel.textContent = `Replay · ${sec}s`;
   };
   updateReplayBtnLabel(appState.bufferMaxSeconds || 20);
 
@@ -587,7 +622,11 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ mainZoom: next });
   });
 
-  mainZoomReset.addEventListener('click', () => {
+  mainZoomBadge?.addEventListener('click', () => {
+    updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
+  });
+
+  mainZoomReset?.addEventListener('click', () => {
     updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
   });
 
@@ -616,14 +655,18 @@ export function initSidebarAndTopControls(videoEl) {
       if (sliderHeatmapDuration) sliderHeatmapDuration.value = '125';
       if (valHeatmapDuration) valHeatmapDuration.textContent = '∞';
       if (inputHeatmapDuration) inputHeatmapDuration.value = '99999';
+      document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((b) => b.classList.remove('radar-btn-active'));
       btnHeatmapInfinite?.classList.add('radar-btn-active');
       updateState({ heatmapDuration: 99999 });
     } else {
       const clamped = Math.max(1, dur);
       if (sliderHeatmapDuration) sliderHeatmapDuration.value = String(Math.min(120, clamped));
-      if (valHeatmapDuration) valHeatmapDuration.textContent = 's';
+      if (valHeatmapDuration) valHeatmapDuration.textContent = `${clamped}s`;
       if (inputHeatmapDuration) inputHeatmapDuration.value = String(clamped);
       btnHeatmapInfinite?.classList.remove('radar-btn-active');
+      document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((b) => {
+        b.classList.toggle('radar-btn-active', Number(b.dataset.dur) === clamped);
+      });
       updateState({ heatmapDuration: clamped });
     }
     saveSettings(appState);
@@ -644,6 +687,13 @@ export function initSidebarAndTopControls(videoEl) {
   inputHeatmapDuration?.addEventListener('change', (e) => {
     const v = Number(e.target.value) || 30;
     setHeatmapDuration(v);
+  });
+
+  document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const dur = Number(btn.dataset.dur);
+      if (dur > 0) setHeatmapDuration(dur);
+    });
   });
 
   btnHeatmapInfinite?.addEventListener('click', () => {
@@ -940,7 +990,7 @@ export function initSidebarAndTopControls(videoEl) {
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
     bufferDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
     bufferText.textContent = state.bufferEnabled
-      ? `${Math.round(state.bufferedSeconds)}s / ${state.bufferMaxSeconds}s`
+      ? `${Math.round(state.bufferedSeconds)}/${state.bufferMaxSeconds}s`
       : 'RAM OFF';
 
     // Update Memory Availability Meter in Settings

@@ -485,6 +485,13 @@ export function initControllerScreen() {
   const screenController = document.getElementById('screenController');
   const screenSettings = document.getElementById('screenSettings');
   const screenLive = document.getElementById('screenLive');
+  const screenReticle = document.getElementById('screenReticle');
+  const btnControllerToReticle = document.getElementById('btnControllerToReticle');
+  const btnProfileOverflow = document.getElementById('btnProfileOverflow');
+  const profileOverflowMenu = document.getElementById('profileOverflowMenu');
+  const inputMappingSearch = document.getElementById('inputMappingSearch');
+  let activeSearchQuery = '';
+  let activeSchematicFilter = '';
 
   const btnBackToSettings = document.getElementById('btnControllerBackToSettings');
   const btnBackToLive = document.getElementById('btnControllerBackToLive');
@@ -530,6 +537,49 @@ export function initControllerScreen() {
     screenController?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
     updateState({ currentScreen: 'settings' });
+  });
+
+  btnControllerToReticle?.addEventListener('click', () => {
+    cancelRebinding();
+    profileOverflowMenu?.classList.add('hidden');
+    screenController?.classList.add('hidden');
+    screenReticle?.classList.remove('hidden');
+    updateState({ currentScreen: 'reticle' });
+  });
+
+  // Profile Overflow Dropdown Menu
+  btnProfileOverflow?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    profileOverflowMenu?.classList.toggle('hidden');
+  });
+  profileOverflowMenu?.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      profileOverflowMenu.classList.add('hidden');
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.cm-overflow-wrap')) {
+      profileOverflowMenu?.classList.add('hidden');
+    }
+  });
+
+  // Search filter + Interactive Schematic Button Click-to-Filter
+  inputMappingSearch?.addEventListener('input', (e) => {
+    activeSearchQuery = (e.target.value || '').trim().toLowerCase();
+    renderMappingTable();
+  });
+
+  document.querySelectorAll('.cm-visual-btn[data-gp]').forEach((badge) => {
+    badge.style.cursor = 'pointer';
+    badge.title = 'Click to filter bindings by this button';
+    badge.addEventListener('click', () => {
+      const role = badge.dataset.gp || '';
+      activeSchematicFilter = activeSchematicFilter === role ? '' : role;
+      document.querySelectorAll('.cm-visual-btn[data-gp]').forEach((b) => {
+        b.classList.toggle('cm-filter-selected', Boolean(activeSchematicFilter && b.dataset.gp === activeSchematicFilter));
+      });
+      renderMappingTable();
+    });
   });
 
   btnBackToLive?.addEventListener('click', () => {
@@ -1000,8 +1050,15 @@ export function initControllerScreen() {
     const currentBindings = getActiveBindings();
 
     const filtered = ACTION_DEFINITIONS.filter((act) => {
-      if (activeCategoryFilter === 'all') return true;
-      return act.category === activeCategoryFilter;
+      if (activeCategoryFilter !== 'all' && act.category !== activeCategoryFilter) return false;
+      const boundCheck = currentBindings[act.id] || { gamepad: act.defaultGamepad, key: act.defaultKey };
+      if (activeSchematicFilter && (boundCheck.gamepad || 'none') !== activeSchematicFilter) return false;
+      if (activeSearchQuery) {
+        const hay = `${act.name} ${act.desc} ${boundCheck.gamepad || ''} ${boundCheck.key || ''}`.toLowerCase();
+        if (!hay.includes(activeSearchQuery)) return false;
+      }
+      return true;
+
     });
 
     let html = '';
@@ -1265,6 +1322,24 @@ export function initControllerScreen() {
   }
 
   tabBtnGamepad?.addEventListener('click', () => switchControllerTab('gamepad'));
+  const guideTextMap = {
+    pan: 'Pan Mode: D-Pad pans viewport; OK toggles Quick Action; Camera swaps PiP & main view.',
+    zoom: 'Zoom Mode: Up / Down zooms in or out; Left / Right cycles PiP or resets 1.0x.',
+    reticle: 'Reticle Calibration: D-Pad aligns crosshair offset; OK toggles FFP / SFP lock.'
+  };
+  const guideStepBtns = Array.from(document.querySelectorAll('.remote-guide-step-btn[data-guide]'));
+  const remoteModeGuideText = document.getElementById('remoteModeGuideText');
+  const setRemoteGuideStep = (stepKey) => {
+    const key = guideTextMap[stepKey] ? stepKey : 'pan';
+    guideStepBtns.forEach((b) => b.classList.toggle('radar-btn-active', b.dataset.guide === key));
+    if (remoteModeGuideText) remoteModeGuideText.textContent = guideTextMap[key];
+  };
+  guideStepBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setRemoteGuideStep(btn.dataset.guide);
+    });
+  });
+
   tabBtnRemote?.addEventListener('click', () => switchControllerTab('remote'));
 
   btnCycleRemoteModeTab?.addEventListener('click', () => {

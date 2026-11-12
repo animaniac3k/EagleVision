@@ -1,31 +1,32 @@
 :root {
-  /* Refined Radar Teal/Green Monochrome Palette */
-  --radar-bg-deep: #03090c;
-  --radar-bg: #040d10;
-  --radar-panel: rgba(7, 22, 27, 0.94);
-  --radar-header: #0b2229;
-  --radar-surface: #091a20;
-  --radar-surface-hover: #11323b;
-  --radar-border: #1b4d57;
+  /* Calm Tactical Glass Palette (Neutral Dark Surfaces + Theme Accent) */
+  --radar-bg-deep: #06090d;
+  --radar-bg: #090e14;
+  --radar-panel: rgba(13, 19, 26, 0.82);
+  --radar-header: rgba(18, 26, 35, 0.92);
+  --radar-surface: rgba(20, 29, 39, 0.78);
+  --radar-surface-hover: rgba(34, 47, 61, 0.92);
+  --radar-border: rgba(255, 255, 255, 0.13);
   --radar-border-strong: #f97316;
-  --radar-text: #fff7ed;
-  --radar-text-secondary: #fed7aa;
-  --radar-text-muted: #fdba74;
+  --radar-text: #f8fafc;
+  --radar-text-secondary: #cbd5e1;
+  --radar-text-muted: #94a3b8;
   --radar-accent: #f97316;
-  --radar-accent-contrast: #041316;
+  --radar-accent-contrast: #090d12;
   --radar-danger: #f43f5e;
   --reticle-shadow: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75));
 
-  /* Typography & Sizing for 12-inch Tablet Touch Screen */
+  /* Typography & Touch Sizing (12-inch Tablet & Desktop) */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --touch-target: 52px;
+  --touch-target: 44px;
   --ui-opacity: 1;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --shadow-panel: 0 14px 32px rgba(0, 0, 0, 0.78), 0 0 1px rgba(45, 212, 191, 0.3);
-  --shadow-glow: 0 0 14px rgba(45, 212, 191, 0.35);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 9999px;
+  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.12);
+  --shadow-glow: 0 0 14px rgba(249, 115, 22, 0.35);
 }
 
 *, *::before, *::after {
@@ -41,8 +42,8 @@ html, body {
   background-color: var(--radar-bg-deep);
   color: var(--radar-text);
   font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.4;
+  font-size: 15px;
+  line-height: 1.45;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
