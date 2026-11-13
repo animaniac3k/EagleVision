@@ -1,18 +1,16 @@
 /**
  * SPOTR 7-Button Wireless Bluetooth Remote / Ring Controller Integration
  *
- * Designed for one-finger tactical operation:
- * - Button 1 (⏻ 1): Instant Replay In / Out toggle (Always 1-click in/out)
- * - Button 2 (2)  : Discrete Mode Switcher cycling 3 live modes:
- *     1. [PAN VIEW]    : ▲/▼/◀/▶ pans the magnified live video stream, ● re-centers pan (0,0)
- *     2. [ZOOM VIEW]   : ▲/▼ zooms main live stream in/out (+/−0.25x), ● resets zoom to 1.0x
- *     3. [RETICLE CAL] : ▲/▼/◀/▶ expands/contracts crosshair hashmark spacing, ● Locks / Unlocks FFP mode 🔒
- * - Center (▶||)  : Context-sensitive action (Re-center / Reset 1:1 / Lock FFP / Video Play-Pause)
- * - Auto-Player Mode in Instant Replay / Gallery:
- *     - ● CENTER : Play / Pause
- *     - ◀ / ▶    : Step -1 / +1 Frame for forensic frame-by-frame review
- *     - ▲ / ▼    : Restart Replay / Exit to Live
- *     - BTN 2    : Toggle 0.5x Slow-Motion
+ * Single 1-to-1 Mode for One-Finger Operation:
+ * - ▲ / ▼ / ◀ / ▶ : Pan Live View (auto-zooms gently to 1.25x if at 1.0x)
+ * - Center (●)    : Cycle Zoom (1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x & re-center)
+ * - Button 2 (2)  : Instant Replay In / Out toggle (recommended on ChromeOS)
+ * - Button 1 (⏻1) : Instant Replay In / Out toggle (alternate)
+ * - Auto-Player Mode when Instant Replay or Gallery is active:
+ *     - ● CENTER     : Play / Pause
+ *     - ◀ / ▶        : Step -1 / +1 Frame
+ *     - ▲            : Restart Replay
+ *     - ▼ / BTN2 / 1 : Exit back to Live View
  *
  * Supports HID Keyboard/Media keys, Scroll-Wheel ticks, Mouse/Aux buttons,
  * and HID Touch/Pointer Swipes & Taps (such as TikTok/e-reader Bluetooth rings
@@ -24,7 +22,7 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
-export const REMOTE_MODES = ['PAN VIEW', 'ZOOM VIEW', 'RETICLE CAL'];
+export const ZOOM_CYCLE_STOPS = [1.0, 1.5, 2.0, 2.5, 3.0];
 
 export const DEFAULT_KEY_MAP = {
   UP: ['ArrowUp', 'PageUp', 'KeyW'],
@@ -39,7 +37,6 @@ export const DEFAULT_KEY_MAP = {
 export const RING_SWIPE_MAX_MS = 420;
 const RING_SWIPE_MIN_DIST_PX = 12;
 
-let modeIndex = 0;
 let learningAction = null;
 let hudFadeTimer = null;
 let lastWheelMs = 0;
@@ -58,13 +55,9 @@ export function shouldHoldCanvasPan(panStartTime) {
 
 export function getActiveRemoteMode() {
   if (appState.currentScreen === 'gallery' || appState.replayActive) {
-    return 'PLAYER';
+    return 'REPLAY';
   }
-  return REMOTE_MODES[modeIndex];
-}
-
-export function setRemoteMode(idx) {
-  modeIndex = ((idx % REMOTE_MODES.length) + REMOTE_MODES.length) % REMOTE_MODES.length;
+  return 'DIRECT';
 }
 
 export function getLearningAction() {
@@ -101,8 +94,12 @@ export function initRingController() {
   const ringActionText = document.getElementById('ringActionText');
   const ringLastSignalEl = document.getElementById('ringLastSignal');
   const ringRawSignalLogEl = document.getElementById('ringRawSignalLog');
+  let lastPrimaryRawMs = 0;
 
-  function logRawSignal(summary) {
+  function logRawSignal(summary, isFallback = false) {
+    const now = performance.now();
+    if (isFallback && now - lastPrimaryRawMs < 120) return;
+    if (!isFallback) lastPrimaryRawMs = now;
     if (ringRawSignalLogEl && appState.currentScreen === 'controller') {
       ringRawSignalLogEl.textContent = `RAW: ${summary}`;
     }
@@ -127,13 +124,6 @@ export function initRingController() {
         ringHudPill.classList.remove('ring-hud-active');
       }, 2600);
     }
-  }
-
-  function getModeHint(mode) {
-    if (mode === 'PAN VIEW') return '[ 1/3 PAN ] ▲▼◀▶ PAN LIVE FEED • ● CENTER';
-    if (mode === 'ZOOM VIEW') return `[ 2/3 ZOOM ] ▲▼ ZOOM FEED • ● 1:1 RESET ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`;
-    if (mode === 'RETICLE CAL') return `[ 3/3 RETICLE ] ▲▼ MILS • ● ${appState.reticleFfpMode ? 'FFP LOCKED 🔒' : 'LOCK FFP'}`;
-    return '● PLAY/PAUSE • ◀▶ STEP 1 FRAME • BTN1 EXIT';
   }
 
   function resolveRingAction(codeOrKey) {
@@ -165,43 +155,29 @@ export function initRingController() {
   // ACTION EXECUTION (One-Finger Ergonomics)
   // -------------------------------------------------------------------------
 
-  function executeBtn1() {
-    // Button 1 (⏻ 1): Instant Replay In / Out toggle
+  function toggleInstantReplay(label) {
     if (appState.currentScreen === 'gallery') {
       document.getElementById('btnBackToLive')?.click();
-      flashRingHud('BTN 1: RETURN TO LIVE FEED');
+      flashRingHud(`${label}: RETURN TO LIVE FEED`);
       return;
     }
 
     if (appState.replayActive) {
       document.getElementById('btnCloseReplay')?.click();
-      flashRingHud('BTN 1: RETURN TO LIVE FEED');
+      flashRingHud(`${label}: RETURN TO LIVE FEED`);
       return;
     }
 
-    // Enter Instant Replay
     document.getElementById('btnReplay20s')?.click();
-    flashRingHud('BTN 1: INSTANT REPLAY');
+    flashRingHud(`${label}: INSTANT REPLAY`);
+  }
+
+  function executeBtn1() {
+    toggleInstantReplay('BTN 1');
   }
 
   function executeBtn2() {
-    // Button 2 (2): Mode Switcher / Replay Slow-Mo
-    if (appState.replayActive) {
-      document.getElementById('btnReplaySlowMo')?.click();
-      flashRingHud('BTN 2: TOGGLE SLOW-MO (0.5x)');
-      return;
-    }
-
-    if (appState.currentScreen === 'gallery') {
-      document.getElementById('btnGallerySlowMo')?.click();
-      flashRingHud('BTN 2: TOGGLE SLOW-MO (0.5x)');
-      return;
-    }
-
-    // Live Mode: Cycle through 3 discrete modes
-    modeIndex = (modeIndex + 1) % REMOTE_MODES.length;
-    const nextMode = REMOTE_MODES[modeIndex];
-    flashRingHud(getModeHint(nextMode));
+    toggleInstantReplay('BTN 2');
   }
 
   function executeCenter() {
@@ -219,31 +195,20 @@ export function initRingController() {
       return;
     }
 
-    // In Live Mode: Contextual behavior depending on current remote mode
-    const mode = REMOTE_MODES[modeIndex];
-
-    if (mode === 'PAN VIEW') {
-      // Re-center pan coordinates to dead center (0,0)
-      updateState({ mainPanX: 0, mainPanY: 0 });
-      flashRingHud('● PAN RE-CENTERED (0, 0)');
-      return;
-    }
-
-    if (mode === 'ZOOM VIEW') {
-      // Reset whole-image zoom to 1.0x native view
+    // Live Mode: Single-mode Zoom Cycle (1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x)
+    const curZoom = appState.mainZoom || 1.0;
+    const nextZoom = ZOOM_CYCLE_STOPS.find((z) => z > curZoom + 0.05) ?? 1.0;
+    if (nextZoom <= 1.01) {
       updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
-      flashRingHud('● ZOOM RESET (1.0x)');
+      flashRingHud('● ZOOM 1.0x (RESET)');
       return;
     }
 
-    if (mode === 'RETICLE CAL') {
-      // Toggle First Focal Plane (FFP) Lock
-      const nextFfp = !appState.reticleFfpMode;
-      updateState({ reticleFfpMode: nextFfp });
-      saveSettings(appState);
-      flashRingHud(nextFfp ? '● FFP LOCKED 🔒 (AUTO-SYNC)' : '● RETICLE MANUAL 🔓 (SFP)');
-      return;
-    }
+    const maxPan = Math.max(0, (1 - 1 / nextZoom) / 2);
+    const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX || 0));
+    const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY || 0));
+    updateState({ mainZoom: nextZoom, mainPanX: nx, mainPanY: ny });
+    flashRingHud(`● ZOOM ${nextZoom.toFixed(1)}x`);
   }
 
   function executeDirectionalAction(act) {
@@ -288,91 +253,28 @@ export function initRingController() {
       return;
     }
 
-    // C. Live Camera Feed — Execute based on current Remote Mode
-    const mode = REMOTE_MODES[modeIndex];
-
-    // 1. PAN VIEW (Move live feed across magnified viewport)
-    if (mode === 'PAN VIEW') {
-      let zoom = appState.mainZoom || 1.0;
-      // If at 1.0x native view, gently bump to 1.25x so pan has visual effect
-      if (zoom <= 1.01) {
-        zoom = 1.25;
-        updateState({ mainZoom: zoom });
-      }
-
-      const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
-      const speedRatio = (appState.ringPanSpeed ?? 40) / 100;
-      const panStep = Math.max(0.002, (0.024 * speedRatio) / zoom);
-
-      let nx = appState.mainPanX || 0;
-      let ny = appState.mainPanY || 0;
-
-      if (act === 'UP') ny = Math.max(-maxPan, ny - panStep);
-      if (act === 'DOWN') ny = Math.min(maxPan, ny + panStep);
-      if (act === 'LEFT') nx = Math.max(-maxPan, nx - panStep);
-      if (act === 'RIGHT') nx = Math.min(maxPan, nx + panStep);
-
-      updateState({ mainPanX: nx, mainPanY: ny });
-      flashRingHud(`PAN (${Math.round(nx * 100)}, ${Math.round(ny * 100)}) [${zoom.toFixed(1)}x]`);
-      return;
+    // C. Live Camera Feed — Direct 1-to-1 Pan
+    let zoom = appState.mainZoom || 1.0;
+    // If at 1.0x native view, gently bump to 1.25x so pan has visual effect
+    if (zoom <= 1.01) {
+      zoom = 1.25;
+      updateState({ mainZoom: zoom });
     }
 
-    // 2. ZOOM VIEW (Adjust main camera digital zoom)
-    if (mode === 'ZOOM VIEW') {
-      const curZoom = appState.mainZoom || 1.0;
-      if (act === 'UP') {
-        const nextZoom = Math.min(5.0, Math.round((curZoom + 0.25) * 100) / 100);
-        updateState({ mainZoom: nextZoom });
-        flashRingHud(`▲ ZOOM ${nextZoom.toFixed(2)}x ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`);
-      } else if (act === 'DOWN') {
-        const nextZoom = Math.max(1.0, Math.round((curZoom - 0.25) * 100) / 100);
-        const maxPan = Math.max(0, (1 - 1 / nextZoom) / 2);
-        const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX || 0));
-        const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY || 0));
-        updateState({ mainZoom: nextZoom, mainPanX: nx, mainPanY: ny });
-        flashRingHud(`▼ ZOOM ${nextZoom.toFixed(2)}x ${appState.reticleFfpMode ? '(FFP 🔒)' : ''}`);
-      } else if (act === 'LEFT') {
-        // Step zoom down coarser (-0.5x)
-        const nextZoom = Math.max(1.0, Math.round((curZoom - 0.5) * 100) / 100);
-        updateState({ mainZoom: nextZoom });
-        flashRingHud(`◀ ZOOM ${nextZoom.toFixed(2)}x`);
-      } else if (act === 'RIGHT') {
-        // Step zoom up coarser (+0.5x)
-        const nextZoom = Math.min(5.0, Math.round((curZoom + 0.5) * 100) / 100);
-        updateState({ mainZoom: nextZoom });
-        flashRingHud(`▶ ZOOM ${nextZoom.toFixed(2)}x`);
-      }
-      return;
-    }
+    const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
+    const speedRatio = (appState.ringPanSpeed ?? 40) / 100;
+    const panStep = Math.max(0.002, (0.024 * speedRatio) / zoom);
 
-    // 3. RETICLE CAL (Adjust crosshair hashmark spacing & scale)
-    if (mode === 'RETICLE CAL') {
-      const cfg = appState.reticleConfig || {};
-      const curSpacing = cfg.clickSpacing || 32;
+    let nx = appState.mainPanX || 0;
+    let ny = appState.mainPanY || 0;
 
-      if (act === 'UP') {
-        const nextSpacing = Math.min(100, curSpacing + 1);
-        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
-        saveSettings(appState);
-        flashRingHud(`▲ RETICLE SPACING: ${nextSpacing}px (+1)`);
-      } else if (act === 'DOWN') {
-        const nextSpacing = Math.max(8, curSpacing - 1);
-        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
-        saveSettings(appState);
-        flashRingHud(`▼ RETICLE SPACING: ${nextSpacing}px (-1)`);
-      } else if (act === 'LEFT') {
-        const nextSpacing = Math.max(8, curSpacing - 5);
-        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
-        saveSettings(appState);
-        flashRingHud(`◀ RETICLE SPACING: ${nextSpacing}px (-5)`);
-      } else if (act === 'RIGHT') {
-        const nextSpacing = Math.min(100, curSpacing + 5);
-        updateState({ reticleConfig: { ...cfg, clickSpacing: nextSpacing } });
-        saveSettings(appState);
-        flashRingHud(`▶ RETICLE SPACING: ${nextSpacing}px (+5)`);
-      }
-      return;
-    }
+    if (act === 'UP') ny = Math.max(-maxPan, ny - panStep);
+    if (act === 'DOWN') ny = Math.min(maxPan, ny + panStep);
+    if (act === 'LEFT') nx = Math.max(-maxPan, nx - panStep);
+    if (act === 'RIGHT') nx = Math.min(maxPan, nx + panStep);
+
+    updateState({ mainPanX: nx, mainPanY: ny });
+    flashRingHud(`PAN (${Math.round(nx * 100)}, ${Math.round(ny * 100)}) [${zoom.toFixed(1)}x]`);
   }
 
   function handleRingSignal(signalCode) {
@@ -462,6 +364,8 @@ export function initRingController() {
         return;
       }
 
+      logRawSignal(`keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
+
       // Do not hijack typing if focus is inside an input, textarea, select, or editable element
       const activeEl = document.activeElement;
       const tag = activeEl?.tagName;
@@ -475,7 +379,6 @@ export function initRingController() {
       const code = extractKeySignal(e);
       if (!code) return;
       lastKeyDownMs = performance.now();
-      logRawSignal(`keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
 
       const handled = handleRingSignal(code);
       if (handled) {
@@ -490,6 +393,7 @@ export function initRingController() {
   window.addEventListener(
     'keyup',
     (e) => {
+      logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`, true);
       if (performance.now() - lastKeyDownMs <= 300) return;
       const activeEl = document.activeElement;
       const tag = activeEl?.tagName;
@@ -515,6 +419,7 @@ export function initRingController() {
   window.addEventListener(
     'wheel',
     (e) => {
+      logRawSignal(`wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)}`);
       const targetEl = e.target instanceof Element ? e.target : null;
       if (
         !learningAction &&
@@ -524,20 +429,20 @@ export function initRingController() {
         return;
       }
       const now = performance.now();
-      if (now - lastWheelMs < 140) return;
+      if (!learningAction && now - lastWheelMs < 140) return;
       lastWheelMs = now;
 
       let wheelCode = null;
       if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-        if (e.deltaY <= -1) wheelCode = 'WheelUp';
-        else if (e.deltaY >= 1) wheelCode = 'WheelDown';
+        if (e.deltaY < 0) wheelCode = 'WheelUp';
+        else if (e.deltaY > 0) wheelCode = 'WheelDown';
       } else {
-        if (e.deltaX <= -1) wheelCode = 'WheelLeft';
-        else if (e.deltaX >= 1) wheelCode = 'WheelRight';
+        if (e.deltaX < 0) wheelCode = 'WheelLeft';
+        else if (e.deltaX > 0) wheelCode = 'WheelRight';
       }
 
       if (!wheelCode) return;
-      logRawSignal(`wheel dx=${Math.round(e.deltaX)} dy=${Math.round(e.deltaY)} → ${wheelCode}`);
+      logRawSignal(`wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)} → ${wheelCode}`);
 
       if (!learningAction && !resolveRingAction(wheelCode)) {
         const dir = wheelCode.replace('Wheel', '').toUpperCase();
@@ -588,9 +493,12 @@ export function initRingController() {
   window.addEventListener(
     'pointerdown',
     (e) => {
-      if (isFormControl(e.target)) return;
+      const onForm = isFormControl(e.target);
+      if (onForm && !learningAction && appState.currentScreen !== 'controller') return;
       const now = performance.now();
-      if (activeSwipePointer && now - activeSwipePointer.startTime < 1500) return;
+      logRawSignal(
+        `ptr-down(${e.pointerType || '?'}) id=${e.pointerId} btn=${e.button} @${Math.round(e.clientX)},${Math.round(e.clientY)}${onForm ? ' [form]' : ''}`
+      );
       activeSwipePointer = {
         id: e.pointerId,
         pointerType: e.pointerType || 'unknown',
@@ -600,7 +508,8 @@ export function initRingController() {
         lastX: e.clientX,
         lastY: e.clientY,
         startTime: now,
-        target: e.target
+        target: e.target,
+        startedOnForm: onForm
       };
     },
     { capture: true, passive: true }
@@ -612,12 +521,26 @@ export function initRingController() {
       if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) return;
       activeSwipePointer.lastX = e.clientX;
       activeSwipePointer.lastY = e.clientY;
+      const dx = e.clientX - activeSwipePointer.startX;
+      const dy = e.clientY - activeSwipePointer.startY;
+      const dist = Math.hypot(dx, dy);
+      if (dist >= 8) {
+        logRawSignal(
+          `ptr-move(${activeSwipePointer.pointerType}) dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)}`
+        );
+      }
     },
     { capture: true, passive: true }
   );
 
   function finishSwipePointer(e, isCancel) {
-    if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) return;
+    if (
+      !activeSwipePointer ||
+      (e.pointerId !== activeSwipePointer.id &&
+        (e.pointerType || 'unknown') !== activeSwipePointer.pointerType)
+    ) {
+      return;
+    }
     const ptr = activeSwipePointer;
     activeSwipePointer = null;
 
@@ -632,8 +555,10 @@ export function initRingController() {
     const elapsed = performance.now() - ptr.startTime;
 
     logRawSignal(
-      `ptr(${ptr.pointerType}) btn=${ptr.button} dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)} ${Math.round(elapsed)}ms`
+      `ptr(${ptr.pointerType}) btn=${ptr.button} dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)} ${Math.round(elapsed)}ms${isCancel ? ' [cancel]' : ''}`
     );
+
+    if (ptr.startedOnForm && !learningAction) return;
 
     // Non-primary mouse buttons (Middle / Right / Browser Back / Browser Forward)
     if (!isCancel && ptr.button >= 1 && dist < RING_SWIPE_MIN_DIST_PX) {
@@ -702,6 +627,42 @@ export function initRingController() {
   window.addEventListener('pointercancel', (e) => finishSwipePointer(e, true), {
     capture: true,
     passive: true
+  });
+
+  // Fallback raw telemetry listeners for unusual ChromeOS HID touch/scroll/gamepad inputs
+  window.addEventListener(
+    'touchstart',
+    (e) => {
+      const t = e.touches?.[0];
+      logRawSignal(
+        `touchstart n=${e.touches?.length || 0} @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
+        true
+      );
+    },
+    { capture: true, passive: true }
+  );
+  window.addEventListener(
+    'touchend',
+    (e) => {
+      const t = e.changedTouches?.[0];
+      logRawSignal(
+        `touchend @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
+        true
+      );
+    },
+    { capture: true, passive: true }
+  );
+  window.addEventListener(
+    'scroll',
+    (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      const label = target?.id || target?.className || 'window';
+      logRawSignal(`scroll(${String(label).slice(0, 24)})`, true);
+    },
+    { capture: true, passive: true }
+  );
+  window.addEventListener('gamepadconnected', (e) => {
+    logRawSignal(`gamepad: ${e.gamepad?.id || 'connected'}`, true);
   });
 
   window.addEventListener(

@@ -182,8 +182,8 @@
       <footer class="strip-bottom">
         <!-- Bottom-Left: Compact Bluetooth Ring & Quick-Tool Chips -->
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <div id="ringHudPill" class="ring-hud-pill" title="Bluetooth Ring Mode (Tap to cycle)">
-            <span id="ringModeBadge" class="ring-mode-badge">RING: AIM ROI</span>
+          <div id="ringHudPill" class="ring-hud-pill" title="Bluetooth Ring Status">
+            <span id="ringModeBadge" class="ring-mode-badge">REMOTE: DIRECT</span>
             <span id="ringActionText" class="ring-action-text">Ready</span>
           </div>
 
@@ -1068,7 +1068,7 @@
                     <g id="rBtnCENTER" class="remote-visual-btn" data-remote-act="CENTER">
                       <rect x="114" y="126" width="52" height="52" rx="13" fill="#252c3a" stroke="#f97316" stroke-width="1.8"/>
                       <circle cx="140" cy="150" r="7" fill="#f97316"/>
-                      <text x="140" y="167" fill="#f8fafc" font-family="monospace" font-size="7.5" font-weight="bold" text-anchor="middle">MODE</text>
+                      <text x="140" y="167" fill="#f8fafc" font-family="monospace" font-size="7.5" font-weight="bold" text-anchor="middle">ZOOM</text>
                     </g>
                     <g id="rBtnRIGHT" class="remote-visual-btn" data-remote-act="RIGHT">
                       <rect x="174" y="126" width="52" height="52" rx="11" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
@@ -1088,7 +1088,7 @@
                     <g id="rBtnBTN2" class="remote-visual-btn" data-remote-act="BTN2">
                       <rect x="146" y="258" width="98" height="68" rx="12" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
                       <text x="195" y="286" fill="#f97316" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle">BTN 2</text>
-                      <text x="195" y="306" fill="#cbd5e1" font-family="monospace" font-size="9" text-anchor="middle">CYCLE MODE</text>
+                      <text x="195" y="306" fill="#cbd5e1" font-family="monospace" font-size="9" text-anchor="middle">REPLAY</text>
                     </g>
                   </svg>
                 </div>
@@ -1097,7 +1097,7 @@
                 <div id="ringRawSignalLog" class="ring-signal-readout" style="margin-top:4px; font-size:11px; opacity:0.78;">Raw input monitor ready</div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                  <button id="btnCycleRemoteModeTab" class="remote-mode-pill">[ PAN VIEW ]</button>
+                  <span id="remoteSingleModeBadge" class="remote-mode-pill" style="cursor:default;">[ 1:1 DIRECT ]</span>
                   <button id="btnToggleFfpTab" class="radar-btn radar-btn-sm">FFP LOCKED</button>
                 </div>
                 <div class="slider-group" style="margin-top:8px;">
@@ -1129,15 +1129,11 @@
                   </table>
                 </div>
 
-                <!-- Compact 3-Mode Stepper Guide -->
+                <!-- Single 1-to-1 Mode Quick Reference -->
                 <div class="remote-mode-stepper">
-                  <div class="remote-mode-stepper-tabs">
-                    <button type="button" class="radar-btn radar-btn-sm radar-btn-active remote-guide-step-btn" data-guide="pan">1. Pan View</button>
-                    <button type="button" class="radar-btn radar-btn-sm remote-guide-step-btn" data-guide="zoom">2. Zoom View</button>
-                    <button type="button" class="radar-btn radar-btn-sm remote-guide-step-btn" data-guide="reticle">3. Reticle Cal</button>
-                  </div>
                   <div id="remoteModeGuideText" class="remote-mode-guide-text">
-                    ▲▼◀▶ Pan feed · ● Re-center (0,0) · BTN 1 Instant Replay · BTN 2 Next Mode
+                    Live: ▲▼◀▶ Pan · ● Zoom Cycle (1x → 1.5x → 2x → 2.5x → 3x → 1x) · BTN 2 / BTN 1 Instant Replay
+                    <br>Replay: ● Play/Pause · ◀▶ ±1 Frame · ▲ Restart · BTN 2 / ▼ Exit to Live
                   </div>
                 </div>
               </div>

@@ -12,7 +12,7 @@
 import { appState, updateState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
-import { REMOTE_MODES, getActiveRemoteMode, setRemoteMode, getLearningAction, setLearningAction } from './ringController.js';
+import { getActiveRemoteMode, getLearningAction, setLearningAction } from './ringController.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [
@@ -259,55 +259,55 @@ export const ACTION_DEFINITIONS = [
   }
 ];
 
-// Unified Bluetooth Ring & Remote Button Definitions (Option B: Tactical Grid Matrix)
+// Unified Bluetooth Ring & Remote Button Definitions (Single 1-to-1 Mode)
 export const REMOTE_BUTTON_DEFS = [
   {
     id: 'UP',
     name: 'UP (▲)',
-    badge: 'DIRECTION',
-    desc: 'Pan Up • Zoom In (+0.25x) • Reticle Spacing +1px • Replay Restart',
+    badge: 'PAN',
+    desc: 'Pan Live View Up • Replay: Restart Playback',
     defaultCodes: 'ArrowUp, PageUp, KeyW'
   },
   {
     id: 'DOWN',
     name: 'DOWN (▼)',
-    badge: 'DIRECTION',
-    desc: 'Pan Down • Zoom Out (-0.25x) • Reticle Spacing -1px • Replay Exit to Live',
+    badge: 'PAN',
+    desc: 'Pan Live View Down • Replay: Exit to Live',
     defaultCodes: 'ArrowDown, PageDown, KeyS'
   },
   {
     id: 'LEFT',
     name: 'LEFT (◀)',
-    badge: 'DIRECTION',
-    desc: 'Pan Left • Zoom Coarse (-0.5x) • Reticle Spacing -5px • Replay Step -1 Frame',
+    badge: 'PAN',
+    desc: 'Pan Live View Left • Replay: Step -1 Frame',
     defaultCodes: 'ArrowLeft, MediaTrackPrevious, KeyA'
   },
   {
     id: 'RIGHT',
     name: 'RIGHT (▶)',
-    badge: 'DIRECTION',
-    desc: 'Pan Right • Zoom Coarse (+0.5x) • Reticle Spacing +5px • Replay Step +1 Frame',
+    badge: 'PAN',
+    desc: 'Pan Live View Right • Replay: Step +1 Frame',
     defaultCodes: 'ArrowRight, MediaTrackNext, KeyD'
   },
   {
     id: 'CENTER',
     name: 'CENTER (●)',
-    badge: 'ACTION / MODE',
-    desc: 'Context Action: Re-center Pan (0,0) • Reset Zoom (1.0x) • Lock/Unlock FFP 🔒 • Play/Pause Video',
+    badge: 'ZOOM / PLAY',
+    desc: 'Zoom Cycle (1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x) • Replay: Play / Pause',
     defaultCodes: 'Enter, Space, MediaPlayPause, KeyF'
   },
   {
     id: 'BTN1',
     name: 'BUTTON 1 (⏻ 1)',
-    badge: 'AUX 1 (REPLAY)',
-    desc: 'Instant Replay In / Out (1-click trigger in/out from any mode)',
+    badge: 'REPLAY (ALT)',
+    desc: 'Instant Replay In / Out (Note: ChromeOS often intercepts BTN 1 as Volume Up)',
     defaultCodes: 'AudioVolumeUp, KeyX, KeyR, F12'
   },
   {
     id: 'BTN2',
     name: 'BUTTON 2 (2)',
-    badge: 'AUX 2 (MODE)',
-    desc: 'Discrete Mode Switcher (PAN → ZOOM → RETICLE) • Slow-Mo in Replay',
+    badge: 'REPLAY',
+    desc: 'Instant Replay In / Out (Recommended on ChromeOS)',
     defaultCodes: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
   }
 ];
@@ -1234,7 +1234,6 @@ export function initControllerScreen() {
   const viewGamepadConfig = document.getElementById('viewGamepadConfig');
   const viewRemoteConfig = document.getElementById('viewRemoteConfig');
   const remoteMappingTableBody = document.getElementById('remoteMappingTableBody');
-  const btnCycleRemoteModeTab = document.getElementById('btnCycleRemoteModeTab');
   const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
   const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
   const remoteLastSignalText = document.getElementById('remoteLastSignalText');
@@ -1257,8 +1256,9 @@ export function initControllerScreen() {
 
   function syncRemoteStateUI() {
     const activeMode = getActiveRemoteMode();
-    if (btnCycleRemoteModeTab) {
-      btnCycleRemoteModeTab.textContent = `[ ${activeMode} ]`;
+    const remoteSingleModeBadge = document.getElementById('remoteSingleModeBadge');
+    if (remoteSingleModeBadge) {
+      remoteSingleModeBadge.textContent = `[ 1:1 ${activeMode} ]`;
     }
     if (btnToggleFfpTab) {
       const isLocked = Boolean(appState.reticleFfpMode);
@@ -1344,34 +1344,7 @@ export function initControllerScreen() {
   }
 
   tabBtnGamepad?.addEventListener('click', () => switchControllerTab('gamepad'));
-  const guideTextMap = {
-    pan: 'Pan Mode: D-Pad pans viewport; OK toggles Quick Action; Camera swaps PiP & main view.',
-    zoom: 'Zoom Mode: Up / Down zooms in or out; Left / Right cycles PiP or resets 1.0x.',
-    reticle: 'Reticle Calibration: D-Pad aligns crosshair offset; OK toggles FFP / SFP lock.'
-  };
-  const guideStepBtns = Array.from(document.querySelectorAll('.remote-guide-step-btn[data-guide]'));
-  const remoteModeGuideText = document.getElementById('remoteModeGuideText');
-  const setRemoteGuideStep = (stepKey) => {
-    const key = guideTextMap[stepKey] ? stepKey : 'pan';
-    guideStepBtns.forEach((b) => b.classList.toggle('radar-btn-active', b.dataset.guide === key));
-    if (remoteModeGuideText) remoteModeGuideText.textContent = guideTextMap[key];
-  };
-  guideStepBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      setRemoteGuideStep(btn.dataset.guide);
-    });
-  });
-
   tabBtnRemote?.addEventListener('click', () => switchControllerTab('remote'));
-
-  btnCycleRemoteModeTab?.addEventListener('click', () => {
-    const currentMode = getActiveRemoteMode();
-    const curIdx = REMOTE_MODES.indexOf(currentMode);
-    const nextIdx = (curIdx + 1) % REMOTE_MODES.length;
-    setRemoteMode(nextIdx);
-    syncRemoteStateUI();
-    showToastBanner(`REMOTE MODE SWITCHED TO: ${REMOTE_MODES[nextIdx]}`);
-  });
 
   btnToggleFfpTab?.addEventListener('click', () => {
     const nextFfp = !appState.reticleFfpMode;
