@@ -8,6 +8,7 @@
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
 const trackedFloatingPanels = new Set();
 
@@ -44,6 +45,8 @@ export function clampFloatingPanelToParent(panelEl) {
 
 export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
   let dragging = false;
+  let dragCommitted = false;
+  let dragStartTime = 0;
   let startX = 0;
   let startY = 0;
   let origLeft = 0;
@@ -64,6 +67,8 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
       return;
     }
     dragging = true;
+    dragStartTime = performance.now();
+    dragCommitted = containerEl.id !== 'zoomTargetCrosshair' || !shouldHoldCanvasPan(dragStartTime);
     startX = e.clientX;
     startY = e.clientY;
     origLeft = containerEl.offsetLeft;
@@ -74,6 +79,12 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
 
   trigger.addEventListener('pointermove', (e) => {
     if (!dragging) return;
+    if (!dragCommitted) {
+      if (shouldHoldCanvasPan(dragStartTime)) return;
+      dragCommitted = true;
+      startX = e.clientX;
+      startY = e.clientY;
+    }
     const parent = containerEl.parentElement;
     const maxX = Math.max(0, parent.clientWidth - containerEl.offsetWidth);
     const maxY = Math.max(0, parent.clientHeight - containerEl.offsetHeight);

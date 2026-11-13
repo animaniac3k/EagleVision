@@ -14,7 +14,9 @@
  *     - ▲ / ▼    : Restart Replay / Exit to Live
  *     - BTN 2    : Toggle 0.5x Slow-Motion
  *
- * Includes live hardware signal diagnostics, visual button glowing,
+ * Supports HID Keyboard/Media keys, Scroll-Wheel ticks, and HID Touch/Pointer Swipes
+ * (such as TikTok/e-reader Bluetooth rings like the Yiser-J6 on ChromeOS),
+ * with live hardware signal diagnostics, visual button glowing,
  * and a one-click "Learn Button" calibration tool in the Controller Screen.
  */
 
@@ -34,10 +36,23 @@ export const DEFAULT_KEY_MAP = {
   BTN2: ['AudioVolumeDown', 'KeyM', 'KeyT', 'Tab', 'KeyB']
 };
 
+export const RING_SWIPE_MAX_MS = 420;
+const RING_SWIPE_MIN_DIST_PX = 24;
+
 let modeIndex = 0;
 let learningAction = null;
 let hudFadeTimer = null;
 let lastWheelMs = 0;
+let suppressNextClickUntil = 0;
+
+export function hasMappedSwipeSignals() {
+  const map = appState.ringKeyMap || {};
+  return Object.values(map).some((v) => typeof v === 'string' && v.includes('Swipe'));
+}
+
+export function shouldHoldCanvasPan(panStartTime) {
+  return hasMappedSwipeSignals() && performance.now() - panStartTime <= RING_SWIPE_MAX_MS;
+}
 
 export function getActiveRemoteMode() {
   if (appState.currentScreen === 'gallery' || appState.replayActive) {
@@ -56,6 +71,10 @@ export function getLearningAction() {
 
 export function setLearningAction(act) {
   learningAction = act;
+  const screenController = document.getElementById('screenController');
+  if (screenController) {
+    screenController.classList.toggle('remote-learning-active', Boolean(learningAction));
+  }
   const ringLastSignalEl = document.getElementById('ringLastSignal');
   if (ringLastSignalEl) {
     ringLastSignalEl.textContent = learningAction
@@ -75,12 +94,14 @@ export function setLearningAction(act) {
 }
 
 export function initRingController() {
-  const customMap = appState.ringKeyMap || {};
-
   const ringHudPill = document.getElementById('ringHudPill');
   const ringModeBadge = document.getElementById('ringModeBadge');
   const ringActionText = document.getElementById('ringActionText');
   const ringLastSignalEl = document.getElementById('ringLastSignal');
+
+  function getCustomRingMap() {
+    return appState.ringKeyMap && typeof appState.ringKeyMap === 'object' ? appState.ringKeyMap : {};
+  }
 
   function flashRingHud(actionSummary) {
     const modeName = getActiveRemoteMode();
@@ -107,9 +128,12 @@ export function initRingController() {
   }
 
   function resolveRingAction(codeOrKey) {
-    // 1. Check custom learned key first
+    const customMap = getCustomRingMap();
+    // 1. Check custom learned key first (supports comma-separated multi-signal strings)
     for (const [act, boundCode] of Object.entries(customMap)) {
-      if (boundCode === codeOrKey) return act;
+      if (!boundCode) continue;
+      const codes = String(boundCode).split(',').map((s) => s.trim()).filter(Boolean);
+      if (codes.includes(codeOrKey)) return act;
     }
     // 2. Check built-in multi-protocol remote bindings
     for (const [act, codes] of Object.entries(DEFAULT_KEY_MAP)) {
@@ -268,7 +292,8 @@ export function initRingController() {
       }
 
       const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
-      const panStep = Math.max(0.015, 0.05 / zoom);
+      const speedRatio = (appState.ringPanSpeed ?? 40) / 100;
+      const panStep = Math.max(0.002, (0.024 * speedRatio) / zoom);
 
       let nx = appState.mainPanX || 0;
       let ny = appState.mainPanY || 0;
@@ -348,8 +373,8 @@ export function initRingController() {
 
     // If user is currently calibrating/learning a button in Controller Screen
     if (learningAction) {
-      customMap[learningAction] = signalCode;
-      updateState({ ringKeyMap: { ...customMap } });
+      const nextMap = { ...getCustomRingMap(), [learningAction]: signalCode };
+      updateState({ ringKeyMap: nextMap });
       saveSettings(appState);
       if (ringLastSignalEl) {
         ringLastSignalEl.textContent = `BOUND [${learningAction}] → ${signalCode}`;
@@ -445,9 +470,11 @@ export function initRingController() {
   window.addEventListener(
     'wheel',
     (e) => {
+      const targetEl = e.target instanceof Element ? e.target : null;
       if (
         !learningAction &&
-        (e.target.closest('#optionsPanel') || e.target.closest('#galleryDrawer'))
+        targetEl &&
+        (targetEl.closest('#optionsPanel') || targetEl.closest('#galleryDrawer'))
       ) {
         return;
       }
@@ -457,11 +484,11 @@ export function initRingController() {
 
       let wheelCode = null;
       if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
-        if (e.deltaY < -4) wheelCode = 'WheelUp';
-        else if (e.deltaY > 4) wheelCode = 'WheelDown';
+        if (e.deltaY <= -1) wheelCode = 'WheelUp';
+        else if (e.deltaY >= 1) wheelCode = 'WheelDown';
       } else {
-        if (e.deltaX < -4) wheelCode = 'WheelLeft';
-        else if (e.deltaX > 4) wheelCode = 'WheelRight';
+        if (e.deltaX <= -1) wheelCode = 'WheelLeft';
+        else if (e.deltaX >= 1) wheelCode = 'WheelRight';
       }
 
       if (!wheelCode) return;
@@ -478,11 +505,130 @@ export function initRingController() {
     { passive: true }
   );
 
+  // 3. Listen for Bluetooth Ring HID Touch / Pointer Swipes (e.g. Yiser-J6 on ChromeOS)
+  let activeSwipePointer = null;
+
+  function isFormControl(el) {
+    if (!el || !(el instanceof Element)) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  function isInteractiveOverlayTarget(el) {
+    if (!el || !(el instanceof Element)) return false;
+    return Boolean(
+      el.closest(
+        '#optionsPanel, #galleryDrawer, #pipZoomWindow, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
+      )
+    );
+  }
+
+  function classifySwipeCode(dx, dy) {
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      return dx > 0 ? 'SwipeRight' : 'SwipeLeft';
+    }
+    return dy > 0 ? 'SwipeDown' : 'SwipeUp';
+  }
+
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (!e.isPrimary) return;
+      if (isFormControl(e.target)) return;
+      activeSwipePointer = {
+        id: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        lastX: e.clientX,
+        lastY: e.clientY,
+        startTime: performance.now(),
+        target: e.target
+      };
+    },
+    { capture: true, passive: true }
+  );
+
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) return;
+      activeSwipePointer.lastX = e.clientX;
+      activeSwipePointer.lastY = e.clientY;
+    },
+    { capture: true, passive: true }
+  );
+
+  function finishSwipePointer(e, isCancel) {
+    if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) return;
+    const ptr = activeSwipePointer;
+    activeSwipePointer = null;
+
+    if (!isCancel && Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
+      ptr.lastX = e.clientX;
+      ptr.lastY = e.clientY;
+    }
+
+    const dx = ptr.lastX - ptr.startX;
+    const dy = ptr.lastY - ptr.startY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < RING_SWIPE_MIN_DIST_PX) return;
+
+    const elapsed = performance.now() - ptr.startTime;
+    const swipeCode = classifySwipeCode(dx, dy);
+
+    if (learningAction) {
+      suppressNextClickUntil = performance.now() + 180;
+      handleRingSignal(swipeCode);
+      return;
+    }
+
+    if (elapsed > RING_SWIPE_MAX_MS) return;
+
+    if (appState.currentScreen === 'controller' && !isInteractiveOverlayTarget(ptr.target)) {
+      // Allow live diagnostics on the Remote screen even before swipes are mapped
+      if (ringLastSignalEl) ringLastSignalEl.textContent = `SIGNAL: ${swipeCode}`;
+      if (!resolveRingAction(swipeCode)) {
+        window.dispatchEvent(
+          new CustomEvent('spotr-remote-button', {
+            detail: { action: null, signalCode: swipeCode, isLearned: false }
+          })
+        );
+        return;
+      }
+    }
+
+    if (isInteractiveOverlayTarget(ptr.target)) return;
+
+    if (resolveRingAction(swipeCode)) {
+      suppressNextClickUntil = performance.now() + 180;
+      handleRingSignal(swipeCode);
+    }
+  }
+
+  window.addEventListener('pointerup', (e) => finishSwipePointer(e, false), {
+    capture: true,
+    passive: true
+  });
+  window.addEventListener('pointercancel', (e) => finishSwipePointer(e, true), {
+    capture: true,
+    passive: true
+  });
+
+  window.addEventListener(
+    'click',
+    (e) => {
+      if (performance.now() < suppressNextClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    { capture: true }
+  );
+
   // Sync HUD label whenever screen, replay, or FFP state changes
   subscribeState(() => {
     if (ringModeBadge) {
       ringModeBadge.textContent = `REMOTE: ${getActiveRemoteMode()}`;
     }
   });
-
 }

@@ -14,6 +14,7 @@ import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { saveVideoClip } from '../storage/videoStore.js';
 import { refreshGalleryClips } from '../ui/videoBrowser.js';
 import { renderCctvTrack } from '../ui/cctvScrubBar.js';
+import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
 let activeFrameUrls = [];
 let activeDuration = 20;
@@ -81,6 +82,8 @@ export function initInstantReplay() {
 
   // Touch / Pointer Panning during replay when zoomed in (>1.0x)
   let panning = false;
+  let panCommitted = false;
+  let panStartTime = 0;
   let panStartX = 0;
   let panStartY = 0;
   let startOffsetX = 0;
@@ -89,6 +92,8 @@ export function initInstantReplay() {
   canvasEl.addEventListener('pointerdown', (e) => {
     if ((appState.mainZoom || 1.0) <= 1.01) return;
     panning = true;
+    panStartTime = performance.now();
+    panCommitted = !shouldHoldCanvasPan(panStartTime);
     panStartX = e.clientX;
     panStartY = e.clientY;
     startOffsetX = appState.mainPanX || 0;
@@ -99,6 +104,12 @@ export function initInstantReplay() {
 
   canvasEl.addEventListener('pointermove', (e) => {
     if (!panning) return;
+    if (!panCommitted) {
+      if (shouldHoldCanvasPan(panStartTime)) return;
+      panCommitted = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+    }
     const rect = canvasEl.getBoundingClientRect();
     const dx = (e.clientX - panStartX) / Math.max(1, rect.width);
     const dy = (e.clientY - panStartY) / Math.max(1, rect.height);

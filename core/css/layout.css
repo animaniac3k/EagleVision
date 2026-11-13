@@ -1339,6 +1339,11 @@
   stroke: #f59e0b !important;
 }
 
+#screenController.remote-learning-active .controller-screen-body,
+#screenController.remote-learning-active .cm-table-wrap {
+  touch-action: none;
+}
+
 .remote-led-dot.active {
   fill: #10b981 !important;
 }

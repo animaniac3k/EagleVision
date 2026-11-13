@@ -341,7 +341,8 @@ export const BUILT_IN_PROFILES = {
       leftStickInvertY: false,
       rightStickInvertY: false,
       touchpadSensitivity: 50,
-      reticleAimSpeed: 50
+      reticleAimSpeed: 50,
+      ringPanSpeed: 40
     }
   },
   simplified: {
@@ -395,7 +396,8 @@ export const BUILT_IN_PROFILES = {
       leftStickInvertY: false,
       rightStickInvertY: false,
       touchpadSensitivity: 40,
-      reticleAimSpeed: 40
+      reticleAimSpeed: 40,
+      ringPanSpeed: 40
     }
   },
   flight: {
@@ -449,7 +451,8 @@ export const BUILT_IN_PROFILES = {
       leftStickInvertY: true,
       rightStickInvertY: false,
       touchpadSensitivity: 60,
-      reticleAimSpeed: 60
+      reticleAimSpeed: 60,
+      ringPanSpeed: 40
     }
   }
 };
@@ -525,6 +528,8 @@ export function initControllerScreen() {
   const valTouchpadSens = document.getElementById('valControllerTouchpadSens');
   const sliderAimSpeed = document.getElementById('sliderControllerAimSpeed');
   const valAimSpeed = document.getElementById('valControllerAimSpeed');
+  const sliderRemotePanSpeed = document.getElementById('sliderRemotePanSpeed');
+  const valRemotePanSpeed = document.getElementById('valRemotePanSpeed');
 
   const mappingTableBody = document.getElementById('controllerMappingTableBody');
   const categoryFilters = document.querySelectorAll('.mapping-cat-btn');
@@ -666,7 +671,8 @@ export function initControllerScreen() {
       leftStickInvertY: Boolean(cal.leftStickInvertY),
       rightStickInvertY: Boolean(cal.rightStickInvertY),
       touchpadSensitivity: cal.touchpadSensitivity ?? 50,
-      reticleAimSpeed: cal.reticleAimSpeed ?? 50
+      reticleAimSpeed: cal.reticleAimSpeed ?? 50,
+      ringPanSpeed: cal.ringPanSpeed ?? 40
     });
 
     saveSettings(appState);
@@ -703,7 +709,8 @@ export function initControllerScreen() {
       leftStickInvertY: Boolean(appState.leftStickInvertY),
       rightStickInvertY: Boolean(appState.rightStickInvertY),
       touchpadSensitivity: appState.touchpadSensitivity ?? 50,
-      reticleAimSpeed: appState.reticleAimSpeed ?? 50
+      reticleAimSpeed: appState.reticleAimSpeed ?? 50,
+      ringPanSpeed: appState.ringPanSpeed ?? 40
     };
     prof.updatedAt = Date.now();
 
@@ -756,7 +763,8 @@ export function initControllerScreen() {
         leftStickInvertY: Boolean(appState.leftStickInvertY),
         rightStickInvertY: Boolean(appState.rightStickInvertY),
         touchpadSensitivity: appState.touchpadSensitivity ?? 50,
-        reticleAimSpeed: appState.reticleAimSpeed ?? 50
+        reticleAimSpeed: appState.reticleAimSpeed ?? 50,
+      ringPanSpeed: appState.ringPanSpeed ?? 40
       }
     };
 
@@ -811,7 +819,8 @@ export function initControllerScreen() {
           leftStickInvertY: Boolean(appState.leftStickInvertY),
           rightStickInvertY: Boolean(appState.rightStickInvertY),
           touchpadSensitivity: appState.touchpadSensitivity ?? 50,
-          reticleAimSpeed: appState.reticleAimSpeed ?? 50
+          reticleAimSpeed: appState.reticleAimSpeed ?? 50,
+      ringPanSpeed: appState.ringPanSpeed ?? 40
         }
       }
     };
@@ -914,7 +923,8 @@ export function initControllerScreen() {
       leftStickInvertY: false,
       rightStickInvertY: false,
       touchpadSensitivity: 50,
-      reticleAimSpeed: 50
+      reticleAimSpeed: 50,
+      ringPanSpeed: 40
     });
     saveSettings(appState);
     isProfileDirty = false;
@@ -986,6 +996,14 @@ export function initControllerScreen() {
     markProfileDirty();
   });
 
+  sliderRemotePanSpeed?.addEventListener('input', (e) => {
+    const v = parseInt(e.target.value, 10);
+    if (valRemotePanSpeed) valRemotePanSpeed.textContent = `${v}%`;
+    updateState({ ringPanSpeed: v });
+    saveSettings(appState);
+    markProfileDirty();
+  });
+
   function syncCalibrationSliders() {
     if (sliderLeftDeadzone && valLeftDeadzone) {
       sliderLeftDeadzone.value = appState.leftStickDeadzone ?? 16;
@@ -1010,6 +1028,10 @@ export function initControllerScreen() {
     if (sliderAimSpeed && valAimSpeed) {
       sliderAimSpeed.value = appState.reticleAimSpeed ?? 50;
       valAimSpeed.textContent = `${appState.reticleAimSpeed ?? 50}%`;
+    }
+    if (sliderRemotePanSpeed && valRemotePanSpeed) {
+      sliderRemotePanSpeed.value = appState.ringPanSpeed ?? 40;
+      valRemotePanSpeed.textContent = `${appState.ringPanSpeed ?? 40}%`;
     }
   }
 

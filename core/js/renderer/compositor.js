@@ -14,6 +14,7 @@ import { recordRenderedFrame } from '../camera/streamStats.js';
 import { getClickDistanceInPixels } from './overlayManager.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
+import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
 export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
 
@@ -252,6 +253,8 @@ export function initCompositor(videoEl) {
 
   // Panning the main image when zoomed in (>1.0x)
   let panning = false;
+  let panCommitted = false;
+  let panStartTime = 0;
   let panStartX = 0;
   let panStartY = 0;
   let startOffsetX = 0;
@@ -260,6 +263,8 @@ export function initCompositor(videoEl) {
   mainCanvas.addEventListener('pointerdown', (e) => {
     if (appState.mainZoom <= 1.01) return;
     panning = true;
+    panStartTime = performance.now();
+    panCommitted = !shouldHoldCanvasPan(panStartTime);
     panStartX = e.clientX;
     panStartY = e.clientY;
     startOffsetX = appState.mainPanX;
@@ -269,6 +274,12 @@ export function initCompositor(videoEl) {
 
   mainCanvas.addEventListener('pointermove', (e) => {
     if (!panning) return;
+    if (!panCommitted) {
+      if (shouldHoldCanvasPan(panStartTime)) return;
+      panCommitted = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+    }
     const dx = (e.clientX - panStartX) / mainCanvas.width;
     const dy = (e.clientY - panStartY) / mainCanvas.height;
     const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);

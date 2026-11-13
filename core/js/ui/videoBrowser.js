@@ -7,6 +7,7 @@
 import { appState, updateState } from '../state.js';
 import { listVideoClips, getVideoClip, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
 import { renderCctvTrack } from './cctvScrubBar.js';
+import { shouldHoldCanvasPan } from './ringController.js';
 
 let cachedClips = [];
 let selectedClipId = null;
@@ -304,6 +305,8 @@ export function initVideoBrowser() {
 
   // Touch / Pointer Panning on Recorded Video when zoomed in (>1.0x)
   let panning = false;
+  let panCommitted = false;
+  let panStartTime = 0;
   let panStartX = 0;
   let panStartY = 0;
   let startOffX = 0;
@@ -312,6 +315,8 @@ export function initVideoBrowser() {
   canvasEl.addEventListener('pointerdown', (e) => {
     if (galleryZoom <= 1.01) return;
     panning = true;
+    panStartTime = performance.now();
+    panCommitted = !shouldHoldCanvasPan(panStartTime);
     panStartX = e.clientX;
     panStartY = e.clientY;
     startOffX = galleryPanX;
@@ -321,6 +326,12 @@ export function initVideoBrowser() {
 
   canvasEl.addEventListener('pointermove', (e) => {
     if (!panning) return;
+    if (!panCommitted) {
+      if (shouldHoldCanvasPan(panStartTime)) return;
+      panCommitted = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+    }
     const rect = canvasEl.getBoundingClientRect();
     const dx = (e.clientX - panStartX) / Math.max(1, rect.width);
     const dy = (e.clientY - panStartY) / Math.max(1, rect.height);

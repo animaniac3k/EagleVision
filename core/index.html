@@ -1099,6 +1099,10 @@
                   <button id="btnCycleRemoteModeTab" class="remote-mode-pill">[ PAN VIEW ]</button>
                   <button id="btnToggleFfpTab" class="radar-btn radar-btn-sm">FFP LOCKED</button>
                 </div>
+                <div class="slider-group" style="margin-top:8px;">
+                  <div class="slider-header"><span>Ring Pan Step Speed</span><span id="valRemotePanSpeed" class="slider-val">40%</span></div>
+                  <input id="sliderRemotePanSpeed" type="range" min="10" max="150" step="5" value="40" class="radar-slider" />
+                </div>
                 <span id="remoteLastSignalText" class="hidden">READY</span>
               </div>
             </div>
@@ -1116,7 +1120,7 @@
                       <tr>
                         <th style="width: 22%;">Button</th>
                         <th style="width: 44%;">Function</th>
-                        <th style="width: 18%;">HID Key</th>
+                        <th style="width: 18%;">Signal</th>
                         <th style="width: 16%; text-align:center;">Learn</th>
                       </tr>
                     </thead>
