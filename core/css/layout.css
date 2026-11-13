@@ -1356,6 +1356,15 @@
   touch-action: none;
 }
 
+#screenController.remote-learning-active #remoteSvgContainer {
+  pointer-events: none;
+}
+
+#screenController.remote-learning-active .remote-learn-btn:not(.radar-btn-active) {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
 .remote-led-dot.active {
   fill: #10b981 !important;
 }

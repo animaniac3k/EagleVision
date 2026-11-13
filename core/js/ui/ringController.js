@@ -36,6 +36,7 @@ export const DEFAULT_KEY_MAP = {
 
 export const RING_SWIPE_MAX_MS = 420;
 const RING_SWIPE_MIN_DIST_PX = 12;
+const SUPPRESS_CLICK_MS = 450;
 
 let learningAction = null;
 let hudFadeTimer = null;
@@ -66,6 +67,9 @@ export function getLearningAction() {
 
 export function setLearningAction(act) {
   learningAction = act;
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   const screenController = document.getElementById('screenController');
   if (screenController) {
     screenController.classList.toggle('remote-learning-active', Boolean(learningAction));
@@ -302,7 +306,7 @@ export function initRingController() {
     }
 
     const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
-    const speedRatio = (appState.ringPanSpeed ?? 40) / 100;
+    const speedRatio = (appState.ringPanSpeed ?? 70) / 100;
     const panStep = Math.max(0.002, (0.024 * speedRatio) / zoom);
 
     let nx = appState.mainPanX || 0;
@@ -645,7 +649,7 @@ export function initRingController() {
     if (dist < RING_SWIPE_MIN_DIST_PX) {
       const tapCode = formatTouchTapSignal(ptr.startX, ptr.startY);
       if (learningAction && !isCancel && !isLearnUiControlTarget(ptr.target)) {
-        suppressNextClickUntil = performance.now() + 180;
+        suppressNextClickUntil = performance.now() + SUPPRESS_CLICK_MS;
         handleRingSignal(tapCode);
         return;
       }
@@ -656,7 +660,7 @@ export function initRingController() {
         !isInteractiveOverlayTarget(ptr.target) &&
         resolveRingAction(tapCode)
       ) {
-        suppressNextClickUntil = performance.now() + 180;
+        suppressNextClickUntil = performance.now() + SUPPRESS_CLICK_MS;
         handleRingSignal(tapCode);
       }
       return;
@@ -665,7 +669,7 @@ export function initRingController() {
     const swipeCode = classifySwipeCode(dx, dy);
 
     if (learningAction) {
-      suppressNextClickUntil = performance.now() + 180;
+      suppressNextClickUntil = performance.now() + SUPPRESS_CLICK_MS;
       handleRingSignal(swipeCode);
       return;
     }
@@ -687,7 +691,7 @@ export function initRingController() {
     if (isInteractiveOverlayTarget(ptr.target)) return;
 
     if (resolveRingAction(swipeCode)) {
-      suppressNextClickUntil = performance.now() + 180;
+      suppressNextClickUntil = performance.now() + SUPPRESS_CLICK_MS;
       handleRingSignal(swipeCode);
     }
   }

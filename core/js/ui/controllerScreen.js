@@ -342,7 +342,7 @@ export const BUILT_IN_PROFILES = {
       rightStickInvertY: false,
       touchpadSensitivity: 50,
       reticleAimSpeed: 50,
-      ringPanSpeed: 40
+      ringPanSpeed: 70
     }
   },
   simplified: {
@@ -397,7 +397,7 @@ export const BUILT_IN_PROFILES = {
       rightStickInvertY: false,
       touchpadSensitivity: 40,
       reticleAimSpeed: 40,
-      ringPanSpeed: 40
+      ringPanSpeed: 70
     }
   },
   flight: {
@@ -452,7 +452,7 @@ export const BUILT_IN_PROFILES = {
       rightStickInvertY: false,
       touchpadSensitivity: 60,
       reticleAimSpeed: 60,
-      ringPanSpeed: 40
+      ringPanSpeed: 70
     }
   }
 };
@@ -672,7 +672,7 @@ export function initControllerScreen() {
       rightStickInvertY: Boolean(cal.rightStickInvertY),
       touchpadSensitivity: cal.touchpadSensitivity ?? 50,
       reticleAimSpeed: cal.reticleAimSpeed ?? 50,
-      ringPanSpeed: cal.ringPanSpeed ?? 40
+      ringPanSpeed: cal.ringPanSpeed ?? 70
     });
 
     saveSettings(appState);
@@ -710,7 +710,7 @@ export function initControllerScreen() {
       rightStickInvertY: Boolean(appState.rightStickInvertY),
       touchpadSensitivity: appState.touchpadSensitivity ?? 50,
       reticleAimSpeed: appState.reticleAimSpeed ?? 50,
-      ringPanSpeed: appState.ringPanSpeed ?? 40
+      ringPanSpeed: appState.ringPanSpeed ?? 70
     };
     prof.updatedAt = Date.now();
 
@@ -764,7 +764,7 @@ export function initControllerScreen() {
         rightStickInvertY: Boolean(appState.rightStickInvertY),
         touchpadSensitivity: appState.touchpadSensitivity ?? 50,
         reticleAimSpeed: appState.reticleAimSpeed ?? 50,
-      ringPanSpeed: appState.ringPanSpeed ?? 40
+      ringPanSpeed: appState.ringPanSpeed ?? 70
       }
     };
 
@@ -820,7 +820,7 @@ export function initControllerScreen() {
           rightStickInvertY: Boolean(appState.rightStickInvertY),
           touchpadSensitivity: appState.touchpadSensitivity ?? 50,
           reticleAimSpeed: appState.reticleAimSpeed ?? 50,
-      ringPanSpeed: appState.ringPanSpeed ?? 40
+      ringPanSpeed: appState.ringPanSpeed ?? 70
         }
       }
     };
@@ -924,7 +924,7 @@ export function initControllerScreen() {
       rightStickInvertY: false,
       touchpadSensitivity: 50,
       reticleAimSpeed: 50,
-      ringPanSpeed: 40
+      ringPanSpeed: 70
     });
     saveSettings(appState);
     isProfileDirty = false;
@@ -1030,8 +1030,8 @@ export function initControllerScreen() {
       valAimSpeed.textContent = `${appState.reticleAimSpeed ?? 50}%`;
     }
     if (sliderRemotePanSpeed && valRemotePanSpeed) {
-      sliderRemotePanSpeed.value = appState.ringPanSpeed ?? 40;
-      valRemotePanSpeed.textContent = `${appState.ringPanSpeed ?? 40}%`;
+      sliderRemotePanSpeed.value = appState.ringPanSpeed ?? 70;
+      valRemotePanSpeed.textContent = `${appState.ringPanSpeed ?? 70}%`;
     }
   }
 

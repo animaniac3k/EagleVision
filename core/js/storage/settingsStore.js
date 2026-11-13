@@ -65,7 +65,7 @@ export function saveSettings(state) {
       uiOpacity: state.uiOpacity ?? 100,
       touchpadSensitivity: state.touchpadSensitivity ?? 50,
       reticleAimSpeed: state.reticleAimSpeed ?? 50,
-      ringPanSpeed: state.ringPanSpeed ?? 40,
+      ringPanSpeed: state.ringPanSpeed ?? 70,
       leftStickDeadzone: state.leftStickDeadzone ?? 16,
       rightStickDeadzone: state.rightStickDeadzone ?? 16,
       leftStickInvertY: Boolean(state.leftStickInvertY),
