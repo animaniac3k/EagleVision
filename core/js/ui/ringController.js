@@ -126,15 +126,57 @@ export function initRingController() {
     }
   }
 
+  function parseTouchTapCoords(code) {
+    if (typeof code !== 'string' || !code.startsWith('TouchTap@')) return null;
+    const parts = code.slice('TouchTap@'.length).split('x');
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  }
+
+  function formatTouchTapSignal(x, y) {
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    const qx = Math.max(0, Math.min(100, Math.round(((x / w) * 100) / 5) * 5));
+    const qy = Math.max(0, Math.min(100, Math.round(((y / h) * 100) / 5) * 5));
+    return `TouchTap@${qx}x${qy}`;
+  }
+
   function resolveRingAction(codeOrKey) {
     const customMap = getCustomRingMap();
-    // 1. Check custom learned key first (supports comma-separated multi-signal strings)
+    // 1. Check exact custom learned signal first
     for (const [act, boundCode] of Object.entries(customMap)) {
       if (!boundCode) continue;
       const codes = String(boundCode).split(',').map((s) => s.trim()).filter(Boolean);
       if (codes.includes(codeOrKey)) return act;
     }
-    // 2. Check built-in multi-protocol remote bindings
+    // 2. Coordinate-tolerant match for TouchTap@qx,qy (10% radius), then legacy TouchTap fallback
+    const tapCoords = parseTouchTapCoords(codeOrKey);
+    if (tapCoords) {
+      let bestAct = null;
+      let bestDist = 10.01;
+      for (const [act, boundCode] of Object.entries(customMap)) {
+        if (!boundCode) continue;
+        const codes = String(boundCode).split(',').map((s) => s.trim()).filter(Boolean);
+        for (const token of codes) {
+          const boundCoords = parseTouchTapCoords(token);
+          if (!boundCoords) continue;
+          const d = Math.hypot(tapCoords.x - boundCoords.x, tapCoords.y - boundCoords.y);
+          if (d <= 10 && d < bestDist) {
+            bestDist = d;
+            bestAct = act;
+          }
+        }
+      }
+      if (bestAct) return bestAct;
+
+      for (const [act, boundCode] of Object.entries(customMap)) {
+        if (!boundCode) continue;
+        const codes = String(boundCode).split(',').map((s) => s.trim()).filter(Boolean);
+        if (codes.includes('TouchTap')) return act;
+      }
+    }
+    // 3. Check built-in multi-protocol remote bindings
     for (const [act, codes] of Object.entries(DEFAULT_KEY_MAP)) {
       if (codes.includes(codeOrKey)) return act;
     }
@@ -283,9 +325,19 @@ export function initRingController() {
     // If user is currently calibrating/learning a button in Controller Screen
     if (learningAction) {
       const nextMap = { ...getCustomRingMap() };
+      const learnedCoords = parseTouchTapCoords(signalCode);
       for (const [act, boundCode] of Object.entries(nextMap)) {
-        if (act !== learningAction && String(boundCode).trim() === signalCode) {
+        if (act === learningAction) continue;
+        const trimmed = String(boundCode).trim();
+        if (trimmed === signalCode) {
           delete nextMap[act];
+          continue;
+        }
+        if (learnedCoords) {
+          const otherCoords = parseTouchTapCoords(trimmed);
+          if (otherCoords && Math.hypot(learnedCoords.x - otherCoords.x, learnedCoords.y - otherCoords.y) <= 6) {
+            delete nextMap[act];
+          }
         }
       }
       nextMap[learningAction] = signalCode;
@@ -591,9 +643,10 @@ export function initRingController() {
 
     // Touch / Pointer Tap (dist < threshold)
     if (dist < RING_SWIPE_MIN_DIST_PX) {
+      const tapCode = formatTouchTapSignal(ptr.startX, ptr.startY);
       if (learningAction && !isCancel && !isLearnUiControlTarget(ptr.target)) {
         suppressNextClickUntil = performance.now() + 180;
-        handleRingSignal('TouchTap');
+        handleRingSignal(tapCode);
         return;
       }
       if (
@@ -601,10 +654,10 @@ export function initRingController() {
         !isCancel &&
         elapsed <= 750 &&
         !isInteractiveOverlayTarget(ptr.target) &&
-        resolveRingAction('TouchTap')
+        resolveRingAction(tapCode)
       ) {
         suppressNextClickUntil = performance.now() + 180;
-        handleRingSignal('TouchTap');
+        handleRingSignal(tapCode);
       }
       return;
     }

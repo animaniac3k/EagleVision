@@ -14,7 +14,6 @@
   --radar-accent: #f97316;
   --radar-accent-contrast: #090d12;
   --radar-danger: #f43f5e;
-  --reticle-shadow: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75));
 
   /* Typography & Touch Sizing (12-inch Tablet & Desktop) */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

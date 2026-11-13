@@ -1,7 +1,7 @@
 /**
  * SPOTR Main Entry Point
  */
-import { appState, updateState } from './state.js';
+import { appState, updateState, APP_VERSION } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';
 import { startCameraStream } from './camera/streamManager.js';
 import { initCompositor, preloadVoiceAudio } from './renderer/compositor.js';
@@ -80,8 +80,21 @@ async function bootstrapApp() {
     navigator.wakeLock.request('screen').catch(() => {});
   }
 
-  // 6. Register PWA Service Worker
+  // 6. Populate Setup version badges & register PWA Service Worker
+  document.querySelectorAll('.setup-version-badge').forEach((el) => {
+    el.textContent = APP_VERSION;
+    el.title = `SPOTR Build ${APP_VERSION}`;
+  });
+
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !reloading) {
+        reloading = true;
+        window.location.reload();
+      }
+    });
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 }

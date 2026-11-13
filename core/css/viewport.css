@@ -49,7 +49,6 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: var(--reticle-shadow, drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75)));
 }
 
 #customOverlayImg {

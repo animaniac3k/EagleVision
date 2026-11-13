@@ -71,14 +71,12 @@ export function applyThemeColor(hex) {
     root.setProperty('--radar-border-strong', '#94a3b8');
     root.setProperty('--radar-accent-contrast', '#ffffff');
     root.setProperty('--shadow-glow', '0 0 10px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.4)');
-    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1px rgba(255, 255, 255, 0.65))');
   } else if (l > 0.85) {
     // Pure White Scheme
     root.setProperty('--radar-border', 'hsl(0, 0%, 30%)');
     root.setProperty('--radar-border-strong', '#ffffff');
     root.setProperty('--radar-accent-contrast', '#051317');
     root.setProperty('--shadow-glow', '0 0 14px rgba(255, 255, 255, 0.5)');
-    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.85))');
   } else {
     // Chromatic Schemes (Orange, Green, Red, Blue)
     root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.14)');
@@ -86,7 +84,6 @@ export function applyThemeColor(hex) {
     const contrastColor = (l > 0.55 && h > 35 && h < 185) ? `hsl(${h}, ${surfSat}%, 5%)` : '#ffffff';
     root.setProperty('--radar-accent-contrast', contrastColor);
     root.setProperty('--shadow-glow', `0 0 14px hsla(${h}, ${sat}%, 55%, 0.4)`);
-    root.setProperty('--reticle-shadow', 'drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.75))');
   }
 }
 
