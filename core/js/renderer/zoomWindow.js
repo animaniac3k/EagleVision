@@ -68,7 +68,7 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
     }
     dragging = true;
     dragStartTime = performance.now();
-    dragCommitted = containerEl.id !== 'zoomTargetCrosshair' || !shouldHoldCanvasPan(dragStartTime);
+    dragCommitted = !shouldHoldCanvasPan(dragStartTime);
     startX = e.clientX;
     startY = e.clientY;
     origLeft = containerEl.offsetLeft;

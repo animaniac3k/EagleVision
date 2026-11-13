@@ -14,10 +14,10 @@
  *     - ▲ / ▼    : Restart Replay / Exit to Live
  *     - BTN 2    : Toggle 0.5x Slow-Motion
  *
- * Supports HID Keyboard/Media keys, Scroll-Wheel ticks, and HID Touch/Pointer Swipes
- * (such as TikTok/e-reader Bluetooth rings like the Yiser-J6 on ChromeOS),
- * with live hardware signal diagnostics, visual button glowing,
- * and a one-click "Learn Button" calibration tool in the Controller Screen.
+ * Supports HID Keyboard/Media keys, Scroll-Wheel ticks, Mouse/Aux buttons,
+ * and HID Touch/Pointer Swipes & Taps (such as TikTok/e-reader Bluetooth rings
+ * like the Yiser-J6 on ChromeOS), with live hardware signal diagnostics,
+ * visual button glowing, and a one-click "Learn Button" calibration tool.
  */
 
 import { appState, updateState, subscribeState } from '../state.js';
@@ -37,13 +37,15 @@ export const DEFAULT_KEY_MAP = {
 };
 
 export const RING_SWIPE_MAX_MS = 420;
-const RING_SWIPE_MIN_DIST_PX = 24;
+const RING_SWIPE_MIN_DIST_PX = 12;
 
 let modeIndex = 0;
 let learningAction = null;
 let hudFadeTimer = null;
 let lastWheelMs = 0;
+let lastKeyDownMs = 0;
 let suppressNextClickUntil = 0;
+let suppressNextAuxUntil = 0;
 
 export function hasMappedSwipeSignals() {
   const map = appState.ringKeyMap || {};
@@ -98,6 +100,13 @@ export function initRingController() {
   const ringModeBadge = document.getElementById('ringModeBadge');
   const ringActionText = document.getElementById('ringActionText');
   const ringLastSignalEl = document.getElementById('ringLastSignal');
+  const ringRawSignalLogEl = document.getElementById('ringRawSignalLog');
+
+  function logRawSignal(summary) {
+    if (ringRawSignalLogEl && appState.currentScreen === 'controller') {
+      ringRawSignalLogEl.textContent = `RAW: ${summary}`;
+    }
+  }
 
   function getCustomRingMap() {
     return appState.ringKeyMap && typeof appState.ringKeyMap === 'object' ? appState.ringKeyMap : {};
@@ -421,6 +430,13 @@ export function initRingController() {
     return true;
   }
 
+  function extractKeySignal(e) {
+    if (e.code && e.code !== 'Unidentified') return e.code;
+    if (e.key && e.key !== 'Unidentified') return e.key;
+    if (e.keyCode || e.which) return `KeyCode${e.keyCode || e.which}`;
+    return null;
+  }
+
   // 1. Listen for Bluetooth HID Keyboard / Consumer Media Key events
   window.addEventListener(
     'keydown',
@@ -456,7 +472,36 @@ export function initRingController() {
         return;
       }
 
-      const code = e.code || e.key;
+      const code = extractKeySignal(e);
+      if (!code) return;
+      lastKeyDownMs = performance.now();
+      logRawSignal(`keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
+
+      const handled = handleRingSignal(code);
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    { capture: true }
+  );
+
+  // Fallback for ChromeOS/Android HID consumer keys that dispatch only keyup
+  window.addEventListener(
+    'keyup',
+    (e) => {
+      if (performance.now() - lastKeyDownMs <= 300) return;
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName;
+      if (
+        !learningAction &&
+        (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || activeEl?.isContentEditable)
+      ) {
+        return;
+      }
+      const code = extractKeySignal(e);
+      if (!code || code === 'Escape') return;
+      logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
       const handled = handleRingSignal(code);
       if (handled) {
         e.preventDefault();
@@ -492,6 +537,7 @@ export function initRingController() {
       }
 
       if (!wheelCode) return;
+      logRawSignal(`wheel dx=${Math.round(e.deltaX)} dy=${Math.round(e.deltaY)} → ${wheelCode}`);
 
       if (!learningAction && !resolveRingAction(wheelCode)) {
         const dir = wheelCode.replace('Wheel', '').toUpperCase();
@@ -505,7 +551,7 @@ export function initRingController() {
     { passive: true }
   );
 
-  // 3. Listen for Bluetooth Ring HID Touch / Pointer Swipes (e.g. Yiser-J6 on ChromeOS)
+  // 3. Listen for Bluetooth Ring HID Touch / Pointer Swipes, Taps & Mouse Aux Buttons
   let activeSwipePointer = null;
 
   function isFormControl(el) {
@@ -514,11 +560,20 @@ export function initRingController() {
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
   }
 
+  function isLearnUiControlTarget(el) {
+    if (!el || !(el instanceof Element)) return false;
+    return Boolean(
+      el.closest(
+        '.remote-visual-btn, .remote-learn-btn, .cm-tab-btn, .setup-nav-tab, .radar-btn, button, a, input, select, textarea'
+      )
+    );
+  }
+
   function isInteractiveOverlayTarget(el) {
     if (!el || !(el instanceof Element)) return false;
     return Boolean(
       el.closest(
-        '#optionsPanel, #galleryDrawer, #pipZoomWindow, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
+        '#optionsPanel, #galleryDrawer, .pip-controls, .pip-resize-handle, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
       )
     );
   }
@@ -533,15 +588,18 @@ export function initRingController() {
   window.addEventListener(
     'pointerdown',
     (e) => {
-      if (!e.isPrimary) return;
       if (isFormControl(e.target)) return;
+      const now = performance.now();
+      if (activeSwipePointer && now - activeSwipePointer.startTime < 1500) return;
       activeSwipePointer = {
         id: e.pointerId,
+        pointerType: e.pointerType || 'unknown',
+        button: e.button,
         startX: e.clientX,
         startY: e.clientY,
         lastX: e.clientX,
         lastY: e.clientY,
-        startTime: performance.now(),
+        startTime: now,
         target: e.target
       };
     },
@@ -571,9 +629,42 @@ export function initRingController() {
     const dx = ptr.lastX - ptr.startX;
     const dy = ptr.lastY - ptr.startY;
     const dist = Math.hypot(dx, dy);
-    if (dist < RING_SWIPE_MIN_DIST_PX) return;
-
     const elapsed = performance.now() - ptr.startTime;
+
+    logRawSignal(
+      `ptr(${ptr.pointerType}) btn=${ptr.button} dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)} ${Math.round(elapsed)}ms`
+    );
+
+    // Non-primary mouse buttons (Middle / Right / Browser Back / Browser Forward)
+    if (!isCancel && ptr.button >= 1 && dist < RING_SWIPE_MIN_DIST_PX) {
+      const btnCode = `MouseBtn${ptr.button}`;
+      if (learningAction || resolveRingAction(btnCode)) {
+        suppressNextAuxUntil = performance.now() + 200;
+        handleRingSignal(btnCode);
+        return;
+      }
+    }
+
+    // Touch / Pointer Tap (dist < threshold)
+    if (dist < RING_SWIPE_MIN_DIST_PX) {
+      if (learningAction && !isCancel && !isLearnUiControlTarget(ptr.target)) {
+        suppressNextClickUntil = performance.now() + 180;
+        handleRingSignal('TouchTap');
+        return;
+      }
+      if (
+        !learningAction &&
+        !isCancel &&
+        elapsed <= 300 &&
+        !isInteractiveOverlayTarget(ptr.target) &&
+        resolveRingAction('TouchTap')
+      ) {
+        suppressNextClickUntil = performance.now() + 180;
+        handleRingSignal('TouchTap');
+      }
+      return;
+    }
+
     const swipeCode = classifySwipeCode(dx, dy);
 
     if (learningAction) {
@@ -585,7 +676,6 @@ export function initRingController() {
     if (elapsed > RING_SWIPE_MAX_MS) return;
 
     if (appState.currentScreen === 'controller' && !isInteractiveOverlayTarget(ptr.target)) {
-      // Allow live diagnostics on the Remote screen even before swipes are mapped
       if (ringLastSignalEl) ringLastSignalEl.textContent = `SIGNAL: ${swipeCode}`;
       if (!resolveRingAction(swipeCode)) {
         window.dispatchEvent(
@@ -618,6 +708,28 @@ export function initRingController() {
     'click',
     (e) => {
       if (performance.now() < suppressNextClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    { capture: true }
+  );
+
+  window.addEventListener(
+    'auxclick',
+    (e) => {
+      if (performance.now() < suppressNextAuxUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    { capture: true }
+  );
+
+  window.addEventListener(
+    'contextmenu',
+    (e) => {
+      if (performance.now() < suppressNextAuxUntil) {
         e.preventDefault();
         e.stopPropagation();
       }
