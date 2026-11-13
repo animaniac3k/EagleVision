@@ -462,6 +462,8 @@ export function initRingController() {
 
   // 3. Listen for Bluetooth Ring HID Touch / Pointer Swipes, Taps & Mouse Aux Buttons
   let activeSwipePointer = null;
+  let recentTapMs = 0;
+  let recentTapCount = 0;
 
   function isFormControl(el) {
     if (!el || !(el instanceof Element)) return false;
@@ -556,10 +558,23 @@ export function initRingController() {
     const dx = ptr.lastX - ptr.startX;
     const dy = ptr.lastY - ptr.startY;
     const dist = Math.hypot(dx, dy);
-    const elapsed = performance.now() - ptr.startTime;
+    const now = performance.now();
+    const elapsed = now - ptr.startTime;
+
+    let tapInfo = '';
+    if (!isCancel && dist < RING_SWIPE_MIN_DIST_PX) {
+      recentTapCount = now - recentTapMs <= 500 ? recentTapCount + 1 : 1;
+      recentTapMs = now;
+      tapInfo = ` taps=${recentTapCount}`;
+    } else {
+      recentTapCount = 0;
+    }
+
+    const pctX = window.innerWidth > 0 ? Math.round((ptr.startX / window.innerWidth) * 100) : 0;
+    const pctY = window.innerHeight > 0 ? Math.round((ptr.startY / window.innerHeight) * 100) : 0;
 
     logRawSignal(
-      `ptr(${ptr.pointerType}) btn=${ptr.button} dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)} ${Math.round(elapsed)}ms${isCancel ? ' [cancel]' : ''}`
+      `ptr(${ptr.pointerType}) btn=${ptr.button} @${Math.round(ptr.startX)},${Math.round(ptr.startY)}(${pctX}%,${pctY}%) dist=${Math.round(dist)}px${tapInfo} ${Math.round(elapsed)}ms${isCancel ? ' [cancel]' : ''}`
     );
 
     if (ptr.startedOnForm && !learningAction) return;
