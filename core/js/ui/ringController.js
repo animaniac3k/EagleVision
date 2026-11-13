@@ -2,7 +2,7 @@
  * SPOTR 7-Button Wireless Bluetooth Remote / Ring Controller Integration
  *
  * Single 1-to-1 Mode for One-Finger Operation:
- * - ▲ / ▼ / ◀ / ▶ : Pan Live View (auto-zooms gently to 1.25x if at 1.0x)
+ * - ▲ / ▼ / ◀ / ▶ : Pan Live View (when zoomed > 1.0x via Center button)
  * - Center (●)    : Cycle Zoom (1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x & re-center)
  * - Button 2 (2)  : Instant Replay In / Out toggle (recommended on ChromeOS)
  * - Button 1 (⏻1) : Instant Replay In / Out toggle (alternate)
@@ -18,7 +18,7 @@
  * visual button glowing, and a one-click "Learn Button" calibration tool.
  */
 
-import { appState, updateState, subscribeState } from '../state.js';
+import { appState, updateState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
@@ -253,12 +253,10 @@ export function initRingController() {
       return;
     }
 
-    // C. Live Camera Feed — Direct 1-to-1 Pan
-    let zoom = appState.mainZoom || 1.0;
-    // If at 1.0x native view, gently bump to 1.25x so pan has visual effect
+    // C. Live Camera Feed — Direct 1-to-1 Pan (only when already zoomed in via Center)
+    const zoom = appState.mainZoom || 1.0;
     if (zoom <= 1.01) {
-      zoom = 1.25;
-      updateState({ mainZoom: zoom });
+      return;
     }
 
     const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
@@ -284,7 +282,13 @@ export function initRingController() {
 
     // If user is currently calibrating/learning a button in Controller Screen
     if (learningAction) {
-      const nextMap = { ...getCustomRingMap(), [learningAction]: signalCode };
+      const nextMap = { ...getCustomRingMap() };
+      for (const [act, boundCode] of Object.entries(nextMap)) {
+        if (act !== learningAction && String(boundCode).trim() === signalCode) {
+          delete nextMap[act];
+        }
+      }
+      nextMap[learningAction] = signalCode;
       updateState({ ringKeyMap: nextMap });
       saveSettings(appState);
       if (ringLastSignalEl) {
@@ -580,7 +584,7 @@ export function initRingController() {
       if (
         !learningAction &&
         !isCancel &&
-        elapsed <= 300 &&
+        elapsed <= 750 &&
         !isInteractiveOverlayTarget(ptr.target) &&
         resolveRingAction('TouchTap')
       ) {
@@ -668,7 +672,7 @@ export function initRingController() {
   window.addEventListener(
     'click',
     (e) => {
-      if (performance.now() < suppressNextClickUntil) {
+      if (e.isTrusted && performance.now() < suppressNextClickUntil) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -679,7 +683,7 @@ export function initRingController() {
   window.addEventListener(
     'auxclick',
     (e) => {
-      if (performance.now() < suppressNextAuxUntil) {
+      if (e.isTrusted && performance.now() < suppressNextAuxUntil) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -690,18 +694,11 @@ export function initRingController() {
   window.addEventListener(
     'contextmenu',
     (e) => {
-      if (performance.now() < suppressNextAuxUntil) {
+      if (e.isTrusted && performance.now() < suppressNextAuxUntil) {
         e.preventDefault();
         e.stopPropagation();
       }
     },
     { capture: true }
   );
-
-  // Sync HUD label whenever screen, replay, or FFP state changes
-  subscribeState(() => {
-    if (ringModeBadge) {
-      ringModeBadge.textContent = `REMOTE: ${getActiveRemoteMode()}`;
-    }
-  });
 }

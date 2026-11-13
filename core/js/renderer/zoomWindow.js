@@ -46,7 +46,9 @@ export function clampFloatingPanelToParent(panelEl) {
 export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
   let dragging = false;
   let dragCommitted = false;
+  let dragRejected = false;
   let dragStartTime = 0;
+  let activePointerId = null;
   let startX = 0;
   let startY = 0;
   let origLeft = 0;
@@ -67,20 +69,35 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
       return;
     }
     dragging = true;
+    dragRejected = false;
+    activePointerId = e.pointerId;
     dragStartTime = performance.now();
-    dragCommitted = !shouldHoldCanvasPan(dragStartTime);
+    dragCommitted = e.pointerType === 'mouse' || !shouldHoldCanvasPan(dragStartTime);
     startX = e.clientX;
     startY = e.clientY;
     origLeft = containerEl.offsetLeft;
     origTop = containerEl.offsetTop;
-    trigger.setPointerCapture(e.pointerId);
+    try {
+      trigger.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore synthetic pointer capture errors
+    }
     e.stopPropagation();
   });
 
   trigger.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (!dragging || e.pointerId !== activePointerId) return;
     if (!dragCommitted) {
-      if (shouldHoldCanvasPan(dragStartTime)) return;
+      if (dragRejected) return;
+      const moveDist = Math.hypot(e.clientX - startX, e.clientY - startY);
+      if (shouldHoldCanvasPan(dragStartTime)) {
+        // Reject rapid synthetic ring swipes permanently so holding >420ms never drags the panel
+        if (moveDist >= 10) {
+          dragRejected = true;
+          dragging = false;
+        }
+        return;
+      }
       dragCommitted = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -101,11 +118,18 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
     }
   });
 
-  const endDrag = () => {
+  const endDrag = (e) => {
+    if (activePointerId !== null && e?.pointerId !== undefined && e.pointerId !== activePointerId) {
+      return;
+    }
     dragging = false;
+    dragCommitted = false;
+    dragRejected = false;
+    activePointerId = null;
   };
   trigger.addEventListener('pointerup', endDrag);
   trigger.addEventListener('pointercancel', endDrag);
+  trigger.addEventListener('lostpointercapture', endDrag);
 }
 
 function initPipCornerResize(pipWindowEl, pipCanvas) {
@@ -126,6 +150,10 @@ function initPipCornerResize(pipWindowEl, pipCanvas) {
   function attachCorner(handleEl, isLeftCorner) {
     if (!handleEl) return;
     let resizing = false;
+    let resizeCommitted = false;
+    let resizeRejected = false;
+    let resizeStartTime = 0;
+    let resizePointerId = null;
     let startX = 0;
     let startY = 0;
     let startW = 0;
@@ -134,19 +162,41 @@ function initPipCornerResize(pipWindowEl, pipCanvas) {
 
     handleEl.addEventListener('pointerdown', (e) => {
       resizing = true;
+      resizeRejected = false;
+      resizePointerId = e.pointerId;
+      resizeStartTime = performance.now();
+      resizeCommitted = e.pointerType === 'mouse' || !shouldHoldCanvasPan(resizeStartTime);
       startX = e.clientX;
       startY = e.clientY;
       startW = pipWindowEl.offsetWidth;
       startH = pipWindowEl.offsetHeight;
       startLeft = pipWindowEl.offsetLeft;
-      pipWindowEl.style.left = `${startLeft}px`;
-      pipWindowEl.style.right = 'auto';
-      handleEl.setPointerCapture(e.pointerId);
+      try {
+        handleEl.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic pointer capture errors
+      }
       e.stopPropagation();
     });
 
     handleEl.addEventListener('pointermove', (e) => {
-      if (!resizing) return;
+      if (!resizing || e.pointerId !== resizePointerId) return;
+      if (!resizeCommitted) {
+        if (resizeRejected) return;
+        const moveDist = Math.hypot(e.clientX - startX, e.clientY - startY);
+        if (shouldHoldCanvasPan(resizeStartTime)) {
+          if (moveDist >= 10) {
+            resizeRejected = true;
+            resizing = false;
+          }
+          return;
+        }
+        resizeCommitted = true;
+        startX = e.clientX;
+        startY = e.clientY;
+      }
+      pipWindowEl.style.left = `${startLeft}px`;
+      pipWindowEl.style.right = 'auto';
       const parent = pipWindowEl.parentElement;
       const pw = parent.clientWidth;
       const ph = parent.clientHeight;
@@ -182,11 +232,18 @@ function initPipCornerResize(pipWindowEl, pipCanvas) {
       syncPipCanvasResolution();
     });
 
-    const stopResize = () => {
+    const stopResize = (e) => {
+      if (resizePointerId !== null && e?.pointerId !== undefined && e.pointerId !== resizePointerId) {
+        return;
+      }
       resizing = false;
+      resizeCommitted = false;
+      resizeRejected = false;
+      resizePointerId = null;
     };
     handleEl.addEventListener('pointerup', stopResize);
     handleEl.addEventListener('pointercancel', stopResize);
+    handleEl.addEventListener('lostpointercapture', stopResize);
   }
 
   attachCorner(handleSE, false);

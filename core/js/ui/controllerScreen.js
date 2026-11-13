@@ -1512,8 +1512,6 @@ export function executeMappedAction(actionId) {
         document.getElementById('btnGalleryPlayPause')?.click();
       } else if (appState.replayActive) {
         document.getElementById('btnReplayPlayPause')?.click();
-      } else {
-        document.getElementById('ringHudPill')?.click();
       }
       break;
 
