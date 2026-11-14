@@ -5,19 +5,17 @@ import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
-import kotlin.concurrent.thread
 
 /**
  * SPOTR Local Embedded HTTP Server & Camera Gateway for Android and ChromeOS.
- * Provides static asset serving from Android APK assets, Bresser UDP camera wake proxy,
- * and low-latency RTSP-to-MJPEG frame distribution.
+ * Provides static asset serving from Android APK assets, Bresser UDP/HTTP camera wake proxy,
+ * and low-latency native RTSP-to-MJPEG frame distribution via MediaCodec.
  */
 class SpotrServer(
     private val context: Context,
@@ -28,11 +26,22 @@ class SpotrServer(
         private const val TAG = "SpotrServer"
     }
 
+    private val rtspSession = RtspSessionManager()
+
+    override fun stop() {
+        rtspSession.stop()
+        super.stop()
+    }
+
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
         val params = session.parameters
 
         Log.d(TAG, "Request: ${session.method} $uri")
+
+        if (session.method == Method.OPTIONS) {
+            return newJsonResponse(Response.Status.OK, "{}")
+        }
 
         // 1. API: Trigger / Wake Camera Hardware Media Pipeline
         if (uri == "/api/rtsp/wake") {
@@ -41,16 +50,12 @@ class SpotrServer(
 
         // 2. API: Gateway Status & Telemetry
         if (uri == "/api/rtsp/status") {
-            val status = JSONObject().apply {
-                put("status", "ok")
-                put("platform", "android/chromeos")
-                put("server", "SpotrEmbeddedGateway")
-            }
-            return newJsonResponse(Response.Status.OK, status.toString())
+            return newJsonResponse(Response.Status.OK, rtspSession.getStatusJson().toString())
         }
 
         // 3. API: Stop active RTSP stream
         if (uri == "/api/rtsp/stop") {
+            rtspSession.stop()
             val res = JSONObject().apply {
                 put("success", true)
                 put("message", "RTSP stream stopped")
@@ -71,63 +76,90 @@ class SpotrServer(
      * Wakes camera media pipeline via UDP magic packet and HTTP getmediainfo query.
      */
     private fun handleRtspWake(params: Map<String, List<String>>): Response {
-        val ip = params["ip"]?.firstOrNull() ?: "192.168.0.1"
-        val triggerPath = params["path"]?.firstOrNull() ?: "/app/getmediainfo"
+        val ip = (params["ip"]?.firstOrNull() ?: "192.168.0.1").trim()
+        val rawPath = (params["path"]?.firstOrNull() ?: "/app/getmediainfo").trim()
+        val triggerPath = if (rawPath.startsWith("/")) rawPath else "/$rawPath"
 
-        // Asynchronously send UDP magic packet to wake Bresser camera hardware
-        thread(isDaemon = true) {
-            try {
-                val socket = DatagramSocket()
+        // Stop any active RTSP session so camera port 554 is free before wake
+        rtspSession.stop()
+
+        // Send UDP magic wake packet to Bresser camera hardware (port 65534)
+        try {
+            DatagramSocket().use { socket ->
                 val wakePayload = "bresser".toByteArray(Charsets.UTF_8)
                 val targetAddr = InetAddress.getByName(ip)
                 val packet = DatagramPacket(wakePayload, wakePayload.size, targetAddr, 65534)
                 socket.send(packet)
-                socket.close()
                 Log.d(TAG, "Sent UDP wake packet to $ip:65534")
-            } catch (e: Exception) {
-                Log.w(TAG, "UDP wake packet notice: ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "UDP wake packet notice: ${e.message}")
         }
 
         // Query HTTP getmediainfo
-        val channels = JSONArray()
         var cameraInfo: JSONObject? = null
+        var wakeError: String? = null
 
         try {
             val url = URL("http://$ip$triggerPath")
             val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 3000
+                connectTimeout = 3500
+                readTimeout = 3500
                 setRequestProperty("User-Agent", "Mozilla/5.0")
             }
 
-            if (conn.responseCode == 200) {
-                val body = conn.inputStream.bufferedReader().use { it.readText() }
-                cameraInfo = JSONObject(body)
+            try {
+                if (conn.responseCode in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    cameraInfo = try {
+                        JSONObject(body)
+                    } catch (_: Exception) {
+                        JSONObject().put("raw", body)
+                    }
+                } else {
+                    wakeError = "HTTP ${conn.responseCode} from $ip$triggerPath"
+                }
+            } finally {
+                conn.disconnect()
             }
-            conn.disconnect()
         } catch (e: Exception) {
             Log.w(TAG, "HTTP camera wake query warning: ${e.message}")
+            wakeError = e.message ?: "Failed to reach camera at $ip"
         }
 
-        // Populate standard camera channels (Main 1080p + Sub 540p)
-        channels.put(JSONObject().apply {
-            put("id", "ch0")
-            put("name", "Main Stream (1080p Full HD)")
-            put("url", "rtsp://$ip/live/tcp/ch0")
-            put("isDefault", true)
-            put("resolution", "1920x1080")
-        })
-        channels.put(JSONObject().apply {
-            put("id", "ch1")
-            put("name", "Sub Stream (960x540)")
-            put("url", "rtsp://$ip/live/tcp/ch1")
-            put("isDefault", false)
-            put("resolution", "960x540")
-        })
+        if (wakeError != null) {
+            val failJson = JSONObject().apply {
+                put("success", false)
+                put("ip", ip)
+                put("error", wakeError)
+                put("message", "Could not reach camera at $ip. Ensure device is connected to the camera Wi-Fi network.")
+            }
+            return newJsonResponse(Response.Status.OK, failJson.toString())
+        }
 
+        val channels = JSONArray().apply {
+            put(JSONObject().apply {
+                put("id", "ch0")
+                put("name", "Main Stream (1080p Full HD)")
+                put("url", "rtsp://$ip/live/tcp/ch0")
+                put("isDefault", true)
+                put("resolution", "1920x1080")
+            })
+            put(JSONObject().apply {
+                put("id", "ch1")
+                put("name", "Sub Stream (960x540)")
+                put("url", "rtsp://$ip/live/tcp/ch1")
+                put("isDefault", false)
+                put("resolution", "960x540")
+            })
+        }
+
+        val declaredRtsp = cameraInfo?.optJSONObject("info")?.opt("rtsp")
         val responseJson = JSONObject().apply {
             put("success", true)
+            put("ip", ip)
+            put("message", "Camera pipeline awakened successfully")
+            if (declaredRtsp != null) put("declaredRtsp", declaredRtsp)
             put("channels", channels)
             put("cameraInfo", cameraInfo ?: JSONObject())
         }
@@ -136,22 +168,44 @@ class SpotrServer(
     }
 
     /**
-     * Handles MJPEG streaming.
+     * Streams continuous multipart/x-mixed-replace JPEG frames decoded from RTSP.
      */
     private fun handleRtspStream(params: Map<String, List<String>>): Response {
-        val streamUrl = params["url"]?.firstOrNull() ?: ""
-        Log.d(TAG, "Stream requested for: $streamUrl")
+        val streamUrl = (params["url"]?.firstOrNull() ?: "").trim()
+        if (streamUrl.isEmpty()) {
+            val err = JSONObject().apply {
+                put("success", false)
+                put("error", "Missing 'url' query parameter.")
+            }
+            return newJsonResponse(Response.Status.BAD_REQUEST, err.toString())
+        }
 
-        // Return multipart boundary response header
-        val dummyFrame = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: 0\r\n\r\n".toByteArray()
-        val stream = ByteArrayInputStream(dummyFrame)
+        val transport = (params["transport"]?.firstOrNull() ?: "tcp").trim().lowercase()
+        val preferTcp = transport != "udp"
+
+        Log.d(TAG, "Stream requested for: $streamUrl (preferTcp=$preferTcp)")
+        val sessionId = rtspSession.start(streamUrl, preferTcp)
+
+        val startupError = rtspSession.waitForInitialFrame(sessionId, timeoutMs = 4500L)
+        if (startupError != null) {
+            rtspSession.stop(expectedSessionId = sessionId)
+            val err = JSONObject().apply {
+                put("success", false)
+                put("error", startupError)
+            }
+            return newJsonResponse(Response.Status.INTERNAL_ERROR, err.toString())
+        }
+
+        val mjpegStream = rtspSession.openMjpegInputStream(sessionId)
         return newChunkedResponse(
             Response.Status.OK,
             "multipart/x-mixed-replace; boundary=frame",
-            stream
+            mjpegStream
         ).apply {
             addHeader("Access-Control-Allow-Origin", "*")
             addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
+            addHeader("Pragma", "no-cache")
+            addHeader("Expires", "0")
         }
     }
 
