@@ -16,24 +16,32 @@ import java.util.Locale
 import kotlin.math.min
 
 /**
- * Hardware-accelerated H.264 / H.265 MediaCodec decoder (with automatic software decoder
- * fallback for ChromeOS ARCVM / strict HALs) that converts YUV_420_888 frames directly
- * into JPEG byte arrays for low-latency MJPEG streaming.
+ * Low-latency H.264 / H.265 MediaCodec decoder (with automatic software fallback for
+ * ChromeOS ARCVM) using a decoupled single-slot conflated JPEG encoder thread so the
+ * RTSP socket reader never stalls behind JPEG compression.
  */
 class MediaCodecJpegDecoder(
     private val mimeType: String,
     initialConfigBytes: ByteArray?,
-    private val jpegQuality: Int = 80,
+    private val jpegQuality: Int = 70,
     private val onFrame: (jpegBytes: ByteArray, width: Int, height: Int) -> Unit
 ) {
     companion object {
         private const val TAG = "MediaCodecJpegDecoder"
-        private const val INPUT_TIMEOUT_US = 15_000L
-        private const val OUTPUT_TIMEOUT_US = 5_000L
+        private const val INPUT_TIMEOUT_US = 8_000L
+        private const val OUTPUT_TIMEOUT_US = 1_000L
     }
 
+    private data class PendingNv21(val data: ByteArray, val width: Int, val height: Int)
+
     private var codec: MediaCodec? = null
-    private var usingSoftwareCodec = false
+    @Volatile
+    var activeDecoderName: String = ""
+        private set
+    @Volatile
+    var usingSoftwareCodec: Boolean = false
+        private set
+
     private val bufferInfo = MediaCodec.BufferInfo()
     private var ptsUs = 0L
     private var initialWidth = 1920
@@ -46,17 +54,19 @@ class MediaCodecJpegDecoder(
     private var droppedBeforeKeyframe = 0
     private var decodedAnyFrame = false
 
-    // Accumulate inline SPS/PPS (or VPS/SPS/PPS) before feeding CODEC_CONFIG
     private val pendingConfigNals = ByteArrayOutputStream(512)
     private var seenSps = false
     private var seenPps = false
 
-    // Reusable buffers on the single decoder thread to minimize GC pauses
-    private var nv21Scratch = ByteArray(0)
+    // Decoupled 1-slot conflated JPEG encoding pipeline
+    private val encodeLock = Object()
+    private var pendingEncode: PendingNv21? = null
+    private var recycledNv21: ByteArray? = null
+    private var jpegThread: Thread? = null
+
     private var yRowScratch = ByteArray(0)
     private var uRowScratch = ByteArray(0)
     private var vRowScratch = ByteArray(0)
-    private val jpegStream = ByteArrayOutputStream(131072)
 
     @Volatile
     private var released = false
@@ -64,12 +74,49 @@ class MediaCodecJpegDecoder(
     fun start(width: Int = 1920, height: Int = 1080) {
         initialWidth = width
         initialHeight = height
+        startJpegEncoderThread()
         try {
             startCodec(forceSoftware = false)
         } catch (e: Exception) {
             Log.w(TAG, "Hardware decoder start failed (${e.message}); trying software fallback")
             startCodec(forceSoftware = true)
         }
+    }
+
+    private fun startJpegEncoderThread() {
+        val t = Thread({
+            val jpegStream = ByteArrayOutputStream(131072)
+            while (!released) {
+                val frame: PendingNv21 = synchronized(encodeLock) {
+                    while (!released && pendingEncode == null) {
+                        try {
+                            encodeLock.wait(200L)
+                        } catch (_: InterruptedException) {
+                            return@Thread
+                        }
+                    }
+                    val f = pendingEncode
+                    pendingEncode = null
+                    f
+                } ?: continue
+
+                try {
+                    jpegStream.reset()
+                    val yuvImage = YuvImage(frame.data, ImageFormat.NV21, frame.width, frame.height, null)
+                    if (yuvImage.compressToJpeg(Rect(0, 0, frame.width, frame.height), jpegQuality, jpegStream)) {
+                        onFrame(jpegStream.toByteArray(), frame.width, frame.height)
+                    }
+                } finally {
+                    synchronized(encodeLock) {
+                        if (recycledNv21 == null || recycledNv21!!.size < frame.data.size) {
+                            recycledNv21 = frame.data
+                        }
+                    }
+                }
+            }
+        }, "SpotrJpegEnc").apply { isDaemon = true }
+        jpegThread = t
+        t.start()
     }
 
     private fun startCodec(forceSoftware: Boolean) {
@@ -119,6 +166,7 @@ class MediaCodecJpegDecoder(
 
         mc.start()
         codec = mc
+        activeDecoderName = mc.name
         configSentToCodec = savedConfigBytes != null
         Log.i(TAG, "Started decoder ${mc.name} ($mimeType, sw=$forceSoftware, hasSdpConfig=$hasConfig)")
     }
@@ -131,24 +179,18 @@ class MediaCodecJpegDecoder(
             return
         }
 
-        // Flush any accumulated inline config NALs before feeding a video slice
         if (pendingConfigNals.size() > 0) {
             flushAccumulatedConfig()
         }
 
-        if (!hasConfig) {
-            // Wait until SPS/PPS arrives before feeding video slices
-            return
-        }
+        if (!hasConfig) return
 
         if (!hasKeyFrame) {
             if (unit.isKeyFrame) {
                 hasKeyFrame = true
             } else {
                 droppedBeforeKeyframe++
-                if (droppedBeforeKeyframe < 45) {
-                    return
-                }
+                if (droppedBeforeKeyframe < 45) return
                 hasKeyFrame = true
             }
         }
@@ -166,7 +208,6 @@ class MediaCodecJpegDecoder(
     }
 
     private fun handleConfigNal(annexBNal: ByteArray) {
-        // Identify NAL type after 4-byte Annex-B start code
         if (annexBNal.size > 4) {
             if (mimeType == MediaFormat.MIMETYPE_VIDEO_AVC) {
                 val nalType = annexBNal[4].toInt() and 0x1F
@@ -187,8 +228,6 @@ class MediaCodecJpegDecoder(
         }
 
         pendingConfigNals.write(annexBNal)
-
-        // Feed config once we have both SPS and PPS
         if (seenSps && seenPps) {
             flushAccumulatedConfig()
         }
@@ -254,8 +293,14 @@ class MediaCodecJpegDecoder(
         }
     }
 
+    /**
+     * Drains all ready decoded buffers from [mc], converting only the newest ready frame
+     * to NV21 so stale backlog frames are discarded immediately without CPU waste.
+     */
     private fun drainOutputs(mc: MediaCodec) {
+        var latestOutIndex = -1
         var timeout = OUTPUT_TIMEOUT_US
+
         while (!released) {
             val outIndex = mc.dequeueOutputBuffer(bufferInfo, timeout)
             timeout = 0L
@@ -269,46 +314,61 @@ class MediaCodecJpegDecoder(
                     Log.i(TAG, "Decoder output format changed: ${w}x${h}")
                 }
                 outIndex >= 0 -> {
-                    try {
-                        if (bufferInfo.size > 0) {
-                            val image = mc.getOutputImage(outIndex)
-                            if (image != null) {
-                                try {
-                                    encodeImageToJpeg(image)
-                                } finally {
-                                    image.close()
-                                }
-                            }
+                    if (bufferInfo.size > 0) {
+                        if (latestOutIndex >= 0) {
+                            mc.releaseOutputBuffer(latestOutIndex, false)
                         }
-                    } finally {
+                        latestOutIndex = outIndex
+                    } else {
                         mc.releaseOutputBuffer(outIndex, false)
                     }
                 }
             }
         }
+
+        if (latestOutIndex >= 0) {
+            try {
+                val image = mc.getOutputImage(latestOutIndex)
+                if (image != null) {
+                    try {
+                        submitImageForJpeg(image)
+                    } finally {
+                        image.close()
+                    }
+                }
+            } finally {
+                mc.releaseOutputBuffer(latestOutIndex, false)
+            }
+        }
     }
 
-    private fun encodeImageToJpeg(image: Image) {
+    private fun submitImageForJpeg(image: Image) {
         val crop = image.cropRect
         val w = crop.width()
         val h = crop.height()
         if (w <= 0 || h <= 0) return
 
-        val nv21 = yuv420888ToNv21(image, crop, w, h)
-        jpegStream.reset()
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, w, h, null)
-        if (yuvImage.compressToJpeg(Rect(0, 0, w, h), jpegQuality, jpegStream)) {
-            decodedAnyFrame = true
-            onFrame(jpegStream.toByteArray(), w, h)
+        val neededSize = w * h * 3 / 2
+        val nv21 = synchronized(encodeLock) {
+            val recycled = recycledNv21
+            recycledNv21 = null
+            if (recycled != null && recycled.size >= neededSize) recycled else ByteArray(neededSize)
+        }
+
+        fillNv21(image, crop, w, h, nv21)
+        decodedAnyFrame = true
+
+        synchronized(encodeLock) {
+            val dropped = pendingEncode
+            pendingEncode = PendingNv21(nv21, w, h)
+            if (dropped != null && (recycledNv21 == null || recycledNv21!!.size < dropped.data.size)) {
+                recycledNv21 = dropped.data
+            }
+            encodeLock.notifyAll()
         }
     }
 
-    private fun yuv420888ToNv21(image: Image, crop: Rect, w: Int, h: Int): ByteArray {
-        val neededSize = w * h * 3 / 2
-        if (nv21Scratch.size < neededSize) {
-            nv21Scratch = ByteArray(neededSize)
-        }
-
+    private fun fillNv21(image: Image, crop: Rect, w: Int, h: Int, dst: ByteArray) {
         val planes = image.planes
         val yPlane = planes[0]
         val uPlane = planes[1]
@@ -322,25 +382,31 @@ class MediaCodecJpegDecoder(
         val yPixStride = yPlane.pixelStride
         val yLimit = yBuf.limit()
 
-        if (yRowScratch.size < yRowStride) yRowScratch = ByteArray(yRowStride)
-
+        // Fast bulk path for full-plane contiguous Y
         var dstPos = 0
-        for (row in 0 until h) {
-            val srcOffset = (crop.top + row) * yRowStride + crop.left * yPixStride
-            if (yPixStride == 1 && srcOffset + w <= yLimit) {
-                yBuf.position(srcOffset)
-                yBuf.get(nv21Scratch, dstPos, w)
-                dstPos += w
-            } else {
-                val readLen = min(yLimit - srcOffset, (w - 1) * yPixStride + 1)
-                if (readLen > 0) {
+        if (yPixStride == 1 && crop.left == 0 && yRowStride == w && crop.top == 0 && w * h <= yLimit) {
+            yBuf.position(0)
+            yBuf.get(dst, 0, w * h)
+            dstPos = w * h
+        } else {
+            if (yRowScratch.size < yRowStride) yRowScratch = ByteArray(yRowStride)
+            for (row in 0 until h) {
+                val srcOffset = (crop.top + row) * yRowStride + crop.left * yPixStride
+                if (yPixStride == 1 && srcOffset + w <= yLimit) {
                     yBuf.position(srcOffset)
-                    yBuf.get(yRowScratch, 0, readLen)
-                    for (col in 0 until w) {
-                        nv21Scratch[dstPos++] = yRowScratch[col * yPixStride]
-                    }
-                } else {
+                    yBuf.get(dst, dstPos, w)
                     dstPos += w
+                } else {
+                    val readLen = min(yLimit - srcOffset, (w - 1) * yPixStride + 1)
+                    if (readLen > 0) {
+                        yBuf.position(srcOffset)
+                        yBuf.get(yRowScratch, 0, readLen)
+                        for (col in 0 until w) {
+                            dst[dstPos++] = yRowScratch[col * yPixStride]
+                        }
+                    } else {
+                        dstPos += w
+                    }
                 }
             }
         }
@@ -375,13 +441,22 @@ class MediaCodecJpegDecoder(
             uBuf.position(uOffset)
             uBuf.get(uRowScratch, 0, uReadLen)
 
-            for (col in 0 until uvW) {
-                nv21Scratch[dstPos++] = vRowScratch[col * vPixStride]
-                nv21Scratch[dstPos++] = uRowScratch[col * uPixStride]
+            if (vPixStride == 1 && uPixStride == 1) {
+                for (col in 0 until uvW) {
+                    dst[dstPos++] = vRowScratch[col]
+                    dst[dstPos++] = uRowScratch[col]
+                }
+            } else {
+                var vIdx = 0
+                var uIdx = 0
+                for (col in 0 until uvW) {
+                    dst[dstPos++] = vRowScratch[vIdx]
+                    dst[dstPos++] = uRowScratch[uIdx]
+                    vIdx += vPixStride
+                    uIdx += uPixStride
+                }
             }
         }
-
-        return nv21Scratch
     }
 
     private fun findSoftwareDecoderName(mime: String): String? {
@@ -414,6 +489,17 @@ class MediaCodecJpegDecoder(
 
     fun release() {
         released = true
+        synchronized(encodeLock) {
+            pendingEncode = null
+            encodeLock.notifyAll()
+        }
+        jpegThread?.let {
+            try {
+                it.join(500L)
+            } catch (_: InterruptedException) {
+            }
+        }
+        jpegThread = null
         releaseCodecOnly()
     }
 }

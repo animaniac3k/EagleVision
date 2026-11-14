@@ -479,8 +479,9 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
       }
 
       const reader = res.body.getReader();
-      let buf = new Uint8Array(0);
-      let expectedLen = -1;
+      let headerBuf = new Uint8Array(0);
+      let frameBuf = null;
+      let frameFill = 0;
       const asciiDecoder = new TextDecoder('ascii');
 
       const appendBytes = (a, b) => {
@@ -503,28 +504,44 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
       while (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
         const { value, done } = await reader.read();
         if (done) break;
-        if (value && value.length) {
-          buf = appendBytes(buf, value);
-        }
+        if (!value || !value.length) continue;
 
-        while (true) {
-          if (expectedLen < 0) {
-            const hdrEnd = findDoubleCrlf(buf);
-            if (hdrEnd < 0) break;
-            const hdrText = asciiDecoder.decode(buf.subarray(0, hdrEnd));
-            const match = /content-length:\s*(\d+)/i.exec(hdrText);
-            buf = buf.subarray(hdrEnd + 4);
-            if (!match) continue;
-            expectedLen = parseInt(match[1], 10);
-          }
-          if (expectedLen >= 0) {
-            if (buf.length < expectedLen) break;
-            const jpegBytes = buf.slice(0, expectedLen);
-            buf = buf.subarray(expectedLen);
-            expectedLen = -1;
-            if (jpegBytes.length > 0) {
-              pendingJpeg = jpegBytes;
+        let pos = 0;
+        while (pos < value.length) {
+          if (frameBuf !== null) {
+            const take = Math.min(frameBuf.length - frameFill, value.length - pos);
+            frameBuf.set(value.subarray(pos, pos + take), frameFill);
+            frameFill += take;
+            pos += take;
+            if (frameFill === frameBuf.length) {
+              pendingJpeg = frameBuf;
+              frameBuf = null;
+              frameFill = 0;
               scheduleDecode();
+            }
+          } else {
+            const prevLen = headerBuf.length;
+            const probeSlice = value.subarray(pos, Math.min(value.length, pos + 256));
+            const combined = appendBytes(headerBuf, probeSlice);
+            const hdrEnd = findDoubleCrlf(combined);
+            if (hdrEnd < 0) {
+              // Header spans across next chunk (or longer than 256B probe)
+              headerBuf = combined;
+              pos += probeSlice.length;
+              if (headerBuf.length > 4096) headerBuf = new Uint8Array(0);
+              continue;
+            }
+            const hdrText = asciiDecoder.decode(combined.subarray(0, hdrEnd));
+            const match = /content-length:\s*(\d+)/i.exec(hdrText);
+            const consumedFromValue = Math.max(0, (hdrEnd + 4) - prevLen);
+            pos += consumedFromValue;
+            headerBuf = new Uint8Array(0);
+            if (match) {
+              const expectedLen = parseInt(match[1], 10);
+              if (expectedLen > 0) {
+                frameBuf = new Uint8Array(expectedLen);
+                frameFill = 0;
+              }
             }
           }
         }
