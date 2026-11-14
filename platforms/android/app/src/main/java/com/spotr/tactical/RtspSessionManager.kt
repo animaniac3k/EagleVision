@@ -304,9 +304,13 @@ class RtspSessionManager {
             val isExpectedStop = synchronized(lock) { !isRunning || currentSessionId != sessionId }
             if (!isExpectedStop) {
                 Log.w(TAG, "RTSP worker #$sessionId error at stage=$stage: ${e.message}", e)
+                val loc = e.stackTrace.firstOrNull { it.className.startsWith("com.spotr.") }
+                    ?: e.stackTrace.firstOrNull()
+                val where = if (loc != null) " at ${loc.fileName}:${loc.lineNumber}" else ""
+                val detail = e.message?.takeIf { it.isNotBlank() } ?: "no-msg$where"
                 synchronized(lock) {
                     if (currentSessionId == sessionId) {
-                        errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "RTSP stream error"} (stage=$stage)"
+                        errorMessage = "${e.javaClass.simpleName}: $detail (stage=$stage)"
                         stage = "error"
                     }
                 }
