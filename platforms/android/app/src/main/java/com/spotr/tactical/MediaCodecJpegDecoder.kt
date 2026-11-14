@@ -47,21 +47,30 @@ class MediaCodecJpegDecoder(
     private var released = false
 
     fun start(width: Int = 1920, height: Int = 1080) {
-        val format = MediaFormat.createVideoFormat(mimeType, width, height).apply {
-            setInteger(
-                MediaFormat.KEY_COLOR_FORMAT,
-                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
-            )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
-            }
-            if (initialConfigBytes != null && initialConfigBytes.isNotEmpty()) {
-                setByteBuffer("csd-0", ByteBuffer.wrap(initialConfigBytes))
+        val buildFormat = { lowLatency: Boolean ->
+            MediaFormat.createVideoFormat(mimeType, width, height).apply {
+                setInteger(
+                    MediaFormat.KEY_COLOR_FORMAT,
+                    MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible
+                )
+                if (lowLatency && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+                }
+                if (initialConfigBytes != null && initialConfigBytes.isNotEmpty()) {
+                    setByteBuffer("csd-0", ByteBuffer.wrap(initialConfigBytes))
+                }
             }
         }
 
-        val mc = MediaCodec.createDecoderByType(mimeType)
-        mc.configure(format, null, null, 0)
+        var mc = MediaCodec.createDecoderByType(mimeType)
+        try {
+            mc.configure(buildFormat(true), null, null, 0)
+        } catch (e: Exception) {
+            Log.w(TAG, "Retrying $mimeType configure without KEY_LOW_LATENCY: ${e.message}")
+            mc.release()
+            mc = MediaCodec.createDecoderByType(mimeType)
+            mc.configure(buildFormat(false), null, null, 0)
+        }
         mc.start()
         codec = mc
         Log.i(TAG, "Started $mimeType hardware decoder (hasSdpConfig=$hasConfig)")

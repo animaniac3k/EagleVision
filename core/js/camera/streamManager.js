@@ -365,17 +365,28 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
   };
 
-  rtspImg.onerror = (err) => {
+  rtspImg.onerror = async (err) => {
     console.warn('[streamManager] RTSP stream image error:', err);
+    let detailMsg = 'Check camera Wi-Fi connection and gateway server';
+    try {
+      const st = await checkRtspGatewayStatus();
+      if (!st || !st.available) {
+        detailMsg = 'RTSP gateway offline';
+      } else if (st.error) {
+        detailMsg = String(st.error);
+      } else if (st.stage) {
+        detailMsg = `Stream ended at stage: ${st.stage} (rtp=${st.rtpPackets ?? 0}, frames=${st.framesDecoded ?? 0})`;
+      }
+    } catch {}
     ctx.fillStyle = '#051317';
     ctx.fillRect(0, 0, rtspCanvas.width, rtspCanvas.height);
     ctx.fillStyle = '#fda4af';
     ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('RTSP STREAM DISCONNECTED / TIMEOUT', rtspCanvas.width / 2, rtspCanvas.height / 2 - 20);
-    ctx.font = '16px monospace';
+    ctx.font = '15px monospace';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText('Check camera Wi-Fi connection and gateway server', rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
+    ctx.fillText(detailMsg.slice(0, 110), rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
   };
 
   // Frames are decoded directly on arrival via rtspImg.onload; redundant 60Hz rAF polling eliminated

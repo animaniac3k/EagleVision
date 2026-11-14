@@ -5,7 +5,9 @@ import android.util.Log
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.HttpURLConnection
@@ -186,7 +188,7 @@ class SpotrServer(
         Log.d(TAG, "Stream requested for: $streamUrl (preferTcp=$preferTcp)")
         val sessionId = rtspSession.start(streamUrl, preferTcp)
 
-        val startupError = rtspSession.waitForInitialFrame(sessionId, timeoutMs = 4500L)
+        val startupError = rtspSession.waitForInitialFrame(sessionId, timeoutMs = 5500L)
         if (startupError != null) {
             rtspSession.stop(expectedSessionId = sessionId)
             val err = JSONObject().apply {
@@ -196,16 +198,41 @@ class SpotrServer(
             return newJsonResponse(Response.Status.INTERNAL_ERROR, err.toString())
         }
 
-        val mjpegStream = rtspSession.openMjpegInputStream(sessionId)
-        return newChunkedResponse(
-            Response.Status.OK,
-            "multipart/x-mixed-replace; boundary=frame",
-            mjpegStream
-        ).apply {
-            addHeader("Access-Control-Allow-Origin", "*")
-            addHeader("Cache-Control", "no-cache, no-store, must-revalidate")
-            addHeader("Pragma", "no-cache")
-            addHeader("Expires", "0")
+        return MjpegStreamResponse(sessionId)
+    }
+
+    private inner class MjpegStreamResponse(
+        private val sessionId: Long
+    ) : Response(
+        Status.OK,
+        "multipart/x-mixed-replace; boundary=frame",
+        ByteArrayInputStream(ByteArray(0)),
+        -1L
+    ) {
+        init {
+            setKeepAlive(false)
+            setChunkedTransfer(false)
+        }
+
+        override fun send(outputStream: OutputStream) {
+            try {
+                val headers = (
+                    "HTTP/1.1 200 OK\r\n" +
+                        "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n" +
+                        "Cache-Control: no-cache, no-store, must-revalidate\r\n" +
+                        "Pragma: no-cache\r\n" +
+                        "Expires: 0\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Connection: close\r\n\r\n"
+                    ).toByteArray(Charsets.US_ASCII)
+                outputStream.write(headers)
+                outputStream.flush()
+                rtspSession.streamMjpegTo(sessionId, outputStream)
+            } catch (e: Exception) {
+                Log.d(TAG, "MJPEG response ended for session #$sessionId: ${e.message}")
+            } finally {
+                rtspSession.stop(expectedSessionId = sessionId)
+            }
         }
     }
 
