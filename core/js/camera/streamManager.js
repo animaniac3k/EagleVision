@@ -11,6 +11,7 @@ let rtspImg = null;
 let rtspCanvas = null;
 let rtspAnimTimer = null;
 let rtspDrawLoopActive = false;
+let rtspAbortController = null;
 
 export function getGatewayBaseUrl() {
   const host = (appState.rtspGatewayHost || '').trim();
@@ -341,9 +342,6 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   ctx.textAlign = 'center';
   ctx.fillText('CONNECTING TO RTSP STREAM...', initW / 2, initH / 2);
 
-  rtspImg = new Image();
-  rtspImg.crossOrigin = 'anonymous';
-
   let lastTrackedW = initW;
   let lastTrackedH = initH;
 
@@ -360,24 +358,20 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     }
   };
 
-  rtspImg.onload = () => {
-    syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
-    ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
-  };
-
-  rtspImg.onerror = async (err) => {
-    console.warn('[streamManager] RTSP stream image error:', err);
-    let detailMsg = 'Check camera Wi-Fi connection and gateway server';
+  const renderRtspDisconnect = async (errMsg = null) => {
+    if (!rtspDrawLoopActive) return;
+    let detailMsg = errMsg || 'Check camera Wi-Fi connection and gateway server';
     try {
       const st = await checkRtspGatewayStatus();
       if (!st || !st.available) {
         detailMsg = 'RTSP gateway offline';
       } else if (st.error) {
         detailMsg = String(st.error);
-      } else if (st.stage) {
+      } else if (!errMsg && st.stage) {
         detailMsg = `Stream ended at stage: ${st.stage} (rtp=${st.rtpPackets ?? 0}, frames=${st.framesDecoded ?? 0})`;
       }
     } catch {}
+    if (!rtspDrawLoopActive) return;
     ctx.fillStyle = '#051317';
     ctx.fillRect(0, 0, rtspCanvas.width, rtspCanvas.height);
     ctx.fillStyle = '#fda4af';
@@ -389,7 +383,6 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.fillText(detailMsg.slice(0, 110), rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
   };
 
-  // Frames are decoded directly on arrival via rtspImg.onload; redundant 60Hz rAF polling eliminated
   rtspDrawLoopActive = true;
 
   // Periodically query gateway /api/rtsp/status to sync exact stream telemetry (dimensions & FPS)
@@ -410,10 +403,142 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     } catch {}
   }, 1000);
 
-  // Connect to the gateway multipart stream endpoint
+  // Connect to the gateway multipart stream endpoint via streaming fetch + createImageBitmap
+  // (avoids Chromium/WebView img.onload firing only once on off-DOM multipart/x-mixed-replace)
   const gatewayBase = getGatewayBaseUrl();
   const streamApiUrl = `${gatewayBase}/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
-  rtspImg.src = streamApiUrl;
+
+  const abortCtrl = new AbortController();
+  rtspAbortController = abortCtrl;
+
+  let pendingJpeg = null;
+  let decodingFrame = false;
+
+  const scheduleDecode = () => {
+    if (decodingFrame || !pendingJpeg || !rtspDrawLoopActive || abortCtrl.signal.aborted) return;
+    const bytes = pendingJpeg;
+    pendingJpeg = null;
+    decodingFrame = true;
+    const blob = new Blob([bytes], { type: 'image/jpeg' });
+    createImageBitmap(blob)
+      .then((bmp) => {
+        try {
+          if (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
+            syncFrameDimensions(bmp.width, bmp.height);
+            ctx.drawImage(bmp, 0, 0, rtspCanvas.width, rtspCanvas.height);
+          }
+        } finally {
+          bmp.close();
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        decodingFrame = false;
+        if (pendingJpeg && rtspDrawLoopActive && !abortCtrl.signal.aborted) scheduleDecode();
+      });
+  };
+
+  const startImgFallback = () => {
+    rtspImg = new Image();
+    rtspImg.crossOrigin = 'anonymous';
+    rtspImg.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.001;pointer-events:none;';
+    document.body.appendChild(rtspImg);
+
+    const drawLoop = () => {
+      if (!rtspDrawLoopActive || !rtspImg) return;
+      if (rtspImg.complete && rtspImg.naturalWidth > 0) {
+        syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
+        ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
+      }
+      rtspAnimTimer = requestAnimationFrame(drawLoop);
+    };
+    rtspImg.onload = () => {
+      if (!rtspAnimTimer && rtspDrawLoopActive) {
+        rtspAnimTimer = requestAnimationFrame(drawLoop);
+      }
+    };
+    rtspImg.onerror = () => renderRtspDisconnect();
+    rtspImg.src = streamApiUrl;
+  };
+
+  (async () => {
+    try {
+      const res = await fetch(streamApiUrl, { signal: abortCtrl.signal, cache: 'no-store' });
+      if (!res.ok) {
+        let serverErr = `HTTP ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.error) serverErr = j.error;
+        } catch {}
+        await renderRtspDisconnect(serverErr);
+        return;
+      }
+      if (!res.body || !res.body.getReader) {
+        startImgFallback();
+        return;
+      }
+
+      const reader = res.body.getReader();
+      let buf = new Uint8Array(0);
+      let expectedLen = -1;
+      const asciiDecoder = new TextDecoder('ascii');
+
+      const appendBytes = (a, b) => {
+        if (!a.length) return b;
+        const out = new Uint8Array(a.length + b.length);
+        out.set(a, 0);
+        out.set(b, a.length);
+        return out;
+      };
+
+      const findDoubleCrlf = (arr) => {
+        for (let i = 0; i <= arr.length - 4; i++) {
+          if (arr[i] === 13 && arr[i + 1] === 10 && arr[i + 2] === 13 && arr[i + 3] === 10) {
+            return i;
+          }
+        }
+        return -1;
+      };
+
+      while (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value && value.length) {
+          buf = appendBytes(buf, value);
+        }
+
+        while (true) {
+          if (expectedLen < 0) {
+            const hdrEnd = findDoubleCrlf(buf);
+            if (hdrEnd < 0) break;
+            const hdrText = asciiDecoder.decode(buf.subarray(0, hdrEnd));
+            const match = /content-length:\s*(\d+)/i.exec(hdrText);
+            buf = buf.subarray(hdrEnd + 4);
+            if (!match) continue;
+            expectedLen = parseInt(match[1], 10);
+          }
+          if (expectedLen >= 0) {
+            if (buf.length < expectedLen) break;
+            const jpegBytes = buf.slice(0, expectedLen);
+            buf = buf.subarray(expectedLen);
+            expectedLen = -1;
+            if (jpegBytes.length > 0) {
+              pendingJpeg = jpegBytes;
+              scheduleDecode();
+            }
+          }
+        }
+      }
+
+      if (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
+        await renderRtspDisconnect();
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError' || abortCtrl.signal.aborted) return;
+      console.warn('[streamManager] RTSP stream fetch error:', err);
+      await renderRtspDisconnect(err?.message || null);
+    }
+  })();
 
   const stream = rtspCanvas.captureStream(30);
   activeMediaStream = stream;
@@ -446,10 +571,15 @@ export function stopCurrentStream() {
     rtspAnimTimer = null;
   }
   rtspDrawLoopActive = false;
+  if (rtspAbortController) {
+    rtspAbortController.abort();
+    rtspAbortController = null;
+  }
   if (rtspImg) {
     rtspImg.onload = null;
     rtspImg.onerror = null;
     rtspImg.src = '';
+    rtspImg.remove();
     rtspImg = null;
   }
   if (activeMediaStream) {
