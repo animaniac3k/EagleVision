@@ -47,10 +47,10 @@
     SPOTR<tspan fill="#ffd166" font-size="14" font-weight="700" dy="-7">™</tspan><tspan fill="#f8fafc" font-size="22" font-weight="800" dy="7"> — SYSTEM ARCHITECTURE &amp; DATA FLOW</tspan>
   </text>
   <text x="54" y="76" fill="#94a3b8" font-family="'Segoe UI', -apple-system, Roboto, sans-serif" font-size="13" font-weight="500">
-    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — Revision 52 Architecture • Pure Browser Client &amp; OpenCV RTSP Gateway • PWA Precached
+    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — v0.1.1 Architecture • Pure Browser Client &amp; OpenCV RTSP Gateway • PWA Precached
   </text>
   <rect x="1170" y="38" width="220" height="38" rx="6" fill="#18181b" stroke="#3f3f46"/>
-  <text x="1280" y="62" text-anchor="middle" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">REV 52.0 (OFFLINE)</text>
+  <text x="1280" y="62" text-anchor="middle" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">v0.1.1 (OFFLINE PWA)</text>
 
   <!-- ===================================================================== -->
   <!-- COLUMN 1: HARDWARE & INPUT BUS                                        -->
@@ -98,12 +98,12 @@
       <rect width="320" height="105" rx="6" fill="#18181b" stroke="#27272a" stroke-width="1.5"/>
       <rect width="320" height="28" rx="6" fill="#202024"/>
       <circle cx="16" cy="14" r="5" fill="#a855f7"/>
-      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">5-BUTTON BLUETOOTH REMOTE RING</text>
+      <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">7-BUTTON BLUETOOTH REMOTE RING</text>
 
       <text x="14" y="48" fill="#c084fc" font-family="monospace" font-size="12" font-weight="bold">ringController.js</text>
-      <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Mode Cycle: AIM ROI → ZOOM → TOOLS → PLAYER</text>
-      <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Double-Tap Center: Trigger Instant Replay</text>
-      <text x="14" y="102" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• Live interactive calibration stage in Settings</text>
+      <text x="14" y="68" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• 1-to-1 Live: D-Pad Pan (70%), Center Zoom Cycle</text>
+      <text x="14" y="86" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• BTN 2 / BTN 1: Toggle Instant Replay In/Out</text>
+      <text x="14" y="102" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="11">• HID Swipe &amp; TouchTap@qxXqy zones in Setup</text>
     </g>
 
     <!-- Central State Bus Box -->
@@ -207,7 +207,7 @@
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• <tspan fill="#38bdf8" font-weight="bold">Memory Guardrails</tspan>: Live RAM Budget Estimator (Used / Free MB)</text>
       <text x="14" y="140" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Automatic frame eviction prevents tab crash or OOM pressure</text>
       <text x="14" y="162" fill="#2dd4bf" font-family="monospace" font-size="11" font-weight="bold">→ snapshotMemoryBuffer(): Instant microsecond zero-copy snapshot</text>
-      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Triggers automatically on Ring Double-Tap, Controller Share, or UI button</text>
+      <text x="14" y="180" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Triggers automatically on Ring BTN 2/1, Controller Share, or UI button</text>
       <text x="14" y="198" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Auto-saves into permanent IndexedDB storage without UI hitch</text>
     </g>
 
@@ -248,7 +248,7 @@
       <circle cx="16" cy="14" r="5" fill="#ffd166"/>
       <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">PWA OFFLINE ARCHITECTURE (PORTABLE APP)</text>
 
-      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">sw.js (spotr-v52) &amp; manifest.json</text>
+      <text x="14" y="48" fill="#ffd166" font-family="monospace" font-size="12" font-weight="bold">sw.js (spotr-v0.1.1) &amp; manifest.json</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Precached Core Assets: HTML, JS, CSS, SVG Icons, Audio Sprite</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Standalone &amp; Window-Controls-Overlay Display Modes</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 100% Offline Capable: Installs on Chromebook, Android, Windows, Mac</text>
@@ -297,8 +297,8 @@
       <!-- View 5 -->
       <rect x="1090" y="0" width="250" height="65" rx="4" fill="#12131a" stroke="#ffd166" stroke-width="1"/>
       <text x="1100" y="18" fill="#ffd166" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">VIEW 5: CONTROLLER SCREEN</text>
-      <text x="1100" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Fullscreen Gamepad config &amp; rebind</text>
-      <text x="1100" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Live button glow &amp; action banner</text>
+      <text x="1100" y="34" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Fullscreen Gamepad &amp; Bluetooth Ring setup</text>
+      <text x="1100" y="48" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Learn schematic lock + RAW telemetry log</text>
       <text x="1100" y="60" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Dual-stick calibration &amp; deadzones</text>
     </g>
   </g>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (Revision 52) — Architecture & Data Flow Infographic</title>
+  <title>SPOTR (v0.1.1) — Architecture & Data Flow Infographic</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body {
@@ -55,7 +55,7 @@
     <!-- Top Banner -->
     <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • REVISION 52</div>
+        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • v0.1.1</div>
         <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
         <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • OpenCV RTSP Gateway &amp; WebHID Virtual Mouse</p>
       </div>
@@ -89,7 +89,7 @@
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">3. SETTINGS (#screenSettings)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Dual camera source, live RAM meter, voice sliders, touchpad sensitivity &amp; ring calibrate.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Dual camera source, live RAM meter, voice sliders, image filters &amp; version badge.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">4. RETICLE (#screenReticle)</span>
@@ -97,7 +97,7 @@
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">5. CONTROLLER (#screenController)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen Gamepad configuration, key rebinding matrix &amp; real-time input diagnostics.</p>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Gamepad &amp; 7-Btn Bluetooth Ring 1-to-1 setup, 70% pan speed &amp; HID zone telemetry.</p>
         </div>
       </div>
     </div>
@@ -142,7 +142,7 @@
               <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• heatmapSpeechEnabled</div>
               <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• voicePitch &amp; Rate<br/>• themeColor (6 HSL)</div>
               <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens &amp; Dur<br/>• bufferMaxSec / FPS</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• uiOpacity (15-100%)<br/>• ringButtonMap</div>
+              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• uiOpacity (15-100%)<br/>• ringKeyMap / Pan (70%)</div>
             </div>
             <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
           </div>
@@ -238,7 +238,7 @@
             <span class="badge">instantReplay.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button, ring double-tap, or gamepad Share</div>
+            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button, Ring BTN 2/1, or gamepad Share</div>
             <div>• Dedicated <strong class="text-[#2dd4bf]">0.5x Slow-Motion</strong> playback toggle</div>
             <div>• Single-frame <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong> forensics</div>
             <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> clip to IndexedDB persistent archive</div>
@@ -264,8 +264,8 @@
     <!-- Bottom UI, Global Opacity & Controllers Bar -->
     <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
       <div>
-        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v52):</span>
-        <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App. Pre-caches shell assets, CSS, JS modules, audio sprites, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
+        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v0.1.1):</span>
+        <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App (Cache-First + Stale-While-Revalidate + auto-reload on SW update). Pre-caches core assets, CSS, JS modules, audio sprites, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
       </div>
       <div>
         <span class="text-[#2dd4bf] font-bold">PORTABLE WINDOWS LAUNCHER (start_spotr.bat • server.py):</span>

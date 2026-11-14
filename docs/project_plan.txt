@@ -1,5 +1,5 @@
 ================================================================================
-SPOTR - PROJECT PLAN & TECHNICAL DOCUMENTATION (REVISION 52)
+SPOTR - PROJECT PLAN & TECHNICAL DOCUMENTATION (v0.1.1)
 Target Platform: Progressive Web App (PWA) for ChromeOS / Android (Lenovo Duet 3)
                  & Portable Windows/macOS/Linux Systems with RTSP Gateway
 ================================================================================
@@ -27,10 +27,17 @@ Core Capabilities:
       * Opacity (0% - 100%) and Reticle Scale (10% - 200%) sliders
       * 6 Tactical Color Themes (Emerald Teal, Amber Gold, High-Vis White, Night Blue, Ruby Red, Amethyst)
       * Center Aiming Point Selector (Empty, Dot, Cross, Chevron)
-  - Dedicated Fullscreen Settings Screen (Screen 3):
+  - Dedicated Fullscreen Settings Screen (Screen 3) & Version Badges:
       * Multi-column tactical grid for camera source (USB vs. RTSP Bresser/Custom),
         memory buffer parameters, reticle overlay configuration, heatmap & voice callouts,
         PS4/Bluetooth gamepad mapping, image filters, and Bluetooth ring calibration
+      * Setup headers display `.setup-version-badge` pills (`APP_VERSION = 'v0.1.1'`)
+  - Bluetooth Ring & Remote Control (7-Button Schematic):
+      * Single 1-to-1 Live Mode: Directional buttons pan zoomed Live View (`>1.0x`),
+        CENTER cycles Zoom (`1.0x -> 1.5x -> 2.0x -> 2.5x -> 3.0x -> 1.0x`), BTN 2 (recommended
+        on ChromeOS) and BTN 1 toggle Instant Replay In/Out; automatic Player mode in Replay/Gallery
+      * Supports HID keys, scroll wheel ticks, aux mouse buttons, and ChromeOS HID touch
+        swipes/taps (`Swipe*` & 5%-quantized `TouchTap@qxXqy` zones) with `ringPanSpeed` (default 70%)
   - Dedicated Fullscreen Reticle Customizer & Click Calibration (Screen 4):
       * Live interactive SVG graduated reticle with configurable clicks/indents per arm (2 to 30),
         click pixel spacing, unobstructed center gap, center brackets, major ticks,
@@ -71,72 +78,82 @@ Core Capabilities:
 
 2. DIRECTORY & MODULE STRUCTURE
 -------------------------------
-/SPOTR
-├── index.html                        # App shell (Screens: 1 Live, 2 Gallery, 3 Settings, 4 Reticle, 5 Controller)
-├── manifest.json                     # PWA manifest (standalone, landscape)
-├── sw.js                             # Network-first Service Worker (spotr-v52)
+/EagleVision (SPOTR)
 ├── server.py                         # OpenCV RTSP gateway, Condition-push stream & UDP wake proxy
-├── start_spotr.bat             # One-click portable launcher for Windows
+├── start_spotr.bat                   # One-click portable launcher for Windows
+├── build_android_apk.bat             # Android Capacitor APK build helper script
 ├── README.md                         # Quickstart & system documentation
 ├── /docs
-│   ├── ARCHITECTURE.md               # Complete technical architecture specification
+│   ├── ARCHITECTURE.md               # Complete technical architecture specification (v0.1.1)
 │   ├── project_plan.txt              # Project plan & subsystem design documentation
 │   ├── user_manual.html              # Tactical visual user manual (print & landscape view)
+│   ├── USER_MANUAL.pdf               # Printable PDF user manual exported from user_manual.html
 │   ├── architecture_infographic.svg  # Vector architecture infographic
 │   └── architecture_infographic.html # Interactive HTML architecture infographic
-├── /assets
-│   ├── /icons
-│   │   ├── icon.svg                  # Vector radar reticle PWA icon
-│   │   ├── icon-192.png              # Standard PWA icon (192px)
-│   │   └── icon-512.png              # High-res PWA icon (512px)
-│   └── /audio
-│       └── voice-sprite.mp3          # Studio recorded female voice speech sprite
-├── /css
-│   ├── variables.css                 # Dynamic --radar-* HSL properties & --ui-opacity
-│   ├── layout.css                    # Screens 1-5 layout, floating strips, settings grid, reticle stage
-│   ├── viewport.css                  # Main canvas, PiP window, corner resize handles, ROI, hardware layers
-│   ├── controls.css                  # Touch buttons, sliders, memory meter, ring D-pad, gamepad telemetry
-│   └── gallery.css                   # Fullscreen Stored Video Player, floating drawer & quick-delete buttons
-└── /js
-    ├── main.js                       # Application bootstrap, WakeLock, Gamepad & Reticle init
-    ├── state.js                      # Central reactive state store (appState)
-    ├── /audio
-    │   ├── voiceManifest.js          # Audio sprite timecodes & phrase definitions
-    │   └── voiceAudioEngine.js       # Web Audio API buffer engine with Web Speech fallback
-    ├── /camera
-    │   ├── streamManager.js          # Dual source manager (UVC USB vs. RTSP gateway), wake proxy, hot-plug
-    │   └── streamStats.js            # Real-time FPS, jitter & resolution telemetry tracker
-    ├── /input
-    │   └── gamepadController.js      # WebHID DualShock 4/5 virtual mouse & HTML5 Gamepad API
-    ├── /renderer
-    │   ├── compositor.js             # Dual-canvas renderer, 20Hz decoupled Heatmap, FFP reticle & voice calls
-    │   ├── zoomWindow.js             # Draggable ROI crosshair, resizable PiP & resize clamp
-    │   ├── imageFilters.js           # GPU CSS filter string builder
-    │   └── overlayManager.js         # Dynamic graduated reticle generator, FFP subtension math & center shapes
-    ├── /recorder
-    │   ├── memoryRingBuffer.js       # Dual-source native-res RAM JPEG ring buffer (USB & getRtspCanvas)
-    │   └── instantReplay.js          # RAM replay player with 0.5x slow-mo, Step -1/+1 & automatic archive save
-    ├── /storage
-    │   ├── videoStore.js             # IndexedDB CRUD for frame archives + native .webm export
-    │   └── settingsStore.js          # LocalStorage persistence for user UI, reticle & voice settings
-    └── /ui
-        ├── hudController.js          # Toggleable live telemetry overlay
-        ├── sidebarControls.js        # Settings screen controller, memory meter, UI opacity, voice audition
-        ├── reticleScreen.js          # Fullscreen Reticle Customizer & Click Calibration controller
-        ├── controllerScreen.js       # Fullscreen Gamepad configuration & rebinding matrix
-        ├── videoBrowser.js           # Fullscreen Stored Video Player, clips drawer & rapid deletion
-        ├── splashScreen.js           # Tactical boot splash sequence controller
-        └── ringController.js         # 5-button Bluetooth scrolling ring remote & calibrator
+├── /platforms
+│   ├── /android                      # Android Capacitor wrapper & Gradle build project
+│   ├── /chromeos                     # ChromeOS / Chromebook deployment guide
+│   ├── /ios                          # iOS deployment guide
+│   └── /windows                      # Windows launcher & gateway files
+└── /core
+    ├── index.html                    # App shell (Screens: 1 Live, 2 Gallery, 3 Settings, 4 Reticle, 5 Controller)
+    ├── manifest.json                 # PWA manifest (standalone, landscape)
+    ├── sw.js                         # Cache-First + Stale-While-Revalidate Service Worker (spotr-v0.1.1)
+    ├── /assets
+    │   ├── /icons
+    │   │   ├── icon.svg              # Vector radar reticle PWA icon
+    │   │   ├── icon-192.png          # Standard PWA icon (192px)
+    │   │   └── icon-512.png          # High-res PWA icon (512px)
+    │   └── /audio
+    │       └── voice-sprite.mp3      # Studio recorded female voice speech sprite
+    ├── /css
+    │   ├── variables.css             # Dynamic --radar-* HSL properties & --ui-opacity (clean vector strokes)
+    │   ├── layout.css                # Screens 1-5 layout, floating strips, settings grid, reticle stage
+    │   ├── viewport.css              # Main canvas, PiP window, corner resize handles, ROI, hardware layers
+    │   ├── controls.css              # Touch buttons, sliders, memory meter, ring schematic, gamepad telemetry
+    │   └── gallery.css               # Fullscreen Stored Video Player, floating drawer & quick-delete buttons
+    └── /js
+        ├── main.js                   # Bootstrap, WakeLock, .setup-version-badge & SW controllerchange reload
+        ├── state.js                  # Central reactive state store (appState, APP_VERSION = 'v0.1.1')
+        ├── /audio
+        │   ├── voiceManifest.js      # Audio sprite timecodes & phrase definitions
+        │   └── voiceAudioEngine.js   # Web Audio API buffer engine with Web Speech fallback
+        ├── /camera
+        │   ├── streamManager.js      # Dual source manager (UVC USB vs. RTSP gateway), wake proxy, hot-plug
+        │   └── streamStats.js        # Real-time FPS, jitter & resolution telemetry tracker
+        ├── /input
+        │   └── gamepadController.js  # WebHID DualShock 4/5 virtual mouse & HTML5 Gamepad API
+        ├── /renderer
+        │   ├── compositor.js         # Dual-canvas renderer, 20Hz decoupled Heatmap, FFP reticle & voice calls
+        │   ├── zoomWindow.js         # Draggable ROI crosshair, resizable PiP & fast ring-swipe lock (>420ms)
+        │   ├── imageFilters.js       # GPU CSS filter string builder
+        │   └── overlayManager.js     # Dynamic graduated reticle generator, FFP subtension math & center shapes
+        ├── /recorder
+        │   ├── memoryRingBuffer.js   # Dual-source native-res RAM JPEG ring buffer (USB & getRtspCanvas)
+        │   └── instantReplay.js      # RAM replay player with 0.5x slow-mo, Step -1/+1 & automatic archive save
+        ├── /storage
+        │   ├── videoStore.js         # IndexedDB CRUD for frame archives + native .webm export
+        │   └── settingsStore.js      # LocalStorage persistence for UI, reticle, voice & ring mappings
+        └── /ui
+            ├── cctvScrubBar.js       # Coarse audio spike & event markers on timeline scrub bar
+            ├── hudController.js      # Toggleable live telemetry overlay
+            ├── sidebarControls.js    # Settings screen controller, memory meter, UI opacity, voice audition
+            ├── reticleScreen.js      # Fullscreen Reticle Customizer & Click Calibration controller
+            ├── controllerScreen.js   # Fullscreen Gamepad & Ring configuration + Learn schematic & RAW telemetry
+            ├── videoBrowser.js       # Fullscreen Stored Video Player, clips drawer & rapid deletion
+            ├── splashScreen.js       # Tactical boot splash sequence controller
+            └── ringController.js     # Bluetooth Ring/Remote (1-to-1 Live + Auto Player + HID Swipe/TouchTap)
 
 
 3. HOW KEY SUBSYSTEMS WORK & CONNECT
 ------------------------------------
 
-3.1 Central Reactive State (js/state.js)
-  - Holds the single source of truth (`appState`) for all screens ('live' | 'gallery' | 'settings' | 'reticle' | 'controller'),
-    camera source mode (`cameraSource`: 'usb' | 'rtsp'), RTSP configurations, zoom levels, ROI target `(roiX, roiY)`,
-    overlay state, FFP lock mode (`reticleFfpMode`), reticle configuration (`reticleConfig`),
-    heatmap sensitivity, duration, speech announcements, voice settings, and gamepad telemetry.
+3.1 Central Reactive State (core/js/state.js)
+  - Holds `APP_VERSION` (`'v0.1.1'`) and the single source of truth (`appState`) for screens
+    ('live' | 'gallery' | 'settings' | 'reticle' | 'controller'), camera source mode ('usb' | 'rtsp'),
+    RTSP config, zoom levels, ROI target `(roiX, roiY)`, overlay state, FFP lock mode (`reticleFfpMode`),
+    reticle configuration (`reticleConfig`), heatmap sensitivity/duration, voice settings,
+    gamepad telemetry, and Bluetooth ring preferences (`ringPanSpeed: 70`, `ringKeyMap`).
   - Subscribed modules react immediately to state updates via `subscribeState(fn)`.
 
 3.2 RTSP Gateway & Condition Push Pipeline (server.py)
@@ -183,6 +200,19 @@ Core Capabilities:
   - Instant Replay modal features a dedicated `0.5x` Slow-Motion button for detailed ballistic analysis.
   - Fullscreen Stored Video Player provides a collapsible clips drawer with individual red trash icons
     (`.btn-quick-delete-clip`) on each card for rapid one-tap deletion without loading the full video.
+
+3.8 Bluetooth Ring & Remote Controller (core/js/ui/ringController.js, controllerScreen.js)
+  - Single 1-to-1 Direct Live Mode:
+      * UP/DOWN/LEFT/RIGHT pan the zoomed Live viewport (`mainZoom > 1.0x`, no auto-zoom from `1.0x`)
+        at configurable `ringPanSpeed` (10% - 150%, default 70%).
+      * CENTER cycles digital zoom presets (`1.0x -> 1.5x -> 2.0x -> 2.5x -> 3.0x -> 1.0x`) + re-center.
+      * BTN 2 (recommended on ChromeOS) and BTN 1 toggle Instant Replay In/Out.
+  - Automatic Player Mode when Replay or Gallery playback is active (CENTER Play/Pause, LEFT/RIGHT
+    Step -1/+1 Frame, UP Restart, DOWN/BTN 2/BTN 1 Return to Live).
+  - ChromeOS HID Touch & Zone Binding: Distinguishes fast directional swipes (`>=12px` within `420ms`),
+    separates fixed-coordinate HID taps into 5%-quantized `TouchTap@qxXqy` buckets (`10%` match radius),
+    locks the SVG schematic (`pointer-events: none`) during Learn capture, streams `RAW:` diagnostics
+    with `@X,Y(X%,Y%)` and tap count, and prevents held swipes (`>420ms`) from dragging `#pipZoomWindow`.
 
 
 4. PORTABLE USAGE GUIDE (USB STICK / LAPTOP / CHROMEBOOK)

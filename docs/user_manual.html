@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SPOTR — Tactical Visual User Manual (Revision 52)</title>
+  <title>SPOTR — Tactical Visual User Manual (v0.1.1)</title>
   <style>
     @page {
       size: letter landscape;
@@ -303,7 +303,7 @@
       </div>
 
       <div style="margin: 4mm 0;">
-        <span class="pill pill-gold" style="font-size: 9pt; padding: 3px 10px;">REVISION 52 SPECIFICATION</span>
+        <span class="pill pill-gold" style="font-size: 9pt; padding: 3px 10px;">VERSION 0.1.1 SPECIFICATION</span>
         <span class="pill pill-teal" style="font-size: 9pt; padding: 3px 10px; margin-left: 3mm;">OFFLINE PWA READY</span>
         <span class="pill pill-blue" style="font-size: 9pt; padding: 3px 10px; margin-left: 3mm;">UVC &amp; RTSP DUAL INGESTION</span>
       </div>
@@ -332,7 +332,7 @@
       </div>
 
       <div style="margin-top: 8mm; font-size: 8pt; color: #64748b; font-family: ui-monospace, monospace;">
-        DOCUMENTATION IDENTIFIER: SPOTR-DOC-REV52 • NOV 2026
+        DOCUMENTATION IDENTIFIER: SPOTR-DOC-v0.1.1 • NOV 2026
       </div>
     </div>
   </div>
@@ -394,7 +394,7 @@
             </ul>
           </li>
           <li><strong>Precision Joysticks:</strong> Left Stick controls primary scope reticle aim with a calibrated 50% precision rate curve. Right Stick smoothly pans the main feed when digitally zoomed.</li>
-          <li><strong>5-Button Bluetooth Remote Ring:</strong> Full hands-free remote control for finger rings with interactive key calibration in Settings.</li>
+          <li><strong>7-Button Bluetooth Ring &amp; Remote (1-to-1 Mode):</strong> Hands-free finger ring control with ChromeOS HID swipe &amp; zone calibration (<span style="font-family: monospace;">TouchTap@qxXqy</span>), live <span style="font-family: monospace;">RAW:</span> log, and 70% default pan speed in Setup → Controllers.</li>
         </ul>
       </div>
     </div>
@@ -504,12 +504,30 @@
             <td>Exit to Live Stream</td>
             <td>Exit to Live Stream</td>
           </tr>
+          <tr>
+            <td><span class="key">Ring D-Pad (▲▼◄►)</span></td>
+            <td>Pan Zoomed View (&gt;1.0x, 70% default speed)</td>
+            <td>▲ Restart • ◄/► Step ±1 Frame • ▼ Return Live</td>
+            <td>Bindable in Setup → Controllers (HID Swipe / Key)</td>
+          </tr>
+          <tr>
+            <td><span class="key">Ring CENTER (●)</span></td>
+            <td>Zoom Cycle (1x → 1.5x → 2x → 2.5x → 3x → 1x)</td>
+            <td>Play / Pause Toggle</td>
+            <td>Bindable in Setup → Controllers (TouchTap Zone)</td>
+          </tr>
+          <tr>
+            <td><span class="key">Ring BTN 2 / BTN 1</span></td>
+            <td>Enter Instant Replay (BTN 2 Rec. on ChromeOS)</td>
+            <td>Exit Replay &amp; Return to Live Stream</td>
+            <td>Bindable in Setup → Controllers (TouchTap Zone)</td>
+          </tr>
         </tbody>
       </table>
     </div>
 
     <div class="doc-footer">
-      <div>SPOTR REV 52 USER MANUAL • SEC 1: HARDWARE &amp; CONTROLLER</div>
+      <div>SPOTR v0.1.1 USER MANUAL • SEC 1: HARDWARE &amp; CONTROLLER</div>
       <div>CONFIDENTIAL &amp; PROPRIETARY</div>
     </div>
   </div>
@@ -544,7 +562,7 @@
       </div>
       <div class="card card-purple">
         <div class="card-title"><span class="pill pill-purple">VIEW 4 &amp; 5</span> Reticle &amp; Controller</div>
-        <p style="font-size: 8pt;">Parametric reticle studio (mils/MOA click corrections) &amp; full-screen Controller &amp; Key Rebinding Matrix with live input diagnostics.</p>
+        <p style="font-size: 8pt;">Parametric reticle studio (mils/MOA click corrections) &amp; full-screen Gamepad &amp; Bluetooth Ring setup with Learn schematic &amp; RAW telemetry.</p>
       </div>
     </div>
 
@@ -601,7 +619,7 @@
     </div>
 
     <div class="doc-footer">
-      <div>SPOTR REV 52 USER MANUAL • SEC 2: SCREEN MODES &amp; DECLUTTER</div>
+      <div>SPOTR v0.1.1 USER MANUAL • SEC 2: SCREEN MODES &amp; DECLUTTER</div>
       <div>CONFIDENTIAL &amp; PROPRIETARY</div>
     </div>
   </div>
@@ -708,7 +726,7 @@
     </div>
 
     <div class="doc-footer">
-      <div>SPOTR REV 52 USER MANUAL • SEC 3: HEATMAP &amp; VOICE ANNOUNCER</div>
+      <div>SPOTR v0.1.1 USER MANUAL • SEC 3: HEATMAP &amp; VOICE ANNOUNCER</div>
       <div>CONFIDENTIAL &amp; PROPRIETARY</div>
     </div>
   </div>
@@ -751,7 +769,7 @@
         </div>
         <p>Capture critical shot strings instantly with a single button press or ring tap.</p>
         <ul>
-          <li><strong>Instant Snapshot:</strong> Press <span class="key">Share</span> on controller, double-tap the center ring button, or click <strong>REPLAY</strong> to freeze and inspect the circular buffer.</li>
+          <li><strong>Instant Snapshot:</strong> Press <span class="key">Share</span> on controller, press Ring <span class="key">BTN 2</span> (or <span class="key">BTN 1</span>), or click <strong>REPLAY</strong> to freeze and inspect the circular buffer.</li>
           <li><strong>Automatic Silent Persistence:</strong> Upon trigger, the snapshot is automatically cloned to permanent local IndexedDB storage in the background without stuttering playback.</li>
           <li><strong>Precision Timeline Scrubber:</strong> Drag the timeline slider to locate the exact microsecond of bullet impact or target change.</li>
           <li><strong>0.5x Slow-Motion Toggle:</strong> Dedicated <span class="key">0.5x</span> button allows smooth slow-motion trajectory and bullet impact forensics.</li>
@@ -782,7 +800,7 @@
     </div>
 
     <div class="doc-footer">
-      <div>SPOTR REV 52 USER MANUAL • SEC 4: RAM BUFFER &amp; INSTANT REPLAY</div>
+      <div>SPOTR v0.1.1 USER MANUAL • SEC 4: RAM BUFFER &amp; INSTANT REPLAY</div>
       <div>CONFIDENTIAL &amp; PROPRIETARY</div>
     </div>
   </div>
@@ -845,7 +863,7 @@
       <div class="card-title">
         <span class="pill pill-teal">DEPLOYMENT</span> Progressive Web App (PWA) Offline Installation Guide
       </div>
-      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App. Precached by Service Worker <span style="font-family: monospace;">spotr-v52</span>:</p>
+      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App. Precached by Service Worker <span style="font-family: monospace;">spotr-v0.1.1</span> (auto-reloading on update, with live build version pills in Setup headers):</p>
 
       <div class="grid-4" style="margin-top: 2mm;">
         <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
@@ -868,7 +886,7 @@
     </div>
 
     <div class="doc-footer">
-      <div>SPOTR REV 52 USER MANUAL • SEC 5: RETICLE STUDIO &amp; PWA DEPLOYMENT</div>
+      <div>SPOTR v0.1.1 USER MANUAL • SEC 5: RETICLE STUDIO &amp; PWA DEPLOYMENT</div>
       <div>CONFIDENTIAL &amp; PROPRIETARY</div>
     </div>
   </div>

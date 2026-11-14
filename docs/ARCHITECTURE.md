@@ -1,4 +1,4 @@
-# SPOTR Software Architecture Document (Revision 52)
+# SPOTR Software Architecture Document (v0.1.1)
 
 ## 1. Executive Overview
 
@@ -16,7 +16,7 @@
 | • WebHID (DualShock 4/5) |       | • UVC USB (1080p/4K Scopes)       |       | • Web Audio Studio Voice |
 | • Capacitive Virt. Mouse |       | • RTSP Gateway (server.py OpenCV) |       | • Browser Web Speech API |
 | • HTML5 Gamepad API      |       | • Bresser Wi-Fi Wake Proxy (UDP)  |       | • Directional Callouts   |
-| • 5-Btn Bluetooth Ring   |       | • Sub-ms Condition Frame Push     |       | • Reticle Click Distance |
+| • 7-Btn Bluetooth Ring   |       | • Sub-ms Condition Frame Push     |       | • Reticle Click Distance |
 +──────────────────────────+       +───────────────────────────────────+       +──────────────────────────+
 ```
 
@@ -39,7 +39,7 @@ flowchart TD
     subgraph Inputs["1. Hardware Input Subsystems"]
         BT["WebHID Bluetooth<br/>(DualShock 4 / DualSense)"]
         GP["HTML5 Gamepad API<br/>(Standard Gamepads)"]
-        RING["5-Button Bluetooth Ring<br/>(Keyboard/HID Emulation)"]
+        RING["Bluetooth Ring / Remote<br/>(Keyboard, Wheel & HID Touch)"]
         MOUSE["Touch / Mouse / Pointer Events"]
     end
 
@@ -187,10 +187,14 @@ flowchart TD
   * **Hardware Deadzone**: Threshold of `0.16` completely eliminates resting analog stick drift.
   * **Non-Linear Aiming Curve**: $v_{out} = \text{sign}(v) \cdot |v|^{1.8}$ reduces low-deflection speed by 50–70% for sub-millimeter tick precision.
   * **Zero-Allocation Polling**: Gamepad loop uses cached object references to avoid garbage collection pauses.
-* **5-Button Bluetooth Scrolling Ring Remote (`ringController.js`)**:
-  * Supports ultra-compact wireless finger rings simulating keyboard/multimedia keys.
-  * Modes: `AIM ROI`, `ZOOM`, `TOOLS`, and `PLAYER`.
-  * Interactive key rebinding and calibration tool in Settings.
+* **Bluetooth Ring & Remote (`ringController.js`, 7-Button Schematic)**:
+  * Supports wireless finger rings and compact remotes emitting HID keyboard/multimedia keys, mouse scroll wheel ticks, aux mouse clicks, or ChromeOS HID touch swipes/taps (e.g., Yiser-J6).
+  * **Single 1-to-1 Direct Live Mode**:
+    * `UP` / `DOWN` / `LEFT` / `RIGHT`: Pans the zoomed Live viewport (`mainZoom > 1.0x`, without auto-zooming from `1.0x`) at configurable speed (`ringPanSpeed`, 10%–150%, **70% default**).
+    * `CENTER`: Cycles digital zoom presets (`1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x`) and re-centers pan when returning to `1.0x`.
+    * `BTN 2` *(Recommended on ChromeOS)* & `BTN 1`: Toggles Instant Replay In/Out.
+  * **Automatic Player Override**: While Instant Replay or Gallery playback is active, `CENTER` toggles Play/Pause, `LEFT`/`RIGHT` step `-1`/`+1` frames, `UP` restarts Replay, and `DOWN`/`BTN 2`/`BTN 1` return to Live.
+  * **HID Touch Calibration & ChromeOS Telemetry (`controllerScreen.js`)**: Classifies directional swipes (`≥12px` within `420ms` as `SwipeUp/Down/Left/Right`), distinguishes fixed-coordinate HID button taps via 5%-quantized `TouchTap@qxXqy` zones (`10%` nearest-match tolerance with `'TouchTap'` fallback), locks the remote schematic (`pointer-events: none`) during Learn capture, streams live `RAW:` telemetry, and guards `#pipZoomWindow` (`zoomWindow.js`) against held ring swipes (`> 420ms`).
 
 ---
 
@@ -215,11 +219,11 @@ stateDiagram-v2
     ControllerScreen --> SettingsScreen: Tap "← Settings" / Gamepad Circle
     ControllerScreen --> LiveScreen: Tap "Exit to Live" / Gamepad Options
     
-    LiveScreen --> GalleryScreen: Tap Stored Clips Icon / Ring Replay
+    LiveScreen --> GalleryScreen: Tap Stored Clips Icon
     GalleryScreen --> LiveScreen: Tap "← Live Feed" / Gamepad Circle
     
-    LiveScreen --> InstantReplayModal: Tap "20s Replay" / Gamepad Share
-    InstantReplayModal --> LiveScreen: Tap "Live" / Gamepad Circle
+    LiveScreen --> InstantReplayModal: Tap "20s Replay" / Gamepad Share / Ring BTN 2 or BTN 1
+    InstantReplayModal --> LiveScreen: Tap "Live" / Gamepad Circle / Ring BTN 2, BTN 1 or Down
 ```
 
 ---
@@ -230,4 +234,4 @@ stateDiagram-v2
 * **Local RTSP Gateway Boundary**: The Python gateway (`server.py`) binds strictly to the local network interface, translating local camera streams into MJPEG without external cloud intermediaries.
 * **Camera Privacy**: Operates under standard browser camera permissions (`getUserMedia`).
 * **WebHID Device Isolation**: Hardware access is explicitly granted per device through Chrome's native security picker prompt.
-* **Offline-First PWA Pre-Caching**: All application assets, scripts, stylesheets, audio sprites, and vector icons are cached by Service Worker (`spotr-v52`), ensuring complete functionality in offline environments.
+* **Offline-First PWA Pre-Caching**: All application assets, scripts, stylesheets, audio sprites, and vector icons are cached by Service Worker (`spotr-v0.1.1`) using Cache-First with background Stale-While-Revalidate updates, `skipWaiting()`, and automatic `controllerchange` page reload (`main.js`). Active builds display `APP_VERSION` (`v0.1.1`) in Setup header `.setup-version-badge` pills.
