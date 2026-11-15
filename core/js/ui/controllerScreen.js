@@ -9,10 +9,12 @@
  * 5. Profile presets (Default DualShock 4, Simplified Field, Flight / Arcade).
  */
 
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
 import { getActiveRemoteMode, getLearningAction, setLearningAction } from './ringController.js';
+import { snapLoupeToLatestHit } from './detectionsScreen.js';
+import { rezeroHeatmap, captureAnnotatedSnapshot } from '../renderer/compositor.js';
 
 // Mappable Action Registry
 export const ACTION_DEFINITIONS = [
@@ -256,7 +258,91 @@ export const ACTION_DEFINITIONS = [
     desc: 'Toggle ON/OFF whichever secondary tool is currently selected on the cyclic dock',
     defaultGamepad: 'cross',
     defaultKey: 'Enter'
+  },
+  {
+    id: 'toggle_dpad_mode',
+    category: 'optics',
+    name: 'Switch D-Pad Mode (Pan ↔ Aim Loupe)',
+    desc: 'Toggle D-Pad / single-stick directional keys between Pan View and Aim Loupe',
+    defaultGamepad: 'none',
+    defaultKey: 'KeyU'
+  },
+  {
+    id: 'snap_loupe_last_hit',
+    category: 'vision',
+    name: 'Snap Loupe to Latest Hit',
+    desc: 'Jump digital Loupe crosshair to the newest logged motion detection',
+    defaultGamepad: 'none',
+    defaultKey: 'KeyG'
+  },
+  {
+    id: 'rezero_heatmap',
+    category: 'vision',
+    name: 'Re-Zero Heatmap Background',
+    desc: 'Re-anchor heatmap reference immediately and clear fading thermal trails',
+    defaultGamepad: 'none',
+    defaultKey: 'KeyZ'
+  },
+  {
+    id: 'capture_snapshot',
+    category: 'recording',
+    name: 'Save Annotated PNG Snapshot',
+    desc: 'Download current frame + reticle overlay as a PNG image',
+    defaultGamepad: 'none',
+    defaultKey: 'KeyN'
+  },
+  {
+    id: 'dpad_up',
+    category: 'optics',
+    name: 'D-Pad Up (Pan / Aim Loupe)',
+    desc: 'Steer Pan or Aim Loupe Up (respects D-Pad Mode toggle)',
+    defaultGamepad: 'none',
+    defaultKey: 'none'
+  },
+  {
+    id: 'dpad_down',
+    category: 'optics',
+    name: 'D-Pad Down (Pan / Aim Loupe)',
+    desc: 'Steer Pan or Aim Loupe Down (respects D-Pad Mode toggle)',
+    defaultGamepad: 'none',
+    defaultKey: 'none'
+  },
+  {
+    id: 'dpad_left',
+    category: 'optics',
+    name: 'D-Pad Left (Pan / Aim / Frame -1)',
+    desc: 'Steer Pan or Aim Loupe Left in Live, or Step −1 frame in Replay',
+    defaultGamepad: 'none',
+    defaultKey: 'none'
+  },
+  {
+    id: 'dpad_right',
+    category: 'optics',
+    name: 'D-Pad Right (Pan / Aim / Frame +1)',
+    desc: 'Steer Pan or Aim Loupe Right in Live, or Step +1 frame in Replay',
+    defaultGamepad: 'none',
+    defaultKey: 'none'
   }
+];
+
+// 16-Button 8BitDo Micro K-Mode (HID Keyboard) Default Layout
+export const MICRO_BUTTON_DEFS = [
+  { id: 'up', label: 'D-Pad ▲', defaultAction: 'dpad_up', defaultKey: 'ArrowUp' },
+  { id: 'down', label: 'D-Pad ▼', defaultAction: 'dpad_down', defaultKey: 'ArrowDown' },
+  { id: 'left', label: 'D-Pad ◀', defaultAction: 'dpad_left', defaultKey: 'ArrowLeft' },
+  { id: 'right', label: 'D-Pad ▶', defaultAction: 'dpad_right', defaultKey: 'ArrowRight' },
+  { id: 'a', label: 'A (East)', defaultAction: 'snap_loupe_last_hit', defaultKey: 'KeyG' },
+  { id: 'b', label: 'B (South)', defaultAction: 'rezero_heatmap', defaultKey: 'KeyZ' },
+  { id: 'x', label: 'X (North)', defaultAction: 'toggle_heatmap', defaultKey: 'KeyH' },
+  { id: 'y', label: 'Y (West)', defaultAction: 'toggle_pip', defaultKey: 'KeyL' },
+  { id: 'l1', label: 'L1', defaultAction: 'zoom_out', defaultKey: 'Minus' },
+  { id: 'r1', label: 'R1', defaultAction: 'zoom_in', defaultKey: 'Equal' },
+  { id: 'l2', label: 'L2', defaultAction: 'reticle_scale_down', defaultKey: 'BracketLeft' },
+  { id: 'r2', label: 'R2', defaultAction: 'reticle_scale_up', defaultKey: 'BracketRight' },
+  { id: 'minus', label: '− (Select)', defaultAction: 'toggle_dpad_mode', defaultKey: 'KeyU' },
+  { id: 'plus', label: '+ (Start)', defaultAction: 'instant_replay', defaultKey: 'KeyR' },
+  { id: 'star', label: '★ (Star)', defaultAction: 'capture_snapshot', defaultKey: 'KeyN' },
+  { id: 'home', label: '⌂ (Home)', defaultAction: 'return_live', defaultKey: 'KeyB' }
 ];
 
 // Unified Bluetooth Ring & Remote Button Definitions (Single 1-to-1 Mode)
@@ -454,6 +540,45 @@ export const BUILT_IN_PROFILES = {
       reticleAimSpeed: 60,
       ringPanSpeed: 70
     }
+  },
+  '8bitdo_micro': {
+    id: '8bitdo_micro',
+    name: '8BitDo Micro (K-Mode)',
+    description: '16-button BLE keyboard preset (Switch K): D-Pad switches Pan/Aim Loupe, ABXY + shoulders control Heatmap, Replay, Loupe Snap & Snapshots.',
+    isBuiltIn: true,
+    bindings: {
+      ...ACTION_DEFINITIONS.reduce((acc, act) => {
+        acc[act.id] = { gamepad: act.defaultGamepad, key: act.defaultKey };
+        return acc;
+      }, {}),
+      aim_reticle: { gamepad: 'left-stick', key: 'none' },
+      pan_view: { gamepad: 'right-stick', key: 'none' },
+      dpad_up: { gamepad: 'none', key: 'ArrowUp' },
+      dpad_down: { gamepad: 'none', key: 'ArrowDown' },
+      dpad_left: { gamepad: 'none', key: 'ArrowLeft' },
+      dpad_right: { gamepad: 'none', key: 'ArrowRight' },
+      snap_loupe_last_hit: { gamepad: 'none', key: 'KeyG' },
+      rezero_heatmap: { gamepad: 'none', key: 'KeyZ' },
+      toggle_heatmap: { gamepad: 'triangle', key: 'KeyH' },
+      toggle_pip: { gamepad: 'none', key: 'KeyL' },
+      zoom_out: { gamepad: 'l1', key: 'Minus' },
+      zoom_in: { gamepad: 'r1', key: 'Equal' },
+      reticle_scale_down: { gamepad: 'dpad-down', key: 'BracketLeft' },
+      reticle_scale_up: { gamepad: 'dpad-up', key: 'BracketRight' },
+      toggle_dpad_mode: { gamepad: 'none', key: 'KeyU' },
+      instant_replay: { gamepad: 'share', key: 'KeyR' },
+      capture_snapshot: { gamepad: 'none', key: 'KeyN' },
+      return_live: { gamepad: 'circle', key: 'KeyB' }
+    },
+    calibration: {
+      leftStickDeadzone: 16,
+      rightStickDeadzone: 16,
+      leftStickInvertY: false,
+      rightStickInvertY: false,
+      touchpadSensitivity: 50,
+      reticleAimSpeed: 50,
+      ringPanSpeed: 70
+    }
   }
 };
 
@@ -478,8 +603,13 @@ export function getActiveBindings() {
 
 let activeRebindActionId = null;
 let activeRebindType = null; // 'gamepad' | 'key'
+let microLearnSlotId = null;
 let rebindTimeout = null;
 let isControllerScreenInitialized = false;
+
+if (typeof window !== 'undefined') {
+  window.isSpotrRebindingKey = () => Boolean(activeRebindActionId || microLearnSlotId);
+}
 
 export function initControllerScreen() {
   if (isControllerScreenInitialized) return;
@@ -682,6 +812,8 @@ export function initControllerScreen() {
     syncCalibrationSliders();
     renderMappingTable();
     renderRemoteTable();
+    if (typeof renderMicroTable === 'function') renderMicroTable();
+    if (typeof syncMicroStateUI === 'function') syncMicroStateUI();
 
     if (showToast) {
       showToastBanner(`PROFILE LOADED: "${prof.name.toUpperCase()}"`);
@@ -932,6 +1064,8 @@ export function initControllerScreen() {
     syncCalibrationSliders();
     renderMappingTable();
     renderRemoteTable();
+    if (typeof renderMicroTable === 'function') renderMicroTable();
+    if (typeof syncMicroStateUI === 'function') syncMicroStateUI();
     showToastBanner('ALL MAPPINGS & CALIBRATION RESET TO FACTORY DEFAULTS');
   });
 
@@ -1035,9 +1169,38 @@ export function initControllerScreen() {
     }
   }
 
-  // Keyboard capture for rebinding
+  // Keyboard capture for rebinding (Gamepad matrix + 8BitDo Micro 16-slot matrix)
   window.addEventListener('keydown', (e) => {
     if (appState.currentScreen !== 'controller') return;
+    if (microLearnSlotId) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') {
+        microLearnSlotId = null;
+        renderMicroTable();
+        showToastBanner('MICRO KEY LEARNING CANCELLED');
+        return;
+      }
+      const learnedCode = e.code || e.key;
+      const slot = MICRO_BUTTON_DEFS.find((d) => d.id === microLearnSlotId);
+      const actionId = getMicroSlotAction(microLearnSlotId);
+      const nextBindings = JSON.parse(JSON.stringify(getActiveBindings()));
+      const def = ACTION_DEFINITIONS.find((a) => a.id === actionId);
+      if (!nextBindings[actionId]) {
+        nextBindings[actionId] = { gamepad: def?.defaultGamepad || 'none', key: learnedCode };
+      } else {
+        nextBindings[actionId].key = learnedCode;
+      }
+      microLearnSlotId = null;
+      updateState({ controllerBindings: nextBindings });
+      saveSettings(appState);
+      markProfileDirty();
+      renderMicroTable();
+      renderMappingTable();
+      showToastBanner(`MICRO [${slot?.label || actionId}] → ${formatKeyLabel(learnedCode)}`);
+      return;
+    }
+
     if (activeRebindActionId) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -1049,21 +1212,63 @@ export function initControllerScreen() {
     }
   });
 
-  // Global keyboard shortcuts driven by active bindings
-  window.addEventListener('keydown', (e) => {
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-    if (activeRebindActionId) return;
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) return;
+  // Global keyboard shortcuts driven by active bindings (supports continuous Pan / Aim + Micro feedback)
+  const CONTINUOUS_ACTIONS = new Set([
+    'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right',
+    'reticle_scale_up', 'reticle_scale_down', 'step_forward', 'step_backward'
+  ]);
 
+  window.addEventListener('keydown', (e) => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable) return;
+    if (activeRebindActionId || microLearnSlotId) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key === 'F12') return;
+
+    const code = e.code || e.key;
     const currentBindings = getActiveBindings();
+
+    // Direct support for ArrowKeys (aim_reticle) & WASD (pan_view) when bound to analog axes
+    if (currentBindings.aim_reticle?.key === 'ArrowKeys' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
+      e.preventDefault();
+      const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      const [dx, dy] = map[code];
+      steerViewOrLoupe('aim', dx, dy);
+      return;
+    }
+    if (currentBindings.pan_view?.key === 'KeyW/A/S/D' && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(code)) {
+      e.preventDefault();
+      const map = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
+      const [dx, dy] = map[code];
+      steerViewOrLoupe('pan', dx, dy);
+      return;
+    }
+
     const entry = Object.entries(currentBindings).find(([actId, b]) => {
       if (!b.key || b.key === 'none') return false;
-      return b.key === e.code || b.key === e.key;
+      return b.key === code || b.key === e.key;
     });
 
     if (entry) {
+      const actionId = entry[0];
+      if (e.repeat && !CONTINUOUS_ACTIONS.has(actionId)) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
-      executeMappedAction(entry[0]);
+
+      // Glow matching 8BitDo Micro schematic button if visible
+      const matchedMicro = MICRO_BUTTON_DEFS.find((d) => getMicroSlotAction(d.id) === actionId);
+      if (matchedMicro) {
+        const vBtn = document.querySelector(`.micro-visual-btn[data-micro-btn="${matchedMicro.id}"]`);
+        if (vBtn) {
+          vBtn.classList.add('micro-active-glow');
+          setTimeout(() => vBtn.classList.remove('micro-active-glow'), 240);
+        }
+        const sigEl = document.getElementById('microLastSignal');
+        if (sigEl) sigEl.textContent = `${matchedMicro.label} (${formatKeyLabel(code)}) → ${actionId.toUpperCase()}`;
+      }
+
+      executeMappedAction(actionId);
     }
   });
 
@@ -1231,8 +1436,15 @@ export function initControllerScreen() {
   // -------------------------------------------------------------------------
   const tabBtnGamepad = document.getElementById('tabBtnGamepad');
   const tabBtnRemote = document.getElementById('tabBtnRemote');
+  const tabBtnMicro = document.getElementById('tabBtnMicro');
   const viewGamepadConfig = document.getElementById('viewGamepadConfig');
   const viewRemoteConfig = document.getElementById('viewRemoteConfig');
+  const viewMicroConfig = document.getElementById('viewMicroConfig');
+  const microMappingTableBody = document.getElementById('microMappingTableBody');
+  const btnMicroDpadMode = document.getElementById('btnMicroDpadMode');
+  const btnApplyMicroPreset = document.getElementById('btnApplyMicroPreset');
+  const btnResetMicroPreset = document.getElementById('btnResetMicroPreset');
+  const microSvgContainer = document.getElementById('microSvgContainer');
   const remoteMappingTableBody = document.getElementById('remoteMappingTableBody');
   const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
   const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
@@ -1327,24 +1539,146 @@ export function initControllerScreen() {
     });
   }
 
+  const microSlotActionMap = {};
+  function getMicroSlotAction(slotId) {
+    if (microSlotActionMap[slotId]) return microSlotActionMap[slotId];
+    const def = MICRO_BUTTON_DEFS.find((d) => d.id === slotId);
+    return def ? def.defaultAction : 'none';
+  }
+
+  function syncMicroStateUI() {
+    if (!btnMicroDpadMode) return;
+    const isAim = appState.dpadMode === 'aim';
+    btnMicroDpadMode.textContent = isAim ? 'D-Pad: AIM LOUPE' : 'D-Pad: PAN VIEW';
+    btnMicroDpadMode.classList.toggle('radar-btn-active', true);
+  }
+
+  function renderMicroTable() {
+    if (!microMappingTableBody) return;
+    const bindings = getActiveBindings();
+    const bindableActions = ACTION_DEFINITIONS.filter((a) => !a.isAnalog);
+
+    microMappingTableBody.innerHTML = MICRO_BUTTON_DEFS.map((def) => {
+      const curActionId = getMicroSlotAction(def.id);
+      const curKey = bindings[curActionId]?.key || def.defaultKey;
+      const isLearning = microLearnSlotId === def.id;
+      const optionsHtml = bindableActions.map((a) => (
+        `<option value="${a.id}" ${a.id === curActionId ? 'selected' : ''}>${a.name}</option>`
+      )).join('');
+
+      return `
+        <tr>
+          <td><strong style="font-size:12px; font-family:var(--font-mono);">${def.label}</strong></td>
+          <td>
+            <select class="radar-select micro-action-select" data-micro-btn="${def.id}" style="height:28px; font-size:11px; width:100%;">
+              ${optionsHtml}
+            </select>
+          </td>
+          <td>
+            <span class="remote-key-tag ${isLearning ? 'learning' : 'primary'}">${isLearning ? 'PRESS KEY...' : formatKeyLabel(curKey)}</span>
+          </td>
+          <td style="text-align:center;">
+            <button type="button" class="radar-btn radar-btn-sm micro-learn-btn ${isLearning ? 'radar-btn-active' : ''}" data-micro-btn="${def.id}" style="font-size:11px; height:26px; padding:0 10px;">
+              ${isLearning ? 'WAIT...' : 'LEARN'}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    microMappingTableBody.querySelectorAll('.micro-action-select').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        const slotId = sel.dataset.microBtn;
+        microSlotActionMap[slotId] = sel.value;
+        const slot = MICRO_BUTTON_DEFS.find((d) => d.id === slotId);
+        if (slot) {
+          const nextBindings = JSON.parse(JSON.stringify(getActiveBindings()));
+          const targetAction = sel.value;
+          const actDef = ACTION_DEFINITIONS.find((a) => a.id === targetAction);
+          if (!nextBindings[targetAction]) {
+            nextBindings[targetAction] = { gamepad: actDef?.defaultGamepad || 'none', key: slot.defaultKey };
+          } else if (!nextBindings[targetAction].key || nextBindings[targetAction].key === 'none') {
+            nextBindings[targetAction].key = slot.defaultKey;
+          }
+          updateState({ controllerBindings: nextBindings });
+          saveSettings(appState);
+          markProfileDirty();
+          renderMappingTable();
+        }
+        renderMicroTable();
+      });
+    });
+
+    microMappingTableBody.querySelectorAll('.micro-learn-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const slotId = btn.dataset.microBtn;
+        microLearnSlotId = microLearnSlotId === slotId ? null : slotId;
+        renderMicroTable();
+        if (microLearnSlotId) {
+          showToastBanner(`PRESS MICRO BUTTON [${slotId.toUpperCase()}] TO BIND KEY (ESC TO CANCEL)`);
+        }
+      });
+    });
+  }
+
+  microSvgContainer?.querySelectorAll('.micro-visual-btn').forEach((vBtn) => {
+    vBtn.addEventListener('click', () => {
+      const slotId = vBtn.dataset.microBtn;
+      if (!slotId) return;
+      microLearnSlotId = microLearnSlotId === slotId ? null : slotId;
+      renderMicroTable();
+      if (microLearnSlotId) {
+        showToastBanner(`PRESS MICRO BUTTON [${slotId.toUpperCase()}] IN K-MODE TO BIND KEY`);
+      }
+    });
+  });
+
+  btnMicroDpadMode?.addEventListener('click', () => {
+    executeMappedAction('toggle_dpad_mode');
+    syncMicroStateUI();
+  });
+
+  btnApplyMicroPreset?.addEventListener('click', () => {
+    Object.keys(microSlotActionMap).forEach((k) => delete microSlotActionMap[k]);
+    loadProfile('8bitdo_micro', true);
+    renderMicroTable();
+    syncMicroStateUI();
+  });
+
+  btnResetMicroPreset?.addEventListener('click', () => {
+    Object.keys(microSlotActionMap).forEach((k) => delete microSlotActionMap[k]);
+    loadProfile('8bitdo_micro', true);
+    renderMicroTable();
+    syncMicroStateUI();
+  });
+
+  subscribeState((state, patch) => {
+    if (patch.dpadMode !== undefined) {
+      syncMicroStateUI();
+    }
+  });
+
   function switchControllerTab(tab) {
+    tabBtnGamepad?.classList.toggle('active', tab === 'gamepad');
+    tabBtnRemote?.classList.toggle('active', tab === 'remote');
+    tabBtnMicro?.classList.toggle('active', tab === 'micro');
+
+    viewGamepadConfig?.classList.toggle('hidden', tab !== 'gamepad');
+    viewRemoteConfig?.classList.toggle('hidden', tab !== 'remote');
+    viewMicroConfig?.classList.toggle('hidden', tab !== 'micro');
+
     if (tab === 'remote') {
-      tabBtnRemote?.classList.add('active');
-      tabBtnGamepad?.classList.remove('active');
-      viewRemoteConfig?.classList.remove('hidden');
-      viewGamepadConfig?.classList.add('hidden');
       renderRemoteTable();
       syncRemoteStateUI();
-    } else {
-      tabBtnGamepad?.classList.add('active');
-      tabBtnRemote?.classList.remove('active');
-      viewGamepadConfig?.classList.remove('hidden');
-      viewRemoteConfig?.classList.add('hidden');
+    } else if (tab === 'micro') {
+      renderMicroTable();
+      syncMicroStateUI();
     }
   }
 
   tabBtnGamepad?.addEventListener('click', () => switchControllerTab('gamepad'));
   tabBtnRemote?.addEventListener('click', () => switchControllerTab('remote'));
+  tabBtnMicro?.addEventListener('click', () => switchControllerTab('micro'));
 
   btnToggleFfpTab?.addEventListener('click', () => {
     const nextFfp = !appState.reticleFfpMode;
@@ -1458,6 +1792,33 @@ function formatKeyLabel(code) {
     .replace('Digit', '')
     .replace('Arrow', 'ARROW ')
     .toUpperCase();
+}
+
+/**
+ * Steers either the magnified main viewport pan ('pan') or Aim Loupe reticle ('aim') by one step.
+ */
+function steerViewOrLoupe(mode, dx, dy) {
+  if (mode === 'aim') {
+    const aimScale = ((appState.reticleAimSpeed ?? 50) / 100) * 0.022;
+    const nextX = Math.max(0.03, Math.min(0.97, (appState.roiX ?? 0.5) + dx * aimScale));
+    const nextY = Math.max(0.03, Math.min(0.97, (appState.roiY ?? 0.5) + dy * aimScale));
+    updateState({
+      roiX: nextX,
+      roiY: nextY,
+      pipEnabled: true,
+      roiTargetVisible: true
+    });
+    return;
+  }
+
+  const zoom = appState.mainZoom || 1.0;
+  if (zoom <= 1.01) return;
+  const maxPan = Math.max(0, (1 - 1 / zoom) / 2);
+  const speedRatio = (appState.ringPanSpeed ?? 70) / 100;
+  const panStep = Math.max(0.002, (0.024 * speedRatio) / zoom);
+  const nx = Math.max(-maxPan, Math.min(maxPan, (appState.mainPanX || 0) + dx * panStep));
+  const ny = Math.max(-maxPan, Math.min(maxPan, (appState.mainPanY || 0) + dy * panStep));
+  updateState({ mainPanX: nx, mainPanY: ny });
 }
 
 /**
@@ -1650,6 +2011,59 @@ export function executeMappedAction(actionId) {
         document.getElementById('btnReplayPlayPause')?.click();
       } else {
         toggleQuickTool();
+      }
+      break;
+
+    case 'toggle_dpad_mode': {
+      const nextMode = appState.dpadMode === 'aim' ? 'pan' : 'aim';
+      updateState({ dpadMode: nextMode });
+      saveSettings(appState);
+      showReticleFfpToast(nextMode === 'aim' ? 'D-PAD: AIM LOUPE' : 'D-PAD: PAN VIEW');
+      break;
+    }
+
+    case 'snap_loupe_last_hit': {
+      const snapped = snapLoupeToLatestHit();
+      showReticleFfpToast(snapped ? '🎯 LOUPE SNAPPED TO LATEST HIT' : 'NO HITS LOGGED YET');
+      break;
+    }
+
+    case 'rezero_heatmap':
+      rezeroHeatmap();
+      if (!appState.heatmapEnabled) updateState({ heatmapEnabled: true });
+      showReticleFfpToast('HEATMAP RE-ZEROED');
+      break;
+
+    case 'capture_snapshot':
+      captureAnnotatedSnapshot();
+      showReticleFfpToast('📷 SNAPSHOT SAVED');
+      break;
+
+    case 'dpad_up':
+      steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', 0, -1);
+      break;
+
+    case 'dpad_down':
+      steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', 0, 1);
+      break;
+
+    case 'dpad_left':
+      if (screen === 'gallery') {
+        document.getElementById('btnGalleryStepBack')?.click();
+      } else if (appState.replayActive) {
+        document.getElementById('btnReplayStepBack')?.click();
+      } else {
+        steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', -1, 0);
+      }
+      break;
+
+    case 'dpad_right':
+      if (screen === 'gallery') {
+        document.getElementById('btnGalleryStep')?.click();
+      } else if (appState.replayActive) {
+        document.getElementById('btnReplayStep')?.click();
+      } else {
+        steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', 1, 0);
       }
       break;
 

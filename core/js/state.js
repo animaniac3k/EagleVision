@@ -81,6 +81,11 @@ export const appState = {
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
   heatmapSpeechEnabled: false, // Voice callouts ("Detection! 11 o'clock, 3 clicks")
+  heatmapAutoSave: false, // Auto-snapshot rolling RAM buffer on localized hit (rate-limited)
+  heatmapIgnoreMasks: [], // Normalized exclude zones: Array<{ x, y, w, h }> in [0..1]
+  detectionHits: [],      // Session spatial detection log: Array<{ id, timestampMs, normX, normY, clockHour, clicks, dirLabel, thumbDataUrl }>
+  selectedHitId: null,    // Currently highlighted detection hit ID in Detections drawer/map
+  galleryArchiveTab: 'clips', // 'clips' | 'hits' inside Screen 2 archive
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
   voiceRate: 0.80,        // Voice speech rate (0.6..1.0)
   voiceAlertKeyword: 'Detection', // Customizable alert keyword (e.g. Contact, Target, Alert)
@@ -101,6 +106,7 @@ export const appState = {
   touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)
   reticleAimSpeed: 50,     // 15% to 150%, default 50% (50% max speed for pinpoint reticle positioning)
   ringPanSpeed: 70,        // 10% to 150%, default 70% (fine step size for Bluetooth ring/remote panning)
+  dpadMode: 'pan',         // 'pan' (Pan/Zoom view) | 'aim' (Steer Aim Loupe / ROI)
   leftStickDeadzone: 16,   // 5% to 30% deadzone
   rightStickDeadzone: 16,  // 5% to 30% deadzone
   leftStickInvertY: false, // Invert left stick vertical axis

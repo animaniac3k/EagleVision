@@ -120,6 +120,7 @@
   min-width: 52px;
   text-align: center;
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 14px;
   font-weight: 700;
   color: var(--radar-text);
@@ -155,10 +156,18 @@
 .live-bottom-dock .radar-btn {
   height: 38px;
   min-width: 38px;
+  flex-shrink: 0;
   border-radius: var(--radius-pill);
   border-color: transparent;
   background-color: transparent;
   padding: 0 11px;
+  white-space: nowrap;
+}
+
+.live-bottom-dock .radar-btn.dock-btn-dimmed,
+.live-bottom-dock .radar-btn:disabled {
+  opacity: 0.36;
+  pointer-events: none;
 }
 
 .live-bottom-dock .radar-btn:hover {
@@ -485,6 +494,7 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  z-index: 12;
 }
 
 .cctv-event-marker {
@@ -498,7 +508,7 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   justify-content: space-between;
   pointer-events: auto;
   cursor: pointer;
-  z-index: 5;
+  z-index: 13;
 }
 
 .cctv-event-marker-pip {
@@ -679,4 +689,58 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
     background: rgba(13, 19, 26, 0.94) !important;
     contain: paint;
   }
+}
+
+/* Split Clips | Hits Archive Pill & Heatmap Dock Badge */
+.archive-split-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.archive-pill-half {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 11px !important;
+}
+
+.archive-pill-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--radar-border);
+}
+
+.hit-count-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+#btnToggleHeatmap {
+  position: relative;
+}
+
+.dock-hit-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #0b0f17;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
 }

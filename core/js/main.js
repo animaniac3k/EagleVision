@@ -1,7 +1,7 @@
 /**
  * SPOTR Main Entry Point
  */
-import { appState, updateState, APP_VERSION } from './state.js';
+import { appState, updateState, subscribeState, APP_VERSION } from './state.js';
 import { loadSavedSettings } from './storage/settingsStore.js';
 import { startCameraStream } from './camera/streamManager.js';
 import { initCompositor, preloadVoiceAudio } from './renderer/compositor.js';
@@ -12,6 +12,7 @@ import { initInstantReplay } from './recorder/instantReplay.js';
 import { initHudController } from './ui/hudController.js';
 import { initSidebarAndTopControls } from './ui/sidebarControls.js';
 import { initVideoBrowser } from './ui/videoBrowser.js';
+import { initDetectionsScreen } from './ui/detectionsScreen.js';
 import { initReticleScreen } from './ui/reticleScreen.js';
 import { initControllerScreen } from './ui/controllerScreen.js';
 import { initRingController } from './ui/ringController.js';
@@ -19,7 +20,8 @@ import { initGamepadController } from './input/gamepadController.js';
 import { initSplashScreen } from './ui/splashScreen.js';
 
 async function bootstrapApp() {
-  // 0. Initialize SPOTR Tactical Splash Screen (dismisses after 3.5s or silently on Space/controller/tap)
+  window.__spotrBootstrapped = true;
+  // 0. Initialize SPOTR Tactical Splash Screen (dismisses after 1.1s or silently on Space/controller/tap)
   initSplashScreen();
 
   // 1. Restore saved user settings
@@ -48,6 +50,7 @@ async function bootstrapApp() {
   initGamepadController();
   initSidebarAndTopControls(videoEl, mainCanvas);
   initVideoBrowser();
+  initDetectionsScreen(subscribeState);
 
   // 4. Handle direct screen and testing query parameters if specified (after listeners are wired)
   const params = new URLSearchParams(window.location.search);

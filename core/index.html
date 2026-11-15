@@ -156,13 +156,20 @@
           <span id="bufferText">20s</span>
         </button>
 
-        <button id="btnSwitchScreen" class="radar-btn radar-btn-pill" title="Open Saved Video Clips">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
-          </svg>
-          <span>Clips</span>
-          <span id="clipCountBadge" style="opacity:0.8; font-family:var(--font-mono);">0</span>
-        </button>
+        <div class="archive-split-pill">
+          <button id="btnSwitchScreen" class="radar-btn radar-btn-pill archive-pill-half" title="Open Saved Video Clips">
+            <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
+            </svg>
+            <span>Clips</span>
+            <span id="clipCountBadge" style="opacity:0.85; font-family:var(--font-mono);">0</span>
+          </button>
+          <span class="archive-pill-sep" aria-hidden="true"></span>
+          <button id="btnOpenHitsTab" class="radar-btn radar-btn-pill archive-pill-half" title="Open Spatial Motion Hits Map">
+            <span id="hitCountBadge" class="hit-count-num">0</span>
+            <span>Hits</span>
+          </button>
+        </div>
       </nav>
 
       <!-- STREAM TELEMETRY HUD OVERLAY -->
@@ -203,6 +210,15 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
               </svg>
               <span class="dock-btn-lbl">Heatmap</span>
+              <span id="heatmapHitBadge" class="dock-hit-badge hidden">0</span>
+            </button>
+
+            <button id="btnLiveRezero" class="radar-btn dock-btn-dimmed" disabled title="Re-Zero Background Reference (Clear Heatmap)">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/>
+                <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+              </svg>
+              <span class="dock-btn-lbl">Re-Zero</span>
             </button>
 
             <button id="btnToggleVoiceAnnounce" class="radar-btn radar-btn-muted" title="Voice Announcements: MUTED">
@@ -235,18 +251,19 @@
               <button id="mainZoomMinus" class="radar-btn" title="Zoom Out">−</button>
               <button id="mainZoomBadge" class="zoom-readout" title="Tap to reset 1.0x">1.0x</button>
               <button id="mainZoomPlus" class="radar-btn" title="Zoom In">+</button>
-              <button id="mainZoomReset" class="radar-btn radar-btn-sm hidden" title="Reset Pan &amp; Zoom">1:1</button>
+              <button id="mainZoomReset" class="radar-btn radar-btn-sm dock-btn-dimmed" disabled title="Reset Pan &amp; Zoom">1:1</button>
             </div>
 
             <div class="dock-divider"></div>
 
-            <div id="replayTriggerPod" style="display:inline-flex;">
+            <div id="replayTriggerPod" style="display:inline-flex; gap:4px; align-items:center;">
               <button id="btnReplay20s" class="radar-btn radar-btn-primary" title="Instant Replay &amp; Save Clip">
                 <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
                 </svg>
                 <span id="replayBtnLabel">Replay</span>
               </button>
+              <button id="btnLiveSnapshot" class="radar-btn" title="Save Annotated PNG Snapshot (Frame + Reticle)" style="padding:0 9px;">📷</button>
             </div>
           </div>
         </div>
@@ -282,24 +299,53 @@
     <!-- SCREEN 2: FULLSCREEN STORED VIDEO PLAYER                            -->
     <!-- =================================================================== -->
     <section id="screenGallery" class="screen-view hidden">
-      <div class="gallery-fullscreen-stage">
+      <div id="galleryClipsStage" class="gallery-fullscreen-stage">
         <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
       </div>
 
-      <!-- Top-Left: Navigation, Slide-Over Clips Toggle & Zoom -->
+      <!-- Spatial Detections Map Stage (Hidden unless 'Hits' tab selected) -->
+      <div id="hitsStage" class="hits-fullscreen-stage hidden">
+        <div id="hitsMapViewport" class="hits-map-viewport">
+          <div id="hitsTransformLayer" class="hits-transform-layer">
+            <img id="hitsRefImage" class="hits-ref-image hidden" alt="Detection reference frame" />
+            <div id="hitsIgnoreLayer" class="hits-ignore-layer"></div>
+            <div id="hitsDrawPreview" class="hits-draw-preview hidden"></div>
+            <div id="hitsCrosshairRef" class="hits-crosshair-ref" aria-hidden="true"></div>
+            <div id="hitsPinsLayer" class="hits-pins-layer"></div>
+          </div>
+          <div id="hitsEmptyBanner" class="hits-empty-banner">
+            <strong>No motion detections logged yet</strong>
+            <span>Turn on Heatmap on the Live view to capture numbered hits &amp; ignore wind zones.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top-Left: Navigation, Archive Mode (Clips | Hits), Slide-Over Drawer & Zoom -->
       <nav class="floating-strip strip-top-left">
         <button id="btnBackToLive" class="radar-btn radar-btn-pill" title="Return to Live Camera Stream">
           <span>← Live</span>
         </button>
 
+        <div class="gallery-tab-switch" role="tablist" aria-label="Archive Section">
+          <button id="tabArchiveClips" type="button" class="gallery-tab-btn active">Clips</button>
+          <button id="tabArchiveHits" type="button" class="gallery-tab-btn">Hits <span id="galleryHitsCountBadge" class="hit-count-num">0</span></button>
+        </div>
+
         <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-pill" title="Show / Hide Saved Clips">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
           <span>Clips</span>
         </button>
 
-        <div class="control-pod control-pod-top" style="border-radius:var(--radius-pill);">
+        <button id="btnToggleHitsDrawer" class="radar-btn radar-btn-pill hidden" title="Show / Hide Detection Log">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+          <span>Log</span>
+        </button>
+
+        <div id="galleryZoomPod" class="control-pod control-pod-top" style="border-radius:var(--radius-pill);">
           <button id="galleryZoomMinus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom Out">−</button>
           <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
           <button id="galleryZoomPlus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom In">+</button>
@@ -307,14 +353,15 @@
         </div>
       </nav>
 
-      <!-- Top-Right: Active Clip Info + Export & Delete (Safely separated from playback bar) -->
+      <!-- Top-Right: Active Clip Info (Clips tab) or Mask/Re-Zero Pill (Hits tab) -->
       <div class="floating-strip strip-top-right">
-        <div class="gallery-info-pill">
+        <div id="galleryClipInfoPill" class="gallery-info-pill">
           <div style="text-align:right;">
             <div id="activeClipTitle" class="clip-name">NO CLIP SELECTED</div>
             <div id="activeClipMeta" class="clip-meta">—</div>
           </div>
           <div style="width:1px; height:26px; background:var(--radar-border);"></div>
+          <button id="btnGallerySnapshot" class="radar-btn radar-btn-sm" title="Save Annotated PNG Snapshot">📷</button>
           <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video (.webm)">Export</button>
           <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Active Recording">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -323,9 +370,16 @@
             </svg>
           </button>
         </div>
+
+        <div id="hitsTopRightPill" class="gallery-info-pill hidden">
+          <button id="btnToggleMaskDraw" class="radar-btn radar-btn-sm" title="Drag on the map to draw an Ignore Wind/Foliage box">Mask: OFF</button>
+          <button id="btnClearMasks" class="radar-btn radar-btn-sm hidden" title="Remove All Ignore Mask Zones">0 Masks</button>
+          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background Reference">Re-Zero</button>
+          <button id="btnHitsClear" class="radar-btn radar-btn-sm radar-btn-danger" title="Clear All Logged Hits">Clear</button>
+        </div>
       </div>
 
-      <!-- Collapsible Floating Left Drawer for Saved Clips (Hidden by default so video is unobstructed) -->
+      <!-- Collapsible Floating Left Drawer for Saved Clips -->
       <aside id="galleryDrawer" class="gallery-floating-drawer hidden">
         <header class="panel-header">
           <span class="panel-title">Saved Clips</span>
@@ -334,9 +388,18 @@
         <div id="clipsList" class="clips-list-container"></div>
       </aside>
 
-      <!-- Bottom Floating Playback Bar (Pure playback controls only) -->
+      <!-- Collapsible Floating Left Drawer for Spatial Detections Log (Closed by default) -->
+      <aside id="hitsDrawer" class="gallery-floating-drawer hidden">
+        <header class="panel-header">
+          <span class="panel-title">Detection Log</span>
+          <button id="btnCloseHitsDrawer" class="radar-btn radar-btn-sm" style="border-color:transparent; background:transparent;" title="Hide Log">✕</button>
+        </header>
+        <div id="hitsLogList" class="clips-list-container"></div>
+      </aside>
+
+      <!-- Bottom Floating Playback Bar (Clips vs Hits Action Pill) -->
       <footer class="strip-bottom">
-        <div class="gallery-transport-bar">
+        <div id="galleryClipsBar" class="gallery-transport-bar">
           <div class="player-btn-group">
             <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-primary" title="Play / Pause">⏸</button>
             <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
@@ -353,6 +416,22 @@
               <input id="galleryScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider cctv-slider-input" />
             </div>
             <span id="galleryTimeReadout" class="slider-val">0.0s / 20.0s</span>
+          </div>
+        </div>
+
+        <!-- Compact Single-Row Action Bar for Spatial Detections Map -->
+        <div id="hitsBottomBar" class="hits-bottom-bar hidden">
+          <div class="hits-nav-group">
+            <button id="btnHitPrev" class="radar-btn radar-btn-sm" title="Previous Detection">◀</button>
+            <span id="hitSelectedSummary" class="hits-summary-readout">No hits</span>
+            <button id="btnHitNext" class="radar-btn radar-btn-sm" title="Next Detection">▶</button>
+          </div>
+
+          <div class="hits-actions-group">
+            <button id="btnHitAimLoupe" class="radar-btn radar-btn-sm radar-btn-primary" title="Snap Digital Loupe Crosshair to Selected Hit & Return to Live">Aim Loupe</button>
+            <button id="btnHitPlayClip" class="radar-btn radar-btn-sm" title="Jump to Hit Timestamp in Replay">▶ 5s</button>
+            <button id="btnHitIgnoreArea" class="radar-btn radar-btn-sm" title="Ignore Future Motion Around This Pin">🚫 Ignore</button>
+            <button id="btnHitSnapshot" class="radar-btn radar-btn-sm" title="Save Annotated Detections PNG Snapshot">📷</button>
           </div>
         </div>
       </footer>
@@ -542,6 +621,14 @@
                 <button type="button" id="btnHeatmapInfinite" class="radar-btn radar-btn-sm duration-preset-btn" title="Infinite Persistence">∞</button>
               </div>
               <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" />
+            </div>
+
+            <div class="settings-card-header" style="margin-top:8px;">
+              <div>
+                <span class="settings-label" style="font-size:12px;">Auto-Save Clip on Hit</span>
+                <div style="font-size:11px; color:var(--radar-text-muted);">Saves RAM buffer clip when motion triggers (12s cooldown).</div>
+              </div>
+              <button id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
             </div>
           </div>
 
@@ -885,6 +972,7 @@
         <div class="cm-tab-bar">
           <button id="tabBtnGamepad" class="cm-tab-btn active">Gamepad / Joystick</button>
           <button id="tabBtnRemote" class="cm-tab-btn">Bluetooth Ring &amp; Remote</button>
+          <button id="tabBtnMicro" class="cm-tab-btn">8BitDo Micro (K-Mode)</button>
         </div>
 
         <div class="cm-profile-bar">
@@ -893,6 +981,7 @@
               <option value="default">Default DualShock 4</option>
               <option value="simplified">Simplified Field Mode</option>
               <option value="flight">Flight / Arcade Stick</option>
+              <option value="8bitdo_micro">8BitDo Micro (K-Mode)</option>
             </optgroup>
             <optgroup label="My Custom Profiles" id="optgroupCustomProfiles"></optgroup>
           </select>
@@ -1139,6 +1228,145 @@
             </div>
           </div>
         </div>
+
+        <!-- TAB 3: 8BITDO MICRO (K-MODE BLUETOOTH KEYBOARD) -->
+        <div id="viewMicroConfig" class="cm-view-tab hidden">
+          <div class="controller-workspace-grid">
+            <div class="cm-hardware-col">
+              <div class="settings-card">
+                <div class="settings-card-header">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="settings-label">8BitDo Micro</span>
+                    <span class="micro-mode-pill">SWITCH → [ K ]</span>
+                  </div>
+                  <button id="btnApplyMicroPreset" class="radar-btn radar-btn-sm radar-btn-primary">Apply K-Mode Preset</button>
+                </div>
+
+                <p class="micro-hint-text">
+                  Set the bottom switch to <strong>K</strong> (HID Keyboard) for zero-sleep Bluetooth control with 16 tactile switches, or set to <strong>D</strong> and use the Gamepad tab.
+                </p>
+
+                <!-- Interactive 16-Button 8BitDo Micro Schematic SVG -->
+                <div class="remote-device-box" id="microSvgContainer">
+                  <svg id="microDeviceSvg" class="remote-device-svg micro-device-svg" viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Shoulder bumpers (L2 / L1 / R1 / R2) -->
+                    <g class="micro-visual-btn" data-micro-btn="l2">
+                      <rect x="26" y="10" width="44" height="22" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="48" y="25" fill="#cbd5e1" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">L2</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="l1">
+                      <rect x="76" y="14" width="46" height="20" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="99" y="28" fill="#cbd5e1" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">L1</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="r1">
+                      <rect x="218" y="14" width="46" height="20" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="241" y="28" fill="#cbd5e1" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">R1</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="r2">
+                      <rect x="270" y="10" width="44" height="22" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="292" y="25" fill="#cbd5e1" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">R2</text>
+                    </g>
+
+                    <!-- Body Shell -->
+                    <rect x="16" y="34" width="308" height="156" rx="34" fill="#141820" stroke="#2c3340" stroke-width="2"/>
+
+                    <!-- Left Cross D-Pad -->
+                    <g class="micro-visual-btn" data-micro-btn="up">
+                      <rect x="64" y="64" width="30" height="30" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="79" y="83" fill="#e2e8f0" font-size="11" text-anchor="middle">▲</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="left">
+                      <rect x="34" y="94" width="30" height="30" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="49" y="113" fill="#e2e8f0" font-size="11" text-anchor="middle">◀</text>
+                    </g>
+                    <rect x="64" y="94" width="30" height="30" rx="4" fill="#171c26" stroke="#262e3d" stroke-width="1"/>
+                    <g class="micro-visual-btn" data-micro-btn="right">
+                      <rect x="94" y="94" width="30" height="30" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="109" y="113" fill="#e2e8f0" font-size="11" text-anchor="middle">▶</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="down">
+                      <rect x="64" y="124" width="30" height="30" rx="6" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="79" y="143" fill="#e2e8f0" font-size="11" text-anchor="middle">▼</text>
+                    </g>
+
+                    <!-- Center Utility Cluster (-, +, Star, Home) -->
+                    <g class="micro-visual-btn" data-micro-btn="minus">
+                      <rect x="137" y="82" width="26" height="16" rx="8" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="150" y="94" fill="#e2e8f0" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">−</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="plus">
+                      <rect x="177" y="82" width="26" height="16" rx="8" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="190" y="94" fill="#e2e8f0" font-family="monospace" font-size="12" font-weight="bold" text-anchor="middle">+</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="star">
+                      <circle cx="150" cy="126" r="12" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="150" y="130" fill="#fbbf24" font-size="12" text-anchor="middle">★</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="home">
+                      <circle cx="190" cy="126" r="12" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="190" y="130" fill="#f97316" font-size="11" text-anchor="middle">⌂</text>
+                    </g>
+
+                    <!-- Right ABXY Diamond (8BitDo Micro Switch Layout: X top, Y left, A right, B bottom) -->
+                    <g class="micro-visual-btn" data-micro-btn="x">
+                      <circle cx="261" cy="76" r="15" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="261" y="80" fill="#e2e8f0" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle">X</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="y">
+                      <circle cx="231" cy="106" r="15" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="231" y="110" fill="#e2e8f0" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle">Y</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="a">
+                      <circle cx="291" cy="106" r="15" fill="#252c3a" stroke="#f97316" stroke-width="1.8"/>
+                      <text x="291" y="110" fill="#f97316" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle">A</text>
+                    </g>
+                    <g class="micro-visual-btn" data-micro-btn="b">
+                      <circle cx="261" cy="136" r="15" fill="#1e2430" stroke="#353d4d" stroke-width="1.5"/>
+                      <text x="261" y="140" fill="#e2e8f0" font-family="monospace" font-size="11" font-weight="bold" text-anchor="middle">B</text>
+                    </g>
+
+                    <!-- Bottom Switch Indicator (S / D / K) -->
+                    <rect x="136" y="172" width="68" height="22" rx="6" fill="#0b0f17" stroke="#334155" stroke-width="1.2"/>
+                    <text x="150" y="187" fill="#64748b" font-family="monospace" font-size="10" text-anchor="middle">S</text>
+                    <text x="170" y="187" fill="#64748b" font-family="monospace" font-size="10" text-anchor="middle">D</text>
+                    <rect x="181" y="175" width="18" height="16" rx="4" fill="#f97316"/>
+                    <text x="190" y="187" fill="#0b0f17" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">K</text>
+                  </svg>
+                </div>
+
+                <div id="microLastSignal" class="ring-signal-readout">Click any button above to rebind or test Micro</div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:4px;">
+                  <span style="font-size:12px; color:var(--radar-text-muted);">D-Pad Mode (or press −)</span>
+                  <button id="btnMicroDpadMode" class="radar-btn radar-btn-sm radar-btn-active">D-Pad: PAN VIEW</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="cm-mapping-col">
+              <div class="settings-card" style="flex:1; display:flex; flex-direction:column;">
+                <div class="settings-card-header">
+                  <span class="settings-label">16-Button Micro K-Mode Matrix</span>
+                  <button id="btnResetMicroPreset" class="radar-btn radar-btn-sm">Reset Micro Preset</button>
+                </div>
+
+                <div class="cm-table-wrap">
+                  <table class="cm-mapping-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 18%;">Button</th>
+                        <th style="width: 44%;">SPOTR Action</th>
+                        <th style="width: 22%;">Key Code</th>
+                        <th style="width: 16%; text-align:center;">Learn</th>
+                      </tr>
+                    </thead>
+                    <tbody id="microMappingTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Custom Profile Name Modal -->
@@ -1171,5 +1399,47 @@
   </div>
 
   <script type="module" src="./js/main.js"></script>
+  <script>
+    (function () {
+      var splash = document.getElementById('splashScreen');
+      if (!splash) return;
+
+      function hideSplashFallback() {
+        splash.classList.add('splash-hidden');
+        splash.style.pointerEvents = 'none';
+        splash.style.opacity = '0';
+        setTimeout(function () { splash.style.display = 'none'; }, 350);
+      }
+
+      if (window.location.protocol === 'file:') {
+        var wrap = splash.querySelector('.splash-content');
+        if (wrap) {
+          var notice = document.createElement('div');
+          notice.id = 'fileProtocolNotice';
+          notice.style.cssText = 'margin-top:18px;padding:14px 18px;border-radius:12px;background:rgba(20,24,32,0.95);border:1px solid rgba(249,115,22,0.55);color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;font-size:13px;max-width:460px;text-align:center;line-height:1.45;';
+          notice.innerHTML =
+            '<strong style="color:#f97316;display:block;margin-bottom:6px;">Local Server Required (Opened via file://)</strong>' +
+            'Browsers block ES module scripts when opening <code>core/index.html</code> directly from disk.<br>' +
+            'Run <code>start_spotr.bat</code> or <code>python server.py</code>, then open <code>http://localhost:8080</code>.' +
+            '<div style="display:flex;gap:10px;justify-content:center;margin-top:12px;">' +
+            '<a href="http://localhost:8080" style="padding:7px 14px;border-radius:8px;background:#f97316;color:#0b0f17;font-weight:700;text-decoration:none;">Open localhost:8080</a>' +
+            '<button type="button" id="btnDismissFileNotice" style="padding:7px 14px;border-radius:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#e2e8f0;cursor:pointer;">Dismiss Splash</button>' +
+            '</div>';
+          wrap.appendChild(notice);
+          var dismissBtn = document.getElementById('btnDismissFileNotice');
+          if (dismissBtn) dismissBtn.addEventListener('click', hideSplashFallback);
+        }
+        return;
+      }
+
+      // Safety net for HTTP if module bootstrap fails or stalls
+      setTimeout(function () {
+        if (!window.__spotrBootstrapped && !splash.classList.contains('splash-hidden')) {
+          console.warn('SPOTR module bootstrap stalled; dismissing splash fallback.');
+          hideSplashFallback();
+        }
+      }, 3000);
+    })();
+  </script>
 </body>
 </html>

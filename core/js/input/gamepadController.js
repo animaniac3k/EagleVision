@@ -1278,9 +1278,13 @@ function dispatchControllerInputs(actionState) {
     updateState({ lastGamepadAction: 'TRIGGER: R2 (RIGHT MOUSE CLICK)' });
   }
 
-  // Options - Open / Close Settings (Options) Screen
+  // Options - Honor custom binding first, fallback to Open / Close Settings
   if (isJustPressed('options')) {
-    if (screen === 'settings') {
+    const custom = getBoundAction('options');
+    if (custom && custom !== 'open_settings') {
+      executeMappedAction(custom);
+      updateState({ lastGamepadAction: `BUTTON: OPTIONS (${custom.toUpperCase()})` });
+    } else if (screen === 'settings') {
       document.getElementById('btnSettingsBackToLive')?.click();
       updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT SETTINGS)' });
     } else if (screen === 'reticle') {
@@ -1292,37 +1296,50 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // Share - Trigger 20s Instant Replay / Reset Reticle Defaults
+  // Share - Honor custom binding on Live/Other, or Reset on Reticle
   if (isJustPressed('share')) {
     if (screen === 'reticle') {
       document.getElementById('btnResetReticle')?.click();
       window.reticleGamepadAPI?.showToast('RETICLE: RESET PRESET DEFAULTS', 'tri');
       updateState({ lastGamepadAction: 'RETICLE: RESET DEFAULTS' });
     } else {
-      document.getElementById('btnReplay20s')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: SHARE (INSTANT REPLAY)' });
+      const act = getBoundAction('share') || 'instant_replay';
+      executeMappedAction(act);
+      updateState({ lastGamepadAction: `BUTTON: SHARE (${act.toUpperCase()})` });
     }
   }
 
-  // L3 (Left Stick Click) - Circle Backward through GUI Color Themes on Live Feed, or Audition on Reticle
+  // L3 (Left Stick Click)
   if (isJustPressed('l3')) {
-    if (screen === 'live') {
-      cycleTheme(-1);
-    } else if (screen === 'reticle') {
+    if (screen === 'reticle') {
       const res = window.reticleGamepadAPI?.activate();
       window.reticleGamepadAPI?.showToast(res || 'AUDITION', 'lstick');
       updateState({ lastGamepadAction: `RETICLE: ${res || 'AUDITION'}` });
+    } else {
+      const act = getBoundAction('l3');
+      if (act && act !== 'theme_cycle') {
+        executeMappedAction(act);
+        updateState({ lastGamepadAction: `BUTTON: L3 (${act.toUpperCase()})` });
+      } else if (screen === 'live') {
+        cycleTheme(-1);
+      }
     }
   }
 
-  // R3 (Right Stick Click) - Circle Forward through GUI Color Themes on Live Feed, or Reset on Reticle
+  // R3 (Right Stick Click)
   if (isJustPressed('r3')) {
-    if (screen === 'live') {
-      cycleTheme(1);
-    } else if (screen === 'reticle') {
+    if (screen === 'reticle') {
       document.getElementById('btnResetReticle')?.click();
       window.reticleGamepadAPI?.showToast('RETICLE: RESET PRESET DEFAULTS', 'rstick');
       updateState({ lastGamepadAction: 'RETICLE: RESET DEFAULTS' });
+    } else {
+      const act = getBoundAction('r3');
+      if (act) {
+        executeMappedAction(act);
+        updateState({ lastGamepadAction: `BUTTON: R3 (${act.toUpperCase()})` });
+      } else if (screen === 'live') {
+        cycleTheme(1);
+      }
     }
   }
 
@@ -1392,12 +1409,11 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // PS Button - Toggle Declutter Mode
+  // PS Button - Honor custom binding, default Declutter Toggle
   if (isJustPressed('ps')) {
-    updateState({
-      uiDecluttered: !appState.uiDecluttered,
-      lastGamepadAction: 'BUTTON: PS BUTTON (DECLUTTER TOGGLE)'
-    });
+    const act = getBoundAction('ps') || 'toggle_declutter';
+    executeMappedAction(act);
+    updateState({ lastGamepadAction: `BUTTON: PS (${act.toUpperCase()})` });
   }
 
   // Save current states for edge detection in subsequent reports/frames

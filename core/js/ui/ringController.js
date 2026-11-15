@@ -299,7 +299,20 @@ export function initRingController() {
       return;
     }
 
-    // C. Live Camera Feed — Direct 1-to-1 Pan (only when already zoomed in via Center)
+    // C. Live Camera Feed — Aim Loupe OR Direct 1-to-1 Pan
+    if (appState.dpadMode === 'aim') {
+      const aimStep = ((appState.reticleAimSpeed ?? 50) / 100) * 0.022;
+      let rx = appState.roiX ?? 0.5;
+      let ry = appState.roiY ?? 0.5;
+      if (act === 'UP') ry = Math.max(0.03, ry - aimStep);
+      if (act === 'DOWN') ry = Math.min(0.97, ry + aimStep);
+      if (act === 'LEFT') rx = Math.max(0.03, rx - aimStep);
+      if (act === 'RIGHT') rx = Math.min(0.97, rx + aimStep);
+      updateState({ roiX: rx, roiY: ry, pipEnabled: true, roiTargetVisible: true });
+      flashRingHud(`LOUPE (${Math.round(rx * 100)}%, ${Math.round(ry * 100)}%)`);
+      return;
+    }
+
     const zoom = appState.mainZoom || 1.0;
     if (zoom <= 1.01) {
       return;
@@ -424,6 +437,10 @@ export function initRingController() {
         return;
       }
 
+      if (window.isSpotrRebindingKey?.()) {
+        return;
+      }
+
       logRawSignal(`keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
 
       // Do not hijack typing if focus is inside an input, textarea, select, or editable element
@@ -438,6 +455,14 @@ export function initRingController() {
 
       const code = extractKeySignal(e);
       if (!code) return;
+      if (
+        !learningAction &&
+        appState.activeControllerProfile === '8bitdo_micro' &&
+        !Object.keys(appState.ringKeyMap || {}).length &&
+        !/^(Page|Media|AudioVolume)/.test(code)
+      ) {
+        return;
+      }
       lastKeyDownMs = performance.now();
 
       const handled = handleRingSignal(code);
@@ -454,6 +479,7 @@ export function initRingController() {
     'keyup',
     (e) => {
       logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`, true);
+      if (window.isSpotrRebindingKey?.()) return;
       if (performance.now() - lastKeyDownMs <= 300) return;
       const activeEl = document.activeElement;
       const tag = activeEl?.tagName;
@@ -465,6 +491,14 @@ export function initRingController() {
       }
       const code = extractKeySignal(e);
       if (!code || code === 'Escape') return;
+      if (
+        !learningAction &&
+        appState.activeControllerProfile === '8bitdo_micro' &&
+        !Object.keys(appState.ringKeyMap || {}).length &&
+        !/^(Page|Media|AudioVolume)/.test(code)
+      ) {
+        return;
+      }
       logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
       const handled = handleRingSignal(code);
       if (handled) {

@@ -330,8 +330,22 @@ export function initZoomWindow() {
     crosshairEl.classList.toggle('hidden', !showCrosshair);
     btnPipToggleRoi.classList.toggle('radar-btn-active', state.roiTargetVisible);
     pipZoomBadge.textContent = `${state.pipZoom.toFixed(1)}x`;
-    if (patch && (patch.roiX !== undefined || patch.roiY !== undefined)) {
+    if (
+      patch &&
+      (patch.roiX !== undefined ||
+        patch.roiY !== undefined ||
+        patch.currentScreen !== undefined ||
+        patch.roiTargetVisible !== undefined ||
+        patch.pipEnabled !== undefined ||
+        patch.mainZoom !== undefined ||
+        patch.mainPanX !== undefined ||
+        patch.mainPanY !== undefined)
+    ) {
       syncRoiCrosshairPosition();
+      // When returning to Live from another screen, #screenLive may still be unhiding during this dispatch
+      if (state.currentScreen === 'live') {
+        requestAnimationFrame(syncRoiCrosshairPosition);
+      }
     }
   });
 }

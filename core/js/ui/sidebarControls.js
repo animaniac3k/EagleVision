@@ -7,7 +7,8 @@ import {
   enumerateCameras,
   startCameraStream,
   wakeCameraPipeline,
-  checkRtspGatewayStatus
+  checkRtspGatewayStatus,
+  getGatewayBaseUrl
 } from '../camera/streamManager.js';
 import {
   startMemoryBuffer,
@@ -17,7 +18,7 @@ import {
   getEstimatedBufferMB
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
-import { speakDetectionAnnouncement, stopVoiceAnnouncement } from '../renderer/compositor.js';
+import { speakDetectionAnnouncement, stopVoiceAnnouncement, rezeroHeatmap, captureAnnotatedSnapshot } from '../renderer/compositor.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
@@ -92,6 +93,7 @@ export function initSidebarAndTopControls(videoEl) {
   const screenSettings = document.getElementById('screenSettings');
   const screenReticle = document.getElementById('screenReticle');
   const screenController = document.getElementById('screenController');
+  const screenGallery = document.getElementById('screenGallery');
 
   const btnDeclutterUi = document.getElementById('btnDeclutterUi');
   const btnRestoreUi = document.getElementById('btnRestoreUi');
@@ -217,9 +219,39 @@ export function initSidebarAndTopControls(videoEl) {
     toggleQuickTool();
   });
 
-  // 3. Toggle Localized Micro-Change Heatmap from Main Interface
+  // 3. Toggle Localized Micro-Change Heatmap (double-tap also re-zeros background)
+  let lastHeatmapTapMs = 0;
+  let rezeroFeedbackTimer = null;
+  const btnLiveRezero = document.getElementById('btnLiveRezero');
+  const triggerLiveRezero = () => {
+    rezeroHeatmap();
+    if (btnLiveRezero) {
+      btnLiveRezero.classList.add('radar-btn-active');
+      clearTimeout(rezeroFeedbackTimer);
+      rezeroFeedbackTimer = setTimeout(() => {
+        btnLiveRezero.classList.remove('radar-btn-active');
+      }, 900);
+    }
+  };
+
+  btnLiveRezero?.addEventListener('click', triggerLiveRezero);
+
   btnToggleHeatmap.addEventListener('click', () => {
+    const now = performance.now();
+    if (now - lastHeatmapTapMs < 350 && appState.heatmapEnabled) {
+      lastHeatmapTapMs = 0;
+      triggerLiveRezero();
+      return;
+    }
+    lastHeatmapTapMs = now;
     updateState({ heatmapEnabled: !appState.heatmapEnabled });
+    saveSettings(appState);
+  });
+
+  // 3b. Save Annotated PNG Snapshot (Live Frame + Reticle)
+  const btnLiveSnapshot = document.getElementById('btnLiveSnapshot');
+  btnLiveSnapshot?.addEventListener('click', () => {
+    captureAnnotatedSnapshot();
   });
 
   // 4. Show/Hide Stream Telemetry HUD
@@ -340,6 +372,7 @@ export function initSidebarAndTopControls(videoEl) {
         panelSourceRtsp.classList.remove('hidden');
         panelSourceRtsp.style.display = 'flex';
       }
+
       checkRtspGatewayStatus().then((st) => {
         if (!st.available) {
           if (textRtspStatus) textRtspStatus.textContent = 'GATEWAY: OFFLINE (Run server.py)';
@@ -413,7 +446,7 @@ export function initSidebarAndTopControls(videoEl) {
 
       // If Bresser stream is currently live, switch channels immediately
       if (appState.isRtspStream && appState.activeDeviceId?.includes('live/tcp/')) {
-        await fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
+        await fetch(`${getGatewayBaseUrl()}/api/rtsp/stop`, { method: 'POST' }).catch(() => {});
         const targetUrl = (inputBresserRtspUrl?.value || `rtsp://${(inputBresserIp?.value || '192.168.0.1').trim()}/live/tcp/${selectedBresserChannel}`).trim();
         const lbl = btn.dataset.label || `Bresser (${selectedBresserChannel})`;
         await startCameraStream(videoEl, 'rtsp:' + targetUrl, lbl);
@@ -455,7 +488,7 @@ export function initSidebarAndTopControls(videoEl) {
     }
     if (textRtspStatus) textRtspStatus.textContent = `WAKING MEDIA PIPELINE AT ${ip}...`;
 
-    await fetch('/api/rtsp/stop', { method: 'POST' }).catch(() => {});
+    await fetch(`${getGatewayBaseUrl()}/api/rtsp/stop`, { method: 'POST' }).catch(() => {});
     const wakeResult = await wakeCameraPipeline(ip, '/app/getmediainfo');
 
     if (wakeResult && wakeResult.success) {
@@ -637,6 +670,18 @@ export function initSidebarAndTopControls(videoEl) {
   const inputHeatmapDuration = document.getElementById('inputHeatmapDuration');
   const btnHeatmapInfinite = document.getElementById('btnHeatmapInfinite');
   const btnToggleHeatmapSpeech = document.getElementById('btnToggleHeatmapSpeech');
+  const btnToggleHeatmapAutoSave = document.getElementById('btnToggleHeatmapAutoSave');
+  const syncAutoSaveUI = (on) => {
+    if (!btnToggleHeatmapAutoSave) return;
+    btnToggleHeatmapAutoSave.classList.toggle('radar-btn-active', on);
+    btnToggleHeatmapAutoSave.textContent = on ? 'AUTO-SAVE: ON' : 'AUTO-SAVE: OFF';
+  };
+  syncAutoSaveUI(Boolean(appState.heatmapAutoSave));
+  btnToggleHeatmapAutoSave?.addEventListener('click', () => {
+    const next = !appState.heatmapAutoSave;
+    updateState({ heatmapAutoSave: next });
+    saveSettings(appState);
+  });
 
   const sliderVoicePitch = document.getElementById('sliderVoicePitch');
   const valVoicePitch = document.getElementById('valVoicePitch');
@@ -955,7 +1000,7 @@ export function initSidebarAndTopControls(videoEl) {
   }
 
   // Reactive UI Sync
-  subscribeState((state) => {
+  subscribeState((state, patch = {}) => {
     if (screenLive) {
       screenLive.classList.toggle('ui-decluttered', Boolean(state.uiDecluttered));
     }
@@ -969,6 +1014,9 @@ export function initSidebarAndTopControls(videoEl) {
       const isReticle = state.currentScreen === 'reticle';
       const isController = state.currentScreen === 'controller';
       const isLive = state.currentScreen === 'live';
+      const isGallery = state.currentScreen === 'gallery';
+
+      if (screenGallery) screenGallery.classList.toggle('hidden', !isGallery);
 
       screenLive.classList.toggle('hidden', !isLive);
       if (screenSettings) screenSettings.classList.toggle('hidden', !isSettings);
@@ -981,7 +1029,12 @@ export function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+    if (btnLiveRezero) {
+      btnLiveRezero.disabled = !state.heatmapEnabled;
+      btnLiveRezero.classList.toggle('dock-btn-dimmed', !state.heatmapEnabled);
+    }
     syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled));
+    syncAutoSaveUI(Boolean(state.heatmapAutoSave));
     btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
@@ -1004,7 +1057,9 @@ export function initSidebarAndTopControls(videoEl) {
     memBarUsedFill.style.width = `${usedPct}%`;
 
     mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
-    mainZoomReset.classList.toggle('hidden', state.mainZoom <= 1.01);
+    const atDefaultZoom = state.mainZoom <= 1.01;
+    mainZoomReset.disabled = atDefaultZoom;
+    mainZoomReset.classList.toggle('dock-btn-dimmed', atDefaultZoom);
 
     btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
     btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
@@ -1019,7 +1074,7 @@ export function initSidebarAndTopControls(videoEl) {
         ? (state.gamepadName.split('(')[0].trim() || 'Controller Connected')
         : 'DISCONNECTED (PRESS ANY BUTTON)';
     }
-    if (liveActionBanner && state.lastGamepadAction) {
+    if (liveActionBanner && patch.lastGamepadAction !== undefined && state.lastGamepadAction) {
       liveActionBanner.textContent = state.lastGamepadAction;
     }
 

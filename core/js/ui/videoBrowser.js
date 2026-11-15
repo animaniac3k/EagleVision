@@ -5,11 +5,12 @@
  * using createImageBitmap lookahead decoding, with a collapsible left clip
  * drawer and floating bottom transport bar.
  */
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { createJpegFramePlayer } from '../recorder/jpegFramePlayer.js';
 import { listVideoClips, getVideoClip, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
 import { renderCctvTrack } from './cctvScrubBar.js';
 import { shouldHoldCanvasPan } from './ringController.js';
+import { exportAnnotatedCanvasPng } from '../renderer/compositor.js';
 
 let cachedClips = [];
 let selectedClipId = null;
@@ -235,6 +236,23 @@ async function selectClip(clip, autoPlay = true) {
   rafId = requestAnimationFrame(galleryTickLoop);
 }
 
+/**
+ * Opens the Stored Clips Gallery directly on a saved clip seeked to a target timestamp (seconds).
+ */
+export async function openClipAtTime(clipId, startSec = 0) {
+  await refreshGalleryClips(false);
+  const target = cachedClips.find((c) => c.id === clipId);
+  if (!target) return false;
+  updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
+  await selectClip(target, true);
+  if (selectedClipId === target.id && clipDuration > 0) {
+    playheadSec = Math.max(0, Math.min(Math.max(0.1, clipDuration - 0.1), Number(startSec) || 0));
+    lastTickMs = performance.now();
+    renderGalleryFrame();
+  }
+  return true;
+}
+
 export function initVideoBrowser() {
   const screenLive = document.getElementById('screenLive');
   const screenGallery = document.getElementById('screenGallery');
@@ -266,6 +284,7 @@ export function initVideoBrowser() {
   const zoomBadge = document.getElementById('galleryZoomBadge');
 
   function syncGalleryZoomUI() {
+    if (appState.galleryArchiveTab === 'hits') return;
     if (zoomBadge) zoomBadge.textContent = `${galleryZoom.toFixed(1)}x`;
     if (btnZoomReset) btnZoomReset.classList.toggle('hidden', galleryZoom <= 1.01);
     canvasEl.style.cursor = galleryZoom > 1.01 ? 'grab' : 'default';
@@ -273,6 +292,7 @@ export function initVideoBrowser() {
   }
 
   btnZoomMinus?.addEventListener('click', () => {
+    if (appState.galleryArchiveTab === 'hits') return;
     galleryZoom = Math.max(1.0, Math.round((galleryZoom - 0.5) * 10) / 10);
     if (galleryZoom <= 1.01) {
       galleryPanX = 0;
@@ -282,11 +302,13 @@ export function initVideoBrowser() {
   });
 
   btnZoomPlus?.addEventListener('click', () => {
+    if (appState.galleryArchiveTab === 'hits') return;
     galleryZoom = Math.min(8.0, Math.round((galleryZoom + 0.5) * 10) / 10);
     syncGalleryZoomUI();
   });
 
   btnZoomReset?.addEventListener('click', () => {
+    if (appState.galleryArchiveTab === 'hits') return;
     galleryZoom = 1.0;
     galleryPanX = 0;
     galleryPanY = 0;
@@ -346,20 +368,41 @@ export function initVideoBrowser() {
   btnCloseGalleryDrawer.addEventListener('click', () => setDrawerOpen(false));
   setDrawerOpen(Boolean(appState.galleryDrawerOpen));
 
-  btnSwitchScreen.addEventListener('click', async () => {
-    screenLive.classList.add('hidden');
-    screenGallery.classList.remove('hidden');
-    updateState({ currentScreen: 'gallery' });
-    await refreshGalleryClips(true);
+  btnSwitchScreen.addEventListener('click', () => {
+    updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
   });
 
   btnBackToLive.addEventListener('click', () => {
     isPlaying = false;
     stopPlayerLoop();
     galleryPlayer.unload();
-    screenGallery.classList.add('hidden');
-    screenLive.classList.remove('hidden');
     updateState({ currentScreen: 'live' });
+  });
+
+  subscribeState((state, patch) => {
+    if (patch.currentScreen !== undefined && state.currentScreen !== 'gallery') {
+      if (isPlaying || galleryPlayer.getFrameCount() > 0) {
+        isPlaying = false;
+        stopPlayerLoop();
+        galleryPlayer.unload();
+      }
+    }
+    if (state.currentScreen === 'gallery') {
+      if (patch.galleryArchiveTab === 'clips') {
+        syncGalleryZoomUI();
+      }
+      if (patch.galleryArchiveTab === 'hits') {
+        if (isPlaying) {
+          isPlaying = false;
+          stopPlayerLoop();
+        }
+      } else if (
+        patch.currentScreen === 'gallery' ||
+        (patch.galleryArchiveTab === 'clips' && !galleryPlayer.getFrameCount())
+      ) {
+        refreshGalleryClips(true).catch(() => {});
+      }
+    }
   });
 
   btnPlayPause.addEventListener('click', () => {
@@ -426,6 +469,11 @@ export function initVideoBrowser() {
     playheadSec = parseFloat(e.target.value) || 0;
     lastTickMs = performance.now();
     renderGalleryFrame();
+  });
+
+  const btnGallerySnapshot = document.getElementById('btnGallerySnapshot');
+  btnGallerySnapshot?.addEventListener('click', async () => {
+    await exportAnnotatedCanvasPng(canvasEl, { includeReticle: true, prefix: 'SPOTR_Clip' });
   });
 
   btnDownload.addEventListener('click', async () => {

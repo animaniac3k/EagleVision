@@ -1332,6 +1332,10 @@
   height: auto;
 }
 
+.remote-device-svg.micro-device-svg {
+  width: 290px;
+}
+
 .remote-visual-btn {
   cursor: pointer;
   transition: filter 0.14s ease;
@@ -1440,4 +1444,38 @@
   font-size: 12px;
   color: var(--radar-text-secondary);
   line-height: 1.5;
+}
+
+.micro-mode-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.14);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.micro-hint-text {
+  font-size: 12px;
+  color: var(--radar-text-muted);
+  margin: 0 0 10px 0;
+  line-height: 1.45;
+}
+
+.micro-visual-btn {
+  cursor: pointer;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.micro-visual-btn:hover rect,
+.micro-visual-btn:hover circle {
+  stroke: #38bdf8;
+}
+
+.micro-visual-btn.micro-active-glow rect,
+.micro-visual-btn.micro-active-glow circle {
+  stroke: #f97316;
+  fill: rgba(249, 115, 22, 0.28);
 }

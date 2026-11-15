@@ -11,8 +11,8 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { createJpegFramePlayer } from './jpegFramePlayer.js';
-import { saveVideoClip } from '../storage/videoStore.js';
-import { refreshGalleryClips } from '../ui/videoBrowser.js';
+import { saveVideoClip, listVideoClips } from '../storage/videoStore.js';
+import { refreshGalleryClips, openClipAtTime } from '../ui/videoBrowser.js';
 import { renderCctvTrack } from '../ui/cctvScrubBar.js';
 import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
@@ -25,6 +25,108 @@ let rafId = null;
 let eventNavHelper = null;
 let pendingSaveTimer = null;
 let pendingSaveTask = null;
+let openReplayHandler = null;
+let lastAutoSaveMs = -20000;
+let autoSaveTimer = null;
+let lastSavedEndTs = -Infinity;
+let lastSavedMaxHitId = 0;
+
+function getLatestHitId() {
+  const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+  return hits.length ? hits[hits.length - 1].id : 0;
+}
+
+function buildWallTimeline(snap) {
+  const monoToWall = Date.now() - performance.now();
+  return {
+    ...(snap.timeline || { soundPeaks: [], events: [] }),
+    wallStartMs: Math.round(snap.startTs + monoToWall),
+    wallEndMs: Math.round(snap.endTs + monoToWall)
+  };
+}
+
+/**
+ * Persists a buffer snapshot once, deduplicating repeat saves for the same hit/buffer window.
+ */
+async function saveSnapIfDistinct(snap, triggerHitId = null) {
+  if (!snap || !snap.jpegFrames?.length) return false;
+  const maxHitId = Math.max(getLatestHitId(), triggerHitId || 0);
+  const sameWindow = (snap.endTs - lastSavedEndTs) < 8000;
+  const noNewHits = maxHitId <= lastSavedMaxHitId;
+  if (sameWindow && (noNewHits || triggerHitId === null)) {
+    return false;
+  }
+
+  lastSavedEndTs = snap.endTs;
+  if (maxHitId > lastSavedMaxHitId) {
+    lastSavedMaxHitId = maxHitId;
+  }
+
+  await saveVideoClip({
+    jpegFrames: snap.jpegFrames,
+    frameTimestamps: snap.frameTimestamps,
+    fps: snap.fps,
+    durationSec: snap.durationSec,
+    sizeBytes: snap.sizeBytes,
+    width: snap.width,
+    height: snap.height,
+    timeline: buildWallTimeline(snap)
+  });
+  await refreshGalleryClips();
+  return true;
+}
+
+/**
+ * Triggers a cooldown-guarded clip auto-save from the RAM ring buffer when a localized hit occurs.
+ */
+export function triggerAutoSaveHeatmapClip(triggerHitId = null) {
+  if (!appState.heatmapAutoSave || !appState.bufferEnabled) return;
+  if (typeof triggerHitId === 'number' && triggerHitId <= lastSavedMaxHitId) return;
+  const now = performance.now();
+  const cooldownMs = Math.max(15000, Math.round((appState.bufferMaxSeconds || 20) * 850));
+  if (now - lastAutoSaveMs < cooldownMs || autoSaveTimer) return;
+  lastAutoSaveMs = now;
+  autoSaveTimer = setTimeout(async () => {
+    autoSaveTimer = null;
+    try {
+      const snap = await snapshotMemoryBuffer();
+      await saveSnapIfDistinct(snap, triggerHitId);
+    } catch (err) {
+      console.warn('Heatmap auto-save failed:', err);
+    }
+  }, 1600);
+}
+
+/**
+ * Opens Instant Replay from the rolling RAM buffer pre-seeked near a detection hit timestamp,
+ * falling back to matching saved clips in the Gallery if the hit has already rolled out of RAM.
+ * @returns {Promise<boolean>} True if replay or saved clip covered the hit timestamp, false otherwise.
+ */
+export async function openReplayAtTimestamp(targetPerfMs, targetWallMs = null) {
+  const clips = await listVideoClips();
+  const matched = (typeof targetWallMs === 'number' && Number.isFinite(targetWallMs))
+    ? clips.find((clip) => {
+      const durMs = Math.max(500, (clip.durationSec || 0) * 1000);
+      const startW = clip.timeline?.wallStartMs ?? (clip.createdAt - durMs);
+      const endW = clip.timeline?.wallEndMs ?? clip.createdAt;
+      return targetWallMs >= startW - 1500 && targetWallMs <= endW + 1500;
+    })
+    : null;
+
+  if (openReplayHandler) {
+    // Skip saving a duplicate DB clip if this hit was already persisted in a saved clip
+    const openedRam = await openReplayHandler(targetPerfMs, { saveToDb: !matched });
+    if (openedRam) return true;
+  }
+
+  if (matched) {
+    const durMs = Math.max(500, (matched.durationSec || 0) * 1000);
+    const startW = matched.timeline?.wallStartMs ?? (matched.createdAt - durMs);
+    const offsetSec = Math.max(0, (targetWallMs - startW) / 1000 - 2.0);
+    return openClipAtTime(matched.id, offsetSec);
+  }
+  return false;
+}
 
 export function initInstantReplay() {
   const modal = document.getElementById('instantReplayModal');
@@ -169,15 +271,29 @@ export function initInstantReplay() {
     rafId = requestAnimationFrame(tickLoop);
   }
 
-  async function openReplay() {
+  async function openReplay(targetWallMs = null, options = {}) {
+    const { saveToDb = true } = options;
     const snap = await snapshotMemoryBuffer();
-    if (!snap || !snap.jpegFrames.length) return;
+    if (!snap || !snap.jpegFrames.length) return false;
+
+    let initialPlayhead = 0;
+    if (typeof targetWallMs === 'number' && Number.isFinite(targetWallMs)) {
+      if (targetWallMs < snap.startTs - 2500 || targetWallMs > snap.endTs + 1500) {
+        return false;
+      }
+      const offsetSec = (targetWallMs - snap.startTs) / 1000;
+      initialPlayhead = Math.max(0, Math.min(Math.max(0.5, snap.durationSec) - 0.5, offsetSec - 2.0));
+    }
+
+    if (appState.currentScreen !== 'live') {
+      updateState({ currentScreen: 'live' });
+    }
 
     stopLoop();
     flushPendingAutoSave();
 
     activeDuration = Math.max(0.5, snap.durationSec);
-    playheadSec = 0;
+    playheadSec = initialPlayhead;
     isPlaying = true;
     playbackSpeed = 1.0;
     lastTimeLabel = '';
@@ -195,7 +311,9 @@ export function initInstantReplay() {
 
     scrubber.max = String(activeDuration.toFixed(2));
     scrubber.value = '0';
-    bannerText.textContent = `INSTANT REPLAY — AUTO-SAVED ${activeDuration.toFixed(1)}s (${snap.width}×${snap.height} @ ${snap.fps} FPS)`;
+    bannerText.textContent = saveToDb
+      ? `INSTANT REPLAY — AUTO-SAVED ${activeDuration.toFixed(1)}s (${snap.width}×${snap.height} @ ${snap.fps} FPS)`
+      : `INSTANT REPLAY — ${activeDuration.toFixed(1)}s (${snap.width}×${snap.height} @ ${snap.fps} FPS)`;
 
     // Render CCTV Waveform & Event Markers
     eventNavHelper = renderCctvTrack({
@@ -218,25 +336,22 @@ export function initInstantReplay() {
     renderCurrentFrame();
     rafId = requestAnimationFrame(tickLoop);
 
-    // Persist clip slightly after playback starts so the first frames render with zero I/O stall
-    pendingSaveTask = async () => {
-      try {
-        await saveVideoClip({
-          jpegFrames: snap.jpegFrames,
-          frameTimestamps: snap.frameTimestamps,
-          fps: snap.fps,
-          durationSec: snap.durationSec,
-          sizeBytes: snap.sizeBytes,
-          width: snap.width,
-          height: snap.height,
-          timeline: snap.timeline
-        });
-        await refreshGalleryClips();
-      } catch (err) {
-        console.warn('Auto-save replay error:', err);
+    // Persist clip once after playback starts (skipping duplicates or already-saved hit reviews)
+    if (saveToDb) {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
       }
-    };
-    pendingSaveTimer = setTimeout(flushPendingAutoSave, 250);
+      pendingSaveTask = async () => {
+        try {
+          await saveSnapIfDistinct(snap);
+        } catch (err) {
+          console.warn('Auto-save replay error:', err);
+        }
+      };
+      pendingSaveTimer = setTimeout(flushPendingAutoSave, 250);
+    }
+    return true;
   }
 
   function closeReplay() {
@@ -309,6 +424,8 @@ export function initInstantReplay() {
     lastTickMs = performance.now();
     renderCurrentFrame();
   });
+
+  openReplayHandler = openReplay;
 
   btnReplay.addEventListener('click', () => {
     if (!modal.classList.contains('hidden')) {

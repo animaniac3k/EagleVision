@@ -260,9 +260,23 @@ export async function snapshotMemoryBuffer() {
 
   // Calculate events relative to the start of the recording in seconds
   // Group events occurring within the same second into a single event timestamp
-  const rawEvents = ringEvents
-    .filter((e) => e.timestampMs >= firstTs && e.timestampMs <= lastTs)
-    .map((e) => Number(((e.timestampMs - firstTs) / 1000).toFixed(2)))
+  const spanSec = Math.max(0.5, (lastTs - firstTs) / 1000);
+  const tailCutoffTs = Math.max(lastTs, performance.now()) + 150;
+  const hitPerfTimestamps = Array.isArray(appState.detectionHits)
+    ? appState.detectionHits
+      .map((h) => h?.perfMs)
+      .filter((t) => typeof t === 'number' && Number.isFinite(t))
+    : [];
+  const allEventTimestamps = [
+    ...ringEvents.map((e) => e.timestampMs),
+    ...hitPerfTimestamps
+  ];
+  const rawEvents = allEventTimestamps
+    .filter((ts) => ts >= firstTs - 350 && ts <= tailCutoffTs)
+    .map((ts) => {
+      const sec = Math.max(0, Math.min(spanSec, (ts - firstTs) / 1000));
+      return Number(sec.toFixed(2));
+    })
     .sort((a, b) => a - b);
 
   const events = [];
@@ -275,6 +289,8 @@ export async function snapshotMemoryBuffer() {
   return {
     jpegFrames,
     frameTimestamps,
+    startTs: firstTs,
+    endTs: lastTs,
     fps: effectiveFps,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: totalBytes,

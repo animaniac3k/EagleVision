@@ -15,6 +15,7 @@ import { getRtspCanvas, getRtspFrameSeq } from '../camera/streamManager.js';
 import { getClickDistanceInPixels } from './overlayManager.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
+import { triggerAutoSaveHeatmapClip } from '../recorder/instantReplay.js';
 import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
 export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
@@ -23,6 +24,134 @@ const HEAT_W = 160;
 const HEAT_H = 90;
 const HEAT_CELLS = HEAT_W * HEAT_H;
 const GLOBAL_MOTION_REJECTION_RATIO = 0.18; // If >18% of image changes at once, treat as camera movement
+const MAX_DETECTION_HITS = 30;
+
+let nextHitSeq = 1;
+let rezeroHandler = null;
+
+/**
+ * Re-anchors the heatmap background reference immediately and clears accumulated thermal persistence.
+ */
+export function rezeroHeatmap() {
+  if (rezeroHandler) rezeroHandler();
+}
+
+/**
+ * Clears all logged session detection pins from state.
+ */
+export function clearDetectionHits() {
+  nextHitSeq = 1;
+  updateState({ detectionHits: [], selectedHitId: null });
+}
+
+/**
+ * Adds a normalized exclude zone ({ x, y, w, h } in [0..1]) so heatmap ignores wind/foliage motion there.
+ */
+export function addHeatmapIgnoreZone(zone) {
+  if (!zone) return;
+  const x = Math.max(0, Math.min(0.98, Number(zone.x) || 0));
+  const y = Math.max(0, Math.min(0.98, Number(zone.y) || 0));
+  const w = Math.max(0.02, Math.min(1 - x, Number(zone.w) || 0.08));
+  const h = Math.max(0.02, Math.min(1 - y, Number(zone.h) || 0.08));
+  const prev = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+  updateState({ heatmapIgnoreMasks: [...prev, { x, y, w, h }] });
+}
+
+/**
+ * Removes all heatmap ignore mask zones.
+ */
+export function clearHeatmapIgnoreZones() {
+  updateState({ heatmapIgnoreMasks: [] });
+}
+
+/**
+ * Captures the given base canvas (and optional #svgOverlay reticle) into a timestamped PNG download.
+ */
+export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
+  if (!baseCanvas || !baseCanvas.width || !baseCanvas.height) return false;
+  const { includeReticle = true, prefix = 'SPOTR', drawExtra = null } = options;
+
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = baseCanvas.width;
+  outCanvas.height = baseCanvas.height;
+  const ctx = outCanvas.getContext('2d');
+  if (!ctx) return false;
+
+  ctx.drawImage(baseCanvas, 0, 0, outCanvas.width, outCanvas.height);
+
+  if (typeof drawExtra === 'function') {
+    await drawExtra(ctx, outCanvas.width, outCanvas.height);
+  }
+
+  if (includeReticle && appState.overlayEnabled) {
+    const svgEl = document.getElementById('svgOverlay');
+    if (svgEl) {
+      try {
+        const clone = svgEl.cloneNode(true);
+        clone.removeAttribute('style');
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        clone.setAttribute('width', String(outCanvas.width));
+        clone.setAttribute('height', String(outCanvas.height));
+        const ffpFactor = appState.reticleFfpMode ? Math.max(1.0, Number(appState.mainZoom) || 1.0) : 1.0;
+        const scaleVal = ((appState.overlayScale ?? 100) / 100) * ffpFactor;
+        const svgText = new XMLSerializer().serializeToString(clone);
+        const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0.1, Math.min(1, (appState.overlayOpacity ?? 85) / 100));
+            ctx.translate(outCanvas.width / 2, outCanvas.height / 2);
+            ctx.scale(scaleVal, scaleVal);
+            ctx.drawImage(img, -outCanvas.width / 2, -outCanvas.height / 2, outCanvas.width, outCanvas.height);
+            ctx.restore();
+            URL.revokeObjectURL(svgUrl);
+            resolve();
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(svgUrl);
+            resolve();
+          };
+          img.src = svgUrl;
+        });
+      } catch {
+        // Ignore SVG rasterization fallback errors
+      }
+    }
+  }
+
+  return new Promise((resolve) => {
+    outCanvas.toBlob((blob) => {
+      if (!blob) {
+        resolve(false);
+        return;
+      }
+      const d = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${prefix}_${stamp}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      resolve(true);
+    }, 'image/png');
+  });
+}
+
+/**
+ * Captures the currently visible live or replay canvas + reticle overlay as a PNG file.
+ */
+export async function captureAnnotatedSnapshot() {
+  const replayCanvas = document.getElementById('replayCanvas');
+  const mainCanvas = document.getElementById('mainCanvas');
+  const target = appState.replayActive && replayCanvas ? replayCanvas : mainCanvas;
+  return exportAnnotatedCanvasPng(target, { includeReticle: true, prefix: 'SPOTR_Live' });
+}
 
 export function initCompositor(videoEl) {
   const mainCanvas = document.getElementById('mainCanvas');
@@ -45,67 +174,147 @@ export function initCompositor(videoEl) {
   const refLuma = new Float32Array(HEAT_CELLS);
   const currentLuma = new Float32Array(HEAT_CELLS);
   const heatAccum = new Float32Array(HEAT_CELLS);
+  const ignoreMaskGrid = new Uint8Array(HEAT_CELLS);
+  let lastMasksRef = null;
   let refInitialized = false;
   let lastHeatTimeMs = performance.now();
   let lastSpeechTimeMs = 0;
   let lastHeatComputeMs = 0;
   const SPEECH_COOLDOWN_MS = 3600;
 
-  function announceHeatmapDetection(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
-    if (!appState.heatmapSpeechEnabled) return;
-    const now = performance.now();
-    if (now - lastSpeechTimeMs < SPEECH_COOLDOWN_MS) return;
+  const hitThumbCanvas = document.createElement('canvas');
+  const hitThumbCtx = hitThumbCanvas.getContext('2d');
 
-    // Convert detection normalized source coords (0..1) into current viewport coords (0..1)
+  rezeroHandler = () => {
+    heatAccum.fill(0);
+    refInitialized = false;
+    heatImgData.data.fill(0);
+    heatOverlayCtx.putImageData(heatImgData, 0, 0);
+  };
+
+  function syncIgnoreMaskGrid() {
+    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+    if (masks === lastMasksRef) return;
+    lastMasksRef = masks;
+    ignoreMaskGrid.fill(0);
+    for (const m of masks) {
+      const x0 = Math.max(0, Math.floor((m.x || 0) * HEAT_W));
+      const y0 = Math.max(0, Math.floor((m.y || 0) * HEAT_H));
+      const x1 = Math.min(HEAT_W, Math.ceil(((m.x || 0) + (m.w || 0)) * HEAT_W));
+      const y1 = Math.min(HEAT_H, Math.ceil(((m.y || 0) + (m.h || 0)) * HEAT_H));
+      for (let gy = y0; gy < y1; gy++) {
+        const rowOff = gy * HEAT_W;
+        for (let gx = x0; gx < x1; gx++) {
+          ignoreMaskGrid[rowOff + gx] = 1;
+          heatAccum[rowOff + gx] = 0;
+        }
+      }
+    }
+  }
+
+  function computeDirectionMetrics(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
     const detViewX = (detSourceNormX * vw - sx) / cropW;
     const detViewY = (detSourceNormY * vh - sy) / cropH;
 
-    // Ignore if detection is outside the currently visible main viewport
-    if (detViewX < 0 || detViewX > 1 || detViewY < 0 || detViewY > 1) return;
-
-    // Calculate offset relative to active POI Crosshair (roiX, roiY) or screen center
     const refX = (appState.pipEnabled && appState.roiTargetVisible) ? (appState.roiX ?? 0.5) : 0.5;
     const refY = (appState.pipEnabled && appState.roiTargetVisible) ? (appState.roiY ?? 0.5) : 0.5;
     const dx = (detViewX - refX) * cw;
     const dy = (detViewY - refY) * ch;
     const distPx = Math.hypot(dx, dy);
 
-    // Dynamic pixel distance of 1 click/indent based on reticle config, scale & FFP zoom
     const clickPx = getClickDistanceInPixels(cw, ch, appState.overlayScale);
-
-    // Clicks are calculated strictly from optical dead-center (refX, refY)
     let clicks = 0;
     if (distPx >= clickPx * 0.4) {
       clicks = Math.max(1, Math.round(distPx / Math.max(1, clickPx)));
     }
 
-    // Clock angle from center: 0 deg = 12 o'clock (-dy), 90 deg = 3 o'clock (+dx)
     const angleDeg = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
     let clockHour = Math.round(angleDeg / 30);
     if (clockHour === 0) clockHour = 12;
 
-    const alertWord = (appState.voiceAlertKeyword || 'Detection').trim();
-    let rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
-    // Singularize if clicks === 1 and unit is clicks
-    let unitWord = rawUnit;
-    if (clicks === 1 && rawUnit.toLowerCase() === 'clicks') {
-      unitWord = 'click';
+    const dirLabel = clicks === 0 ? 'Center' : `${clockHour} o'c, ${clicks} clk`;
+    return { detViewX, detViewY, clockHour, clicks, dirLabel };
+  }
+
+  function recordSpatialHit(detSourceNormX, detSourceNormY, videoSource, vw, vh, metrics) {
+    const nowWall = Date.now();
+    const nowPerf = performance.now();
+    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+    const last = hits.length ? hits[hits.length - 1] : null;
+
+    if (last && (nowWall - last.timestampMs) < 1500 && Math.hypot(detSourceNormX - last.normX, detSourceNormY - last.normY) < 0.055) {
+      const updated = hits.slice();
+      updated[updated.length - 1] = {
+        ...last,
+        timestampMs: nowWall,
+        perfMs: nowPerf,
+        normX: (last.normX + detSourceNormX) * 0.5,
+        normY: (last.normY + detSourceNormY) * 0.5,
+        clockHour: metrics.clockHour,
+        clicks: metrics.clicks,
+        dirLabel: metrics.dirLabel
+      };
+      updateState({ detectionHits: updated });
+      return;
     }
+
+    let thumbDataUrl = '';
+    try {
+      const scale = vw > 960 ? 960 / vw : 1;
+      const tw = Math.max(160, Math.round(vw * scale));
+      const th = Math.max(90, Math.round(vh * scale));
+      if (hitThumbCanvas.width !== tw || hitThumbCanvas.height !== th) {
+        hitThumbCanvas.width = tw;
+        hitThumbCanvas.height = th;
+      }
+      if (hitThumbCtx) {
+        hitThumbCtx.drawImage(videoSource, 0, 0, tw, th);
+        thumbDataUrl = hitThumbCanvas.toDataURL('image/jpeg', 0.72);
+      }
+    } catch {
+      thumbDataUrl = '';
+    }
+
+    const newHit = {
+      id: nextHitSeq++,
+      timestampMs: nowWall,
+      perfMs: nowPerf,
+      normX: detSourceNormX,
+      normY: detSourceNormY,
+      clockHour: metrics.clockHour,
+      clicks: metrics.clicks,
+      dirLabel: metrics.dirLabel,
+      thumbDataUrl,
+      frameW: vw,
+      frameH: vh
+    };
+
+    const nextHits = hits.length >= MAX_DETECTION_HITS ? [...hits.slice(1), newHit] : [...hits, newHit];
+    updateState({
+      detectionHits: nextHits,
+      selectedHitId: appState.selectedHitId ?? newHit.id
+    });
+    triggerAutoSaveHeatmapClip(newHit.id);
+  }
+
+  function announceHeatmapDetection(metrics) {
+    if (!appState.heatmapSpeechEnabled) return;
+    const now = performance.now();
+    if (now - lastSpeechTimeMs < SPEECH_COOLDOWN_MS) return;
+
+    const { detViewX, detViewY, clockHour, clicks } = metrics;
+    if (detViewX < 0 || detViewX > 1 || detViewY < 0 || detViewY > 1) return;
+
+    const alertWord = (appState.voiceAlertKeyword || 'Detection').trim();
+    const rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
+    const unitWord = clicks === 1 && rawUnit.toLowerCase() === 'clicks' ? 'click' : rawUnit;
 
     const phrase = clicks === 0
       ? `${alertWord}! Center`
       : `${alertWord}! ${clockHour} o'clock, ${clicks} ${unitWord}`;
-    const hudSummary = clicks === 0
-      ? `🔊 ${alertWord.toUpperCase()}: CENTER`
-      : `🔊 ${clockHour} O'CLOCK • ${clicks} ${unitWord.toUpperCase()}`;
 
     lastSpeechTimeMs = now;
     speakDetectionAnnouncement(phrase);
-
-    const ringActionText = document.getElementById('ringActionText');
-    if (ringActionText) {
-      ringActionText.textContent = hudSummary;
-    }
   }
 
   function updateHeatmap(videoSource, sx, sy, cropW, cropH, vw, vh, cw, ch) {
@@ -136,18 +345,23 @@ export function initCompositor(videoEl) {
       return;
     }
 
-    // Pass 1: Measure how many cells changed above threshold to detect global camera motion
+    syncIgnoreMaskGrid();
+
+    // Pass 1: Measure how many unmasked cells changed above threshold to detect global camera motion
     let changedCells = 0;
+    let activeCells = 0;
     for (let i = 0; i < HEAT_CELLS; i++) {
       const p = i * 4;
       const luma = 0.299 * src[p] + 0.587 * src[p + 1] + 0.114 * src[p + 2];
       currentLuma[i] = luma;
+      if (ignoreMaskGrid[i]) continue;
+      activeCells++;
       if (Math.abs(luma - refLuma[i]) > threshold) {
         changedCells++;
       }
     }
 
-    const changedFraction = changedCells / HEAT_CELLS;
+    const changedFraction = activeCells > 0 ? changedCells / activeCells : 0;
 
     // Global Motion Gate: if the whole camera moved (>18% of scene changed simultaneously),
     // re-anchor the background reference and do NOT light up the heatmap!
@@ -165,6 +379,11 @@ export function initCompositor(videoEl) {
       let maxSpikeHeat = 0;
 
       for (let i = 0; i < HEAT_CELLS; i++) {
+        if (ignoreMaskGrid[i]) {
+          heatAccum[i] = 0;
+          refLuma[i] = currentLuma[i];
+          continue;
+        }
         const delta = Math.abs(currentLuma[i] - refLuma[i]);
         if (delta > threshold) {
           const added = (delta - threshold) * 3.8;
@@ -184,11 +403,13 @@ export function initCompositor(videoEl) {
         refLuma[i] += (currentLuma[i] - refLuma[i]) * 0.15;
       }
 
-      // If a distinct localized movement spike occurred, announce its clock direction & ticks
+      // If a distinct localized movement spike occurred, log pin, optionally auto-save & speak
       if (spikeCount >= 2 && maxSpikeHeat >= 135 && spikeWeightSum > 0) {
         const centroidNormX = (spikeSumX / spikeWeightSum + 0.5) / HEAT_W;
         const centroidNormY = (spikeSumY / spikeWeightSum + 0.5) / HEAT_H;
-        announceHeatmapDetection(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
+        const metrics = computeDirectionMetrics(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
+        recordSpatialHit(centroidNormX, centroidNormY, videoSource, vw, vh, metrics);
+        announceHeatmapDetection(metrics);
         recordEvent('heatmap');
       }
     }

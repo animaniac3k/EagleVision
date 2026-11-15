@@ -7,6 +7,7 @@ Thumbs.db
 
 # Android build outputs & local config
 .gradle/
+**/.kotlin/
 **/build/
 local.properties
 *.apk
