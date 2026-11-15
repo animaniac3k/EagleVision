@@ -154,6 +154,7 @@ export function initSidebarAndTopControls(videoEl) {
       screenSettings?.classList.remove('hidden');
       switchSettingsSubTab(btn.dataset.setupTab);
       updateState({ currentScreen: 'settings', replayActive: false });
+      populateCameraDropdown().catch(() => {});
     });
   });
 
@@ -162,6 +163,7 @@ export function initSidebarAndTopControls(videoEl) {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
     updateState({ currentScreen: 'settings' });
+    populateCameraDropdown().catch(() => {});
   });
 
   btnSettingsBackToLive?.addEventListener('click', () => {
@@ -598,21 +600,29 @@ export function initSidebarAndTopControls(videoEl) {
     inputOnvifUser.value = appState.rtspOnvifUser;
   }
 
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   async function populateCameraDropdown() {
     const devices = await enumerateCameras();
     let optionsHtml = '';
 
     // If an RTSP stream is currently active, surface it at the top of the selector
-    if (appState.isRtspStream && appState.activeDeviceId) {
-      optionsHtml += `<option value="${appState.activeDeviceId}" selected>📡 ${appState.activeDeviceLabel}</option>`;
+    if (appState.isRtspStream && appState.activeDeviceId && !appState.activeDeviceId.startsWith('uvc:')) {
+      optionsHtml += `<option value="${escapeHtml(appState.activeDeviceId)}" selected>📡 ${escapeHtml(appState.activeDeviceLabel)}</option>`;
     }
 
     optionsHtml += devices
-      .map((d) => `<option value="${d.deviceId}">${d.label}</option>`)
+      .map((d) => `<option value="${escapeHtml(d.deviceId)}">${escapeHtml(d.label)}</option>`)
       .join('');
 
     cameraSelect.innerHTML = optionsHtml;
-    if (appState.activeDeviceId && !appState.isRtspStream && devices.some((d) => d.deviceId === appState.activeDeviceId)) {
+    if (appState.activeDeviceId && devices.some((d) => d.deviceId === appState.activeDeviceId)) {
       cameraSelect.value = appState.activeDeviceId;
     }
   }
@@ -620,7 +630,8 @@ export function initSidebarAndTopControls(videoEl) {
   populateCameraDropdown().catch((err) => console.warn('Camera enum deferred:', err));
 
   cameraSelect.addEventListener('change', async (e) => {
-    await startCameraStream(videoEl, e.target.value);
+    const selectedOpt = e.target.selectedOptions?.[0];
+    await startCameraStream(videoEl, e.target.value, selectedOpt?.textContent || null);
     if (appState.bufferEnabled) {
       startMemoryBuffer(videoEl);
     }
@@ -628,6 +639,17 @@ export function initSidebarAndTopControls(videoEl) {
   });
 
   btnRefreshCameras.addEventListener('click', populateCameraDropdown);
+  window.addEventListener('spotr:camera-list-changed', populateCameraDropdown);
+  window.__spotrRefreshCameras = () => populateCameraDropdown().catch(() => {});
+  window.__spotrOnAndroidCameraPermission = async (granted) => {
+    if (granted && (appState.isSimulatedStream || appState.activeDeviceId === 'auto' || appState.activeDeviceId === 'sim')) {
+      await startCameraStream(videoEl, 'auto');
+      if (appState.bufferEnabled) {
+        startMemoryBuffer(videoEl);
+      }
+    }
+    await populateCameraDropdown().catch(() => {});
+  };
   if (navigator.mediaDevices?.addEventListener) {
     navigator.mediaDevices.addEventListener('devicechange', populateCameraDropdown);
   }

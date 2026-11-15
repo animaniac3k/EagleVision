@@ -71,6 +71,7 @@ async function bootstrapApp() {
 
   // 4. Initialize Camera Stream (USB Camera or Test Signal fallback) asynchronously in background
   startCameraStream(videoEl, 'auto').then(() => {
+    window.__spotrRefreshCameras?.();
     if (appState.bufferEnabled) {
       startMemoryBuffer(videoEl);
     }

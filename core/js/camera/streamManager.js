@@ -14,18 +14,20 @@ let rtspAnimTimer = null;
 let rtspDrawLoopActive = false;
 let rtspAbortController = null;
 let lastGatewayPaused = false;
+let activeMjpegPauseUrl = '';
+let activeMjpegStopUrl = '';
+let uvcGatewaySupported = null;
 const rtspJpegListeners = new Set();
 
 subscribeState((state) => {
-  if (!state.isRtspStream) {
+  if (!state.isRtspStream || !activeMjpegPauseUrl) {
     lastGatewayPaused = false;
     return;
   }
   const shouldPause = Boolean(state.replayActive || state.currentScreen === 'gallery');
   if (shouldPause !== lastGatewayPaused) {
     lastGatewayPaused = shouldPause;
-    const gatewayBase = getGatewayBaseUrl();
-    fetch(`${gatewayBase}/api/rtsp/pause?paused=${shouldPause ? '1' : '0'}`, { method: 'POST' }).catch(() => {});
+    fetch(`${activeMjpegPauseUrl}?paused=${shouldPause ? '1' : '0'}`, { method: 'POST' }).catch(() => {});
   }
 });
 
@@ -112,33 +114,89 @@ export async function checkRtspGatewayStatus() {
   }
 }
 
-export async function enumerateCameras() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    return [{ deviceId: 'sim', label: 'RADAR TEST SIGNAL (1080p)' }];
-  }
+async function fetchAndroidUvcCameras() {
+  if (uvcGatewaySupported === false) return [];
+  const gatewayBase = getGatewayBaseUrl();
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoInputs = devices
-      .filter((d) => d.kind === 'videoinput')
-      .map((d, idx) => ({
-        deviceId: d.deviceId,
-        label: d.label || `USB / Video Camera #${idx + 1}`
-      }));
-
-    videoInputs.push({
-      deviceId: 'sim',
-      label: 'BUILT-IN TEST SIGNAL (1080p)'
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 800);
+    const res = await fetch(`${gatewayBase}/api/uvc/list`, {
+      cache: 'no-store',
+      signal: controller.signal
     });
-    return videoInputs;
+    clearTimeout(timer);
+    if (!res.ok) {
+      if (res.status === 404) uvcGatewaySupported = false;
+      return [];
+    }
+    const data = await res.json();
+    if (!data || data.supported === false) {
+      uvcGatewaySupported = false;
+      return [];
+    }
+    uvcGatewaySupported = true;
+    return Array.isArray(data.cameras) ? data.cameras : [];
   } catch {
-    return [{ deviceId: 'sim', label: 'BUILT-IN TEST SIGNAL (1080p)' }];
+    return [];
   }
+}
+
+function notifyCameraListChanged() {
+  window.dispatchEvent(new CustomEvent('spotr:camera-list-changed'));
+}
+
+export async function enumerateCameras() {
+  const browserEnumPromise = (async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      return [];
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const rawVideoInputs = devices.filter((d) => d.kind === 'videoinput');
+      const hasRealIds = rawVideoInputs.some((d) => Boolean(d.deviceId));
+      const filtered = hasRealIds
+        ? rawVideoInputs.filter((d) => Boolean(d.deviceId))
+        : rawVideoInputs.slice(0, 1);
+
+      return filtered.map((d, idx) => ({
+        deviceId: d.deviceId,
+        label: d.label || `Camera #${idx + 1}`
+      }));
+    } catch {
+      return [];
+    }
+  })();
+
+  const [browserInputs, uvcCameras] = await Promise.all([
+    browserEnumPromise,
+    fetchAndroidUvcCameras()
+  ]);
+
+  const combined = [...browserInputs];
+  const seenIds = new Set(combined.map((c) => c.deviceId));
+
+  for (const uvc of uvcCameras) {
+    if (uvc?.deviceId && !seenIds.has(uvc.deviceId)) {
+      seenIds.add(uvc.deviceId);
+      combined.push({
+        deviceId: uvc.deviceId,
+        label: uvc.label || 'USB UVC Camera'
+      });
+    }
+  }
+
+  combined.push({
+    deviceId: 'sim',
+    label: 'BUILT-IN TEST SIGNAL (1080p)'
+  });
+
+  return combined;
 }
 
 export async function startCameraStream(videoEl, preferredDeviceId = 'auto', customLabel = null) {
   stopCurrentStream();
 
-  // Route network / RTSP streams to the dedicated RTSP canvas bridge
+  // Route network / RTSP streams to the dedicated MJPEG canvas bridge
   if (typeof preferredDeviceId === 'string' && (preferredDeviceId.startsWith('rtsp:') || preferredDeviceId.startsWith('rtsp://'))) {
     let cleanUrl = preferredDeviceId;
     while (cleanUrl.startsWith('rtsp:')) {
@@ -152,11 +210,35 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
     return startRtspStream(videoEl, cleanUrl, customLabel || 'RTSP STREAM');
   }
 
-  if (preferredDeviceId === 'sim' || !navigator.mediaDevices?.getUserMedia) {
+  // Route Android native USB UVC streams to the local UVC MJPEG bridge
+  if (typeof preferredDeviceId === 'string' && preferredDeviceId.startsWith('uvc:')) {
+    return startUvcStream(videoEl, preferredDeviceId, customLabel || 'USB UVC CAMERA');
+  }
+
+  if (preferredDeviceId === 'sim') {
+    return startSimulatedStream(videoEl);
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    const uvcCameras = await fetchAndroidUvcCameras();
+    if (uvcCameras.length > 0) {
+      return startUvcStream(videoEl, uvcCameras[0].deviceId, uvcCameras[0].label);
+    }
     return startSimulatedStream(videoEl);
   }
 
   try {
+    const acquireStream = async (constraints) => {
+      const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
+        video: constraints,
+        audio: false
+      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Camera acquisition timeout')), 10000)
+      );
+      return Promise.race([getUserMediaPromise, timeoutPromise]);
+    };
+
     const videoConstraints = {
       width: { ideal: 1920 },
       height: { ideal: 1080 },
@@ -167,15 +249,21 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
       videoConstraints.deviceId = { exact: preferredDeviceId };
     }
 
-    const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
-      video: videoConstraints,
-      audio: false
-    });
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Camera acquisition timeout')), 10000)
-    );
-
-    const stream = await Promise.race([getUserMediaPromise, timeoutPromise]);
+    let stream;
+    try {
+      stream = await acquireStream(videoConstraints);
+    } catch (primaryErr) {
+      // Retry with unconstrained video if ideal constraints caused OverconstrainedError on a device
+      if (
+        (!preferredDeviceId || preferredDeviceId === 'auto') &&
+        primaryErr?.name !== 'NotAllowedError' &&
+        primaryErr?.message !== 'Camera acquisition timeout'
+      ) {
+        stream = await acquireStream(true);
+      } else {
+        throw primaryErr;
+      }
+    }
 
     activeMediaStream = stream;
     videoEl.srcObject = stream;
@@ -187,15 +275,26 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
 
     updateState({
       activeDeviceId: actualDeviceId,
-      activeDeviceLabel: (track && track.label) ? track.label.slice(0, 24).toUpperCase() : 'USB CAMERA',
+      activeDeviceLabel: (track && track.label) ? track.label.slice(0, 24).toUpperCase() : 'CAMERA',
       streamWidth: videoEl.videoWidth || settings.width || 1920,
       streamHeight: videoEl.videoHeight || settings.height || 1080,
-      isSimulatedStream: false
+      isSimulatedStream: false,
+      isRtspStream: false
     });
+
+    // Re-enumerate now that getUserMedia permission is granted in this session
+    notifyCameraListChanged();
 
     return stream;
   } catch (err) {
-    console.warn('Camera stream unavailable, activating simulated inspection feed:', err);
+    console.warn('Camera stream unavailable, checking USB UVC / test fallback:', err);
+    if (!preferredDeviceId || preferredDeviceId === 'auto') {
+      const uvcCameras = await fetchAndroidUvcCameras();
+      if (uvcCameras.length > 0) {
+        notifyCameraListChanged();
+        return startUvcStream(videoEl, uvcCameras[0].deviceId, uvcCameras[0].label);
+      }
+    }
     return startSimulatedStream(videoEl);
   }
 }
@@ -347,12 +446,59 @@ function startSimulatedStream(videoEl) {
 let rtspStatusPollTimer = null;
 
 export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
+  const gatewayBase = getGatewayBaseUrl();
+  const isSub = rtspUrl.includes('ch1');
+  return startMjpegCanvasStream(videoEl, {
+    streamApiUrl: `${gatewayBase}/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`,
+    statusUrl: `${gatewayBase}/api/rtsp/status`,
+    pauseUrl: `${gatewayBase}/api/rtsp/pause`,
+    stopUrl: `${gatewayBase}/api/rtsp/stop`,
+    deviceId: 'rtsp:' + rtspUrl,
+    label,
+    initW: isSub ? 960 : 1920,
+    initH: isSub ? 540 : 1080,
+    connectingTitle: 'CONNECTING TO RTSP STREAM...',
+    disconnectTitle: 'RTSP STREAM DISCONNECTED / TIMEOUT',
+    defaultDisconnectDetail: 'Check camera Wi-Fi connection and gateway server'
+  });
+}
+
+export async function startUvcStream(videoEl, uvcDeviceId, label = 'USB UVC CAMERA') {
+  const gatewayBase = getGatewayBaseUrl();
+  return startMjpegCanvasStream(videoEl, {
+    streamApiUrl: `${gatewayBase}/api/uvc/stream?deviceId=${encodeURIComponent(uvcDeviceId)}&_t=${Date.now()}`,
+    statusUrl: `${gatewayBase}/api/uvc/status`,
+    pauseUrl: `${gatewayBase}/api/uvc/pause`,
+    stopUrl: `${gatewayBase}/api/uvc/stop`,
+    deviceId: uvcDeviceId,
+    label,
+    initW: 1280,
+    initH: 720,
+    connectingTitle: 'CONNECTING TO USB UVC CAMERA...',
+    disconnectTitle: 'USB UVC CAMERA DISCONNECTED',
+    defaultDisconnectDetail: 'Check USB camera connection and Android USB permission'
+  });
+}
+
+async function startMjpegCanvasStream(videoEl, opts) {
   stopCurrentStream();
 
-  // Initial resolution heuristic based on channel endpoint (ch1 = 960x540, ch0 = 1920x1080)
-  const isSub = rtspUrl.includes('ch1');
-  const initW = isSub ? 960 : 1920;
-  const initH = isSub ? 540 : 1080;
+  const {
+    streamApiUrl,
+    statusUrl,
+    pauseUrl,
+    stopUrl,
+    deviceId,
+    label,
+    initW,
+    initH,
+    connectingTitle,
+    disconnectTitle,
+    defaultDisconnectDetail
+  } = opts;
+
+  activeMjpegPauseUrl = pauseUrl;
+  activeMjpegStopUrl = stopUrl;
 
   rtspCanvas = document.createElement('canvas');
   rtspCanvas.width = initW;
@@ -366,7 +512,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   ctx.fillStyle = '#2dd4bf';
   ctx.font = 'bold 24px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('CONNECTING TO RTSP STREAM...', initW / 2, initH / 2);
+  ctx.fillText(connectingTitle, initW / 2, initH / 2);
 
   let lastTrackedW = initW;
   let lastTrackedH = initH;
@@ -384,17 +530,18 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     }
   };
 
-  const renderRtspDisconnect = async (errMsg = null) => {
+  const renderMjpegDisconnect = async (errMsg = null) => {
     if (!rtspDrawLoopActive) return;
-    let detailMsg = errMsg || 'Check camera Wi-Fi connection and gateway server';
+    let detailMsg = errMsg || defaultDisconnectDetail;
     try {
-      const st = await checkRtspGatewayStatus();
+      const res = await fetch(statusUrl, { cache: 'no-store' });
+      const st = res.ok ? await res.json() : null;
       if (!st || !st.available) {
-        detailMsg = 'RTSP gateway offline';
+        detailMsg = 'Camera gateway offline';
       } else if (st.error) {
         detailMsg = String(st.error);
       } else if (!errMsg && st.stage) {
-        detailMsg = `Stream ended at stage: ${st.stage} (rtp=${st.rtpPackets ?? 0}, frames=${st.framesDecoded ?? 0})`;
+        detailMsg = `Stream ended at stage: ${st.stage} (frames=${st.framesDecoded ?? 0})`;
       }
     } catch {}
     if (!rtspDrawLoopActive) return;
@@ -403,7 +550,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.fillStyle = '#fda4af';
     ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('RTSP STREAM DISCONNECTED / TIMEOUT', rtspCanvas.width / 2, rtspCanvas.height / 2 - 20);
+    ctx.fillText(disconnectTitle, rtspCanvas.width / 2, rtspCanvas.height / 2 - 20);
     ctx.font = '15px monospace';
     ctx.fillStyle = '#94a3b8';
     ctx.fillText(detailMsg.slice(0, 110), rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
@@ -412,28 +559,23 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
 
   rtspDrawLoopActive = true;
 
-  // Periodically query gateway /api/rtsp/status to sync exact stream telemetry (dimensions & FPS)
+  // Periodically query gateway status to sync exact stream telemetry (dimensions & FPS)
   rtspStatusPollTimer = setInterval(async () => {
     if (!rtspDrawLoopActive) return;
     try {
-      const st = await checkRtspGatewayStatus();
+      const res = await fetch(statusUrl, { cache: 'no-store' });
+      if (!res.ok) return;
+      const st = await res.json();
       if (st && st.isStreaming) {
-        const patch = {};
         if (st.width && st.height && (st.width !== appState.streamWidth || st.height !== appState.streamHeight)) {
           syncFrameDimensions(st.width, st.height);
         }
         if (typeof st.fps === 'number' && st.fps > 0) {
-          patch.fps = Math.round(st.fps);
-          updateState(patch);
+          updateState({ fps: Math.round(st.fps) });
         }
       }
     } catch {}
   }, 1000);
-
-  // Connect to the gateway multipart stream endpoint via streaming fetch + createImageBitmap
-  // (avoids Chromium/WebView img.onload firing only once on off-DOM multipart/x-mixed-replace)
-  const gatewayBase = getGatewayBaseUrl();
-  const streamApiUrl = `${gatewayBase}/api/rtsp/stream?url=${encodeURIComponent(rtspUrl)}&transport=tcp&_t=${Date.now()}`;
 
   const abortCtrl = new AbortController();
   rtspAbortController = abortCtrl;
@@ -491,7 +633,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
         rtspAnimTimer = requestAnimationFrame(drawLoop);
       }
     };
-    rtspImg.onerror = () => renderRtspDisconnect();
+    rtspImg.onerror = () => renderMjpegDisconnect();
     rtspImg.src = streamApiUrl;
   };
 
@@ -504,7 +646,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
           const j = await res.json();
           if (j?.error) serverErr = j.error;
         } catch {}
-        await renderRtspDisconnect(serverErr);
+        await renderMjpegDisconnect(serverErr);
         return;
       }
       if (!res.body || !res.body.getReader) {
@@ -568,7 +710,6 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
             const combined = appendBytes(headerBuf, probeSlice);
             const hdrEnd = findDoubleCrlf(combined);
             if (hdrEnd < 0) {
-              // Header spans across next chunk (or longer than 256B probe)
               headerBuf = combined;
               pos += probeSlice.length;
               if (headerBuf.length > 4096) headerBuf = new Uint8Array(0);
@@ -591,12 +732,12 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
       }
 
       if (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
-        await renderRtspDisconnect();
+        await renderMjpegDisconnect();
       }
     } catch (err) {
       if (err?.name === 'AbortError' || abortCtrl.signal.aborted) return;
-      console.warn('[streamManager] RTSP stream fetch error:', err);
-      await renderRtspDisconnect(err?.message || null);
+      console.warn('[streamManager] MJPEG stream fetch error:', err);
+      await renderMjpegDisconnect(err?.message || null);
     }
   })();
 
@@ -606,8 +747,8 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   }
 
   updateState({
-    activeDeviceId: 'rtsp:' + rtspUrl,
-    activeDeviceLabel: label.slice(0, 24).toUpperCase(),
+    activeDeviceId: deviceId,
+    activeDeviceLabel: (label || 'STREAM').slice(0, 24).toUpperCase(),
     streamWidth: initW,
     streamHeight: initH,
     isSimulatedStream: false,
@@ -649,11 +790,14 @@ export function stopCurrentStream() {
   rtspCanvas = null;
   rtspFrameSeq = 0;
   lastGatewayPaused = false;
-  // Only notify local Python server to release RTSP socket if an RTSP stream was active
+  const stopUrl = activeMjpegStopUrl;
+  activeMjpegPauseUrl = '';
+  activeMjpegStopUrl = '';
+  // Notify active native/local gateway stream to release hardware/socket
   if (appState.isRtspStream) {
     updateState({ isRtspStream: false });
-    const gatewayBase = getGatewayBaseUrl();
-    fetch(`${gatewayBase}/api/rtsp/stop`, { method: 'POST' }).catch(() => {});
+    const fallbackStop = `${getGatewayBaseUrl()}/api/rtsp/stop`;
+    fetch(stopUrl || fallbackStop, { method: 'POST' }).catch(() => {});
   }
 }
 

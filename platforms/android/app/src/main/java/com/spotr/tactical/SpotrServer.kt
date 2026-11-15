@@ -21,7 +21,8 @@ import java.net.URL
  */
 class SpotrServer(
     private val context: Context,
-    port: Int = 8080
+    port: Int = 8080,
+    private val uvcSession: UsbUvcSessionManager = UsbUvcSessionManager(context)
 ) : NanoHTTPD("127.0.0.1", port) {
 
     companion object {
@@ -32,6 +33,7 @@ class SpotrServer(
 
     override fun stop() {
         rtspSession.stop()
+        uvcSession.stop()
         super.stop()
     }
 
@@ -77,9 +79,45 @@ class SpotrServer(
             return newJsonResponse(Response.Status.OK, res.toString())
         }
 
-        // 4. API: Ultra-Low-Latency Multipart MJPEG Stream
+        // 4. API: Ultra-Low-Latency Multipart MJPEG Stream (RTSP)
         if (uri == "/api/rtsp/stream") {
             return handleRtspStream(params)
+        }
+
+        // 4b. API: USB UVC Camera Discovery & Streaming
+        if (uri == "/api/uvc/list") {
+            val status = uvcSession.getStatusJson()
+            status.put("supported", true)
+            status.put("cameras", uvcSession.listUvcCamerasJson())
+            return newJsonResponse(Response.Status.OK, status.toString())
+        }
+
+        if (uri == "/api/uvc/status") {
+            return newJsonResponse(Response.Status.OK, uvcSession.getStatusJson().toString())
+        }
+
+        if (uri == "/api/uvc/stop") {
+            uvcSession.stop()
+            val res = JSONObject().apply {
+                put("success", true)
+                put("message", "USB UVC stream stopped")
+            }
+            return newJsonResponse(Response.Status.OK, res.toString())
+        }
+
+        if (uri == "/api/uvc/pause") {
+            val pausedRaw = (params["paused"]?.firstOrNull() ?: "1").trim().lowercase()
+            val paused = pausedRaw == "1" || pausedRaw == "true"
+            uvcSession.setEncodePaused(paused)
+            val res = JSONObject().apply {
+                put("success", true)
+                put("paused", paused)
+            }
+            return newJsonResponse(Response.Status.OK, res.toString())
+        }
+
+        if (uri == "/api/uvc/stream") {
+            return handleUvcStream(params)
         }
 
         // 5. Static File Serving from APK assets (core/)
@@ -210,11 +248,45 @@ class SpotrServer(
             return newJsonResponse(Response.Status.INTERNAL_ERROR, err.toString())
         }
 
-        return MjpegStreamResponse(sessionId)
+        return MjpegStreamResponse(
+            sessionId = sessionId,
+            streamTo = { out -> rtspSession.streamMjpegTo(sessionId, out) },
+            stopSession = { rtspSession.stop(expectedSessionId = sessionId) }
+        )
+    }
+
+    /**
+     * Streams continuous multipart/x-mixed-replace JPEG frames from an attached USB UVC camera.
+     */
+    private fun handleUvcStream(params: Map<String, List<String>>): Response {
+        val deviceId = (params["deviceId"]?.firstOrNull() ?: "uvc:auto").trim()
+        // Stop any active RTSP session before opening USB camera
+        rtspSession.stop()
+
+        Log.d(TAG, "USB UVC stream requested for: $deviceId")
+        val sessionId = uvcSession.start(deviceId)
+
+        val startupError = uvcSession.waitForInitialFrame(sessionId, timeoutMs = 18000L)
+        if (startupError != null) {
+            uvcSession.stop(expectedSessionId = sessionId)
+            val err = JSONObject().apply {
+                put("success", false)
+                put("error", startupError)
+            }
+            return newJsonResponse(Response.Status.INTERNAL_ERROR, err.toString())
+        }
+
+        return MjpegStreamResponse(
+            sessionId = sessionId,
+            streamTo = { out -> uvcSession.streamMjpegTo(sessionId, out) },
+            stopSession = { uvcSession.stop(expectedSessionId = sessionId) }
+        )
     }
 
     private inner class MjpegStreamResponse(
-        private val sessionId: Long
+        private val sessionId: Long,
+        private val streamTo: (OutputStream) -> Unit,
+        private val stopSession: () -> Unit
     ) : Response(
         Status.OK,
         "multipart/x-mixed-replace; boundary=frame",
@@ -239,11 +311,11 @@ class SpotrServer(
                     ).toByteArray(Charsets.US_ASCII)
                 outputStream.write(headers)
                 outputStream.flush()
-                rtspSession.streamMjpegTo(sessionId, outputStream)
+                streamTo(outputStream)
             } catch (e: Exception) {
                 Log.d(TAG, "MJPEG response ended for session #$sessionId: ${e.message}")
             } finally {
-                rtspSession.stop(expectedSessionId = sessionId)
+                stopSession()
             }
         }
     }
