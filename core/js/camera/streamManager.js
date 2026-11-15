@@ -1,7 +1,7 @@
 /**
  * USB Camera Enumeration, Stream Acquisition & Simulated Inspection Signal Fallback
  */
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 
 let activeMediaStream = null;
 let simCanvas = null;
@@ -9,9 +9,34 @@ let staticBgCanvas = null;
 let simTimer = null;
 let rtspImg = null;
 let rtspCanvas = null;
+let rtspFrameSeq = 0;
 let rtspAnimTimer = null;
 let rtspDrawLoopActive = false;
 let rtspAbortController = null;
+let lastGatewayPaused = false;
+const rtspJpegListeners = new Set();
+
+subscribeState((state) => {
+  if (!state.isRtspStream) {
+    lastGatewayPaused = false;
+    return;
+  }
+  const shouldPause = Boolean(state.replayActive || state.currentScreen === 'gallery');
+  if (shouldPause !== lastGatewayPaused) {
+    lastGatewayPaused = shouldPause;
+    const gatewayBase = getGatewayBaseUrl();
+    fetch(`${gatewayBase}/api/rtsp/pause?paused=${shouldPause ? '1' : '0'}`, { method: 'POST' }).catch(() => {});
+  }
+});
+
+export function subscribeRtspJpegFrames(listener) {
+  rtspJpegListeners.add(listener);
+  return () => rtspJpegListeners.delete(listener);
+}
+
+export function getRtspFrameSeq() {
+  return rtspFrameSeq;
+}
 
 export function getGatewayBaseUrl() {
   const host = (appState.rtspGatewayHost || '').trim();
@@ -332,7 +357,8 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
   rtspCanvas = document.createElement('canvas');
   rtspCanvas.width = initW;
   rtspCanvas.height = initH;
-  const ctx = rtspCanvas.getContext('2d');
+  rtspFrameSeq = 1;
+  const ctx = rtspCanvas.getContext('2d', { alpha: false }) || rtspCanvas.getContext('2d');
 
   // Fill initial dark backdrop with tactical status
   ctx.fillStyle = '#051317';
@@ -381,6 +407,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     ctx.font = '15px monospace';
     ctx.fillStyle = '#94a3b8';
     ctx.fillText(detailMsg.slice(0, 110), rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
+    rtspFrameSeq += 1;
   };
 
   rtspDrawLoopActive = true;
@@ -416,6 +443,11 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
 
   const scheduleDecode = () => {
     if (decodingFrame || !pendingJpeg || !rtspDrawLoopActive || abortCtrl.signal.aborted) return;
+    // Skip browser-side JPEG decode & canvas draw when live viewport is hidden (replay/gallery/settings)
+    if (appState.replayActive || appState.currentScreen !== 'live') {
+      pendingJpeg = null;
+      return;
+    }
     const bytes = pendingJpeg;
     pendingJpeg = null;
     decodingFrame = true;
@@ -426,6 +458,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
           if (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
             syncFrameDimensions(bmp.width, bmp.height);
             ctx.drawImage(bmp, 0, 0, rtspCanvas.width, rtspCanvas.height);
+            rtspFrameSeq += 1;
           }
         } finally {
           bmp.close();
@@ -449,6 +482,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
       if (rtspImg.complete && rtspImg.naturalWidth > 0) {
         syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
         ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
+        rtspFrameSeq += 1;
       }
       rtspAnimTimer = requestAnimationFrame(drawLoop);
     };
@@ -514,9 +548,18 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
             frameFill += take;
             pos += take;
             if (frameFill === frameBuf.length) {
-              pendingJpeg = frameBuf;
+              const completedFrame = frameBuf;
               frameBuf = null;
               frameFill = 0;
+              if (rtspJpegListeners.size > 0) {
+                const nowMs = performance.now();
+                for (const listener of rtspJpegListeners) {
+                  try {
+                    listener(completedFrame, lastTrackedW, lastTrackedH, nowMs);
+                  } catch {}
+                }
+              }
+              pendingJpeg = completedFrame;
               scheduleDecode();
             }
           } else {
@@ -557,10 +600,10 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     }
   })();
 
-  const stream = rtspCanvas.captureStream(30);
-  activeMediaStream = stream;
-  videoEl.srcObject = stream;
-  videoEl.play().catch(() => {});
+  if (videoEl) {
+    videoEl.pause?.();
+    videoEl.srcObject = null;
+  }
 
   updateState({
     activeDeviceId: 'rtsp:' + rtspUrl,
@@ -571,7 +614,7 @@ export async function startRtspStream(videoEl, rtspUrl, label = 'RTSP STREAM') {
     isRtspStream: true
   });
 
-  return stream;
+  return null;
 }
 
 export function stopCurrentStream() {
@@ -603,6 +646,9 @@ export function stopCurrentStream() {
     activeMediaStream.getTracks().forEach((t) => t.stop());
     activeMediaStream = null;
   }
+  rtspCanvas = null;
+  rtspFrameSeq = 0;
+  lastGatewayPaused = false;
   // Only notify local Python server to release RTSP socket if an RTSP stream was active
   if (appState.isRtspStream) {
     updateState({ isRtspStream: false });

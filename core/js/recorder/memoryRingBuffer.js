@@ -3,22 +3,24 @@
  *
  * Captures frames at the camera stream's native resolution (e.g. 1920×1080)
  * and stores only compressed JPEG ArrayBuffers in RAM.
- * Supports user-adjustable duration (seconds) and frame rate (FPS) with live
- * RAM usage, audio amplitude sampling, and external event recording.
+ * For RTSP streams, ingests incoming JPEG frames directly with zero canvas
+ * readback or double-JPEG re-encoding.
  */
 import { appState, updateState } from '../state.js';
-import { getRtspCanvas } from '../camera/streamManager.js';
+import { subscribeRtspJpegFrames } from '../camera/streamManager.js';
 import { getSoundPeak, initSoundSampler } from '../audio/soundSampler.js';
 
 let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height, soundPeak }
 let ringEvents = []; // Array of { timestampMs, type }
 let totalBytes = 0;
 let captureInterval = null;
+let rtspUnsubscribe = null;
 let captureCanvas = null;
 let captureCtx = null;
 let encodingInProgress = false;
 let currentVideoEl = null;
 let lastBufferStateUpdateTime = 0;
+let lastRtspCaptureMs = 0;
 
 /**
  * Records an external detection event (e.g. Micro-Change Heatmap target hit)
@@ -66,6 +68,49 @@ export function getEstimatedBufferMB() {
   return Number(((estFrameBytes * totalTargetFrames) / (1024 * 1024)).toFixed(1));
 }
 
+function appendFrameToRing(jpegBuffer, width, height, capturedAt, soundPeak, targetFps) {
+  frameRing.push({
+    timestampMs: capturedAt,
+    jpegBuffer,
+    width,
+    height,
+    soundPeak
+  });
+  totalBytes += jpegBuffer.byteLength;
+
+  const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
+  const maxFrames = maxSec * targetFps;
+  const cutoff = capturedAt - maxSec * 1000;
+  const maxBudgetBytes = getAvailableMemoryBudgetMB() * 1024 * 1024;
+
+  while (
+    frameRing.length > maxFrames ||
+    (frameRing.length > 2 && frameRing[0].timestampMs < cutoff) ||
+    (frameRing.length > 2 && totalBytes > maxBudgetBytes)
+  ) {
+    const old = frameRing.shift();
+    totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
+  }
+
+  // Prune events outside rolling window
+  ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
+
+  const spanSec =
+    frameRing.length > 1
+      ? Math.min(maxSec, (frameRing[frameRing.length - 1].timestampMs - frameRing[0].timestampMs) / 1000)
+      : frameRing.length > 0
+        ? Number((1 / targetFps).toFixed(1))
+        : 0;
+
+  if (capturedAt - lastBufferStateUpdateTime >= 500) {
+    lastBufferStateUpdateTime = capturedAt;
+    updateState({
+      bufferedSeconds: Number(spanSec.toFixed(1)),
+      bufferBytes: totalBytes
+    });
+  }
+}
+
 export function startMemoryBuffer(videoEl) {
   if (videoEl) {
     currentVideoEl = videoEl;
@@ -74,28 +119,49 @@ export function startMemoryBuffer(videoEl) {
     clearInterval(captureInterval);
     captureInterval = null;
   }
+  if (rtspUnsubscribe) {
+    rtspUnsubscribe();
+    rtspUnsubscribe = null;
+  }
   if (!appState.bufferEnabled || !currentVideoEl) return;
 
   // Initialize sound sampler if mic available
   initSoundSampler().catch(() => {});
 
-  if (!captureCanvas) {
-    captureCanvas = document.createElement('canvas');
-    captureCtx = captureCanvas.getContext('2d');
-  }
-
   const targetFps = Math.max(5, Math.min(30, appState.bufferTargetFps || 15));
   const intervalMs = Math.round(1000 / targetFps);
+  const minRtspIntervalMs = (1000 / targetFps) * 0.92;
 
+  // Direct zero-reencode RTSP JPEG ingestion
+  rtspUnsubscribe = subscribeRtspJpegFrames((jpegBytes, w, h, nowMs) => {
+    if (!appState.bufferEnabled || appState.replayActive || !appState.isRtspStream) return;
+    if (nowMs - lastRtspCaptureMs < minRtspIntervalMs) return;
+    lastRtspCaptureMs = nowMs;
+
+    const jpegBuffer =
+      jpegBytes.byteOffset === 0 && jpegBytes.byteLength === jpegBytes.buffer.byteLength
+        ? jpegBytes.buffer
+        : jpegBytes.slice().buffer;
+
+    appendFrameToRing(
+      jpegBuffer,
+      w || appState.streamWidth || 1920,
+      h || appState.streamHeight || 1080,
+      nowMs,
+      getSoundPeak(),
+      targetFps
+    );
+  });
+
+  if (!captureCanvas) {
+    captureCanvas = document.createElement('canvas');
+    captureCtx = captureCanvas.getContext('2d', { alpha: false }) || captureCanvas.getContext('2d');
+  }
+
+  // Fallback canvas capture loop for USB UVC & simulated streams
   captureInterval = setInterval(() => {
-    if (!appState.bufferEnabled || appState.replayActive || encodingInProgress) return;
-    let source = currentVideoEl;
-    if (appState.isRtspStream) {
-      const rtspCanv = getRtspCanvas();
-      if (rtspCanv && rtspCanv.width > 0) {
-        source = rtspCanv;
-      }
-    }
+    if (!appState.bufferEnabled || appState.replayActive || appState.isRtspStream || encodingInProgress) return;
+    const source = currentVideoEl;
     if (!source) return;
     if (source.tagName === 'VIDEO' && source.readyState < 2) return;
 
@@ -118,48 +184,7 @@ export function startMemoryBuffer(videoEl) {
           try {
             if (!blob || !appState.bufferEnabled) return;
             const jpegBuffer = await blob.arrayBuffer();
-
-            frameRing.push({
-              timestampMs: capturedAt,
-              jpegBuffer,
-              width: nativeW,
-              height: nativeH,
-              soundPeak: currentPeak
-            });
-            totalBytes += jpegBuffer.byteLength;
-
-            const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
-            const maxFrames = maxSec * targetFps;
-            const cutoff = capturedAt - maxSec * 1000;
-            const maxBudgetBytes = getAvailableMemoryBudgetMB() * 1024 * 1024;
-
-            while (
-              frameRing.length > maxFrames ||
-              (frameRing.length > 2 && frameRing[0].timestampMs < cutoff) ||
-              (frameRing.length > 2 && totalBytes > maxBudgetBytes)
-            ) {
-              const old = frameRing.shift();
-              totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
-            }
-
-            // Prune events outside rolling window
-            ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
-
-            const spanSec =
-              frameRing.length > 1
-                ? Math.min(maxSec, (frameRing[frameRing.length - 1].timestampMs - frameRing[0].timestampMs) / 1000)
-                : frameRing.length > 0
-                  ? Number((1 / targetFps).toFixed(1))
-                  : 0;
-
-            const now = capturedAt;
-            if (now - lastBufferStateUpdateTime >= 500) {
-              lastBufferStateUpdateTime = now;
-              updateState({
-                bufferedSeconds: Number(spanSec.toFixed(1)),
-                bufferBytes: totalBytes
-              });
-            }
+            appendFrameToRing(jpegBuffer, nativeW, nativeH, capturedAt, currentPeak, targetFps);
           } finally {
             encodingInProgress = false;
           }
@@ -188,11 +213,16 @@ export function stopMemoryBuffer() {
     clearInterval(captureInterval);
     captureInterval = null;
   }
+  if (rtspUnsubscribe) {
+    rtspUnsubscribe();
+    rtspUnsubscribe = null;
+  }
   frameRing = [];
   ringEvents = [];
   totalBytes = 0;
   encodingInProgress = false;
   lastBufferStateUpdateTime = 0;
+  lastRtspCaptureMs = 0;
   updateState({ bufferedSeconds: 0, bufferBytes: 0 });
 }
 
@@ -205,7 +235,13 @@ export async function snapshotMemoryBuffer() {
   const durationSec = Math.max(0.5, Math.min(maxSec, (lastTs - firstTs) / 1000));
   const lastFrame = frameRing[frameRing.length - 1];
 
-  const jpegFrames = frameRing.map((f) => f.jpegBuffer.slice(0));
+  // Zero-copy snapshot: frameRing never mutates individual ArrayBuffer contents
+  const jpegFrames = frameRing.map((f) => f.jpegBuffer);
+  const frameTimestamps = frameRing.map((f) => Number(((f.timestampMs - firstTs) / 1000).toFixed(3)));
+  const effectiveFps =
+    frameRing.length > 1
+      ? Math.max(1, Math.min(60, Math.round((frameRing.length - 1) / durationSec)))
+      : appState.bufferTargetFps || 15;
 
   // Downsample sound peaks to up to 80 bins across duration
   const rawPeaks = frameRing.map((f) => f.soundPeak || 0);
@@ -238,7 +274,8 @@ export async function snapshotMemoryBuffer() {
 
   return {
     jpegFrames,
-    fps: appState.bufferTargetFps || 15,
+    frameTimestamps,
+    fps: effectiveFps,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: totalBytes,
     width: lastFrame.width || appState.streamWidth || 1920,

@@ -70,6 +70,8 @@ class MediaCodecJpegDecoder(
 
     @Volatile
     private var released = false
+    @Volatile
+    var encodePaused = false
 
     fun start(width: Int = 1920, height: Int = 1080) {
         initialWidth = width
@@ -328,12 +330,14 @@ class MediaCodecJpegDecoder(
 
         if (latestOutIndex >= 0) {
             try {
-                val image = mc.getOutputImage(latestOutIndex)
-                if (image != null) {
-                    try {
-                        submitImageForJpeg(image)
-                    } finally {
-                        image.close()
+                if (!encodePaused) {
+                    val image = mc.getOutputImage(latestOutIndex)
+                    if (image != null) {
+                        try {
+                            submitImageForJpeg(image)
+                        } finally {
+                            image.close()
+                        }
                     }
                 }
             } finally {

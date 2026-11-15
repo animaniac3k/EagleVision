@@ -1,13 +1,15 @@
 /**
- * IndexedDB Storage & Disk Export for Saved 20-Second Video Clips
+ * IndexedDB Storage & Disk Export for Saved Video Clips
  *
- * Stores frame-accurate compressed JPEG buffers in IndexedDB for 100% reliable
- * playback, slow-motion, and frame-stepping in the Stored Video Viewer, and
- * encodes a standard .webm video file when exporting to disk.
+ * Separates lightweight clip metadata (`clipMeta`) from heavy JPEG frame
+ * buffers (`clipFrames`) so listing clips is instantaneous regardless of
+ * archive size, and encodes a standard .webm video file when exporting.
  */
 const DB_NAME = 'SPOTRVideoDB';
-const DB_VERSION = 3;
-const STORE_NAME = 'clips';
+const DB_VERSION = 4;
+const LEGACY_STORE = 'clips';
+const META_STORE = 'clipMeta';
+const FRAMES_STORE = 'clipFrames';
 
 let cachedDbInstance = null;
 
@@ -15,13 +17,56 @@ function openDB() {
   if (cachedDbInstance) return Promise.resolve(cachedDbInstance);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
-      if (db.objectStoreNames.contains(STORE_NAME)) {
-        db.deleteObjectStore(STORE_NAME);
+      const tx = event.target.transaction;
+
+      let metaStore;
+      if (!db.objectStoreNames.contains(META_STORE)) {
+        metaStore = db.createObjectStore(META_STORE, { keyPath: 'id' });
+        metaStore.createIndex('createdAt', 'createdAt', { unique: false });
+      } else {
+        metaStore = tx.objectStore(META_STORE);
       }
-      const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      store.createIndex('createdAt', 'createdAt', { unique: false });
+
+      const framesStore = db.objectStoreNames.contains(FRAMES_STORE)
+        ? tx.objectStore(FRAMES_STORE)
+        : db.createObjectStore(FRAMES_STORE, { keyPath: 'id' });
+
+      // Migrate v3 single-store clips into split metadata/frames stores without data loss
+      if (db.objectStoreNames.contains(LEGACY_STORE)) {
+        const legacyStore = tx.objectStore(LEGACY_STORE);
+        const cursorReq = legacyStore.openCursor();
+        cursorReq.onsuccess = (e) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const item = cursor.value;
+            const frames = Array.isArray(item.jpegFrames) ? item.jpegFrames : [];
+            if (frames.length > 0) {
+              metaStore.put({
+                id: item.id,
+                name: item.name,
+                createdAt: item.createdAt,
+                fps: item.fps || 15,
+                durationSec: item.durationSec,
+                sizeBytes: item.sizeBytes,
+                width: item.width || 1920,
+                height: item.height || 1080,
+                frameCount: frames.length,
+                timeline: item.timeline || { soundPeaks: [], events: [] }
+              });
+              framesStore.put({
+                id: item.id,
+                jpegFrames: frames,
+                frameTimestamps: item.frameTimestamps || null
+              });
+            }
+            cursor.continue();
+          } else {
+            db.deleteObjectStore(LEGACY_STORE);
+          }
+        };
+      }
     };
     req.onsuccess = () => {
       cachedDbInstance = req.result;
@@ -36,14 +81,24 @@ function openDB() {
   });
 }
 
-export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, width, height, timeline }) {
+export async function saveVideoClip({
+  jpegFrames,
+  frameTimestamps = null,
+  fps,
+  durationSec,
+  sizeBytes,
+  width,
+  height,
+  timeline
+}) {
   const db = await openDB();
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
-  const record = {
-    id: `clip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  const id = `clip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const metaRecord = {
+    id,
     name: `CLIP_${stamp}.WEBM`,
     createdAt: Date.now(),
     fps: fps || 15,
@@ -51,14 +106,21 @@ export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, w
     sizeBytes: sizeBytes || jpegFrames.reduce((acc, b) => acc + b.byteLength, 0),
     width: width || 1920,
     height: height || 1080,
-    jpegFrames,
+    frameCount: jpegFrames.length,
     timeline: timeline || { soundPeaks: [], events: [] }
   };
 
+  const framesRecord = {
+    id,
+    jpegFrames,
+    frameTimestamps: Array.isArray(frameTimestamps) ? frameTimestamps : null
+  };
+
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(record);
-    tx.oncomplete = () => resolve(record);
+    const tx = db.transaction([META_STORE, FRAMES_STORE], 'readwrite');
+    tx.objectStore(META_STORE).put(metaRecord);
+    tx.objectStore(FRAMES_STORE).put(framesRecord);
+    tx.oncomplete = () => resolve(metaRecord);
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -66,33 +128,12 @@ export async function saveVideoClip({ jpegFrames, fps, durationSec, sizeBytes, w
 export async function listVideoClips() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const items = [];
-    const req = store.openCursor();
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor) {
-        const item = cursor.value;
-        const frameCount = Array.isArray(item.jpegFrames) ? item.jpegFrames.length : 0;
-        if (frameCount > 0) {
-          items.push({
-            id: item.id,
-            name: item.name,
-            createdAt: item.createdAt,
-            fps: item.fps || 15,
-            durationSec: item.durationSec,
-            sizeBytes: item.sizeBytes,
-            width: item.width || 1920,
-            height: item.height || 1080,
-            frameCount
-          });
-        }
-        cursor.continue();
-      } else {
-        items.sort((a, b) => b.createdAt - a.createdAt);
-        resolve(items);
-      }
+    const tx = db.transaction(META_STORE, 'readonly');
+    const req = tx.objectStore(META_STORE).getAll();
+    req.onsuccess = () => {
+      const items = (req.result || []).filter((item) => (item.frameCount || 0) > 0);
+      items.sort((a, b) => b.createdAt - a.createdAt);
+      resolve(items);
     };
     req.onerror = () => reject(req.error);
   });
@@ -101,18 +142,36 @@ export async function listVideoClips() {
 export async function getVideoClip(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(id);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
+    const tx = db.transaction([META_STORE, FRAMES_STORE], 'readonly');
+    const metaReq = tx.objectStore(META_STORE).get(id);
+    const framesReq = tx.objectStore(FRAMES_STORE).get(id);
+    let meta = null;
+    let frames = null;
+
+    metaReq.onsuccess = () => { meta = metaReq.result || null; };
+    framesReq.onsuccess = () => { frames = framesReq.result || null; };
+
+    tx.oncomplete = () => {
+      if (!meta || !frames) {
+        resolve(null);
+        return;
+      }
+      resolve({
+        ...meta,
+        jpegFrames: frames.jpegFrames || [],
+        frameTimestamps: frames.frameTimestamps || null
+      });
+    };
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 export async function deleteVideoClip(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(id);
+    const tx = db.transaction([META_STORE, FRAMES_STORE], 'readwrite');
+    tx.objectStore(META_STORE).delete(id);
+    tx.objectStore(FRAMES_STORE).delete(id);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
@@ -126,9 +185,10 @@ export async function exportClipToDisk(clip) {
   const canvas = document.createElement('canvas');
   canvas.width = clip.width || 1920;
   canvas.height = clip.height || 1080;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false }) || canvas.getContext('2d');
 
-  const stream = canvas.captureStream(clip.fps || 15);
+  const exportFps = clip.fps || 15;
+  const stream = canvas.captureStream(exportFps);
   const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
     ? 'video/webm;codecs=vp8'
     : 'video/webm';
@@ -143,12 +203,34 @@ export async function exportClipToDisk(clip) {
   });
 
   recorder.start();
-  const frameIntervalMs = Math.round(1000 / (clip.fps || 15));
-  for (const buf of clip.jpegFrames) {
-    const bmp = await createImageBitmap(new Blob([buf], { type: 'image/jpeg' }));
+
+  const frames = clip.jpegFrames || [];
+  const timestamps = Array.isArray(clip.frameTimestamps) && clip.frameTimestamps.length === frames.length
+    ? clip.frameTimestamps
+    : null;
+  const frameIntervalMs = 1000 / exportFps;
+  const startMs = performance.now();
+
+  let nextBitmapPromise = frames.length > 0
+    ? createImageBitmap(new Blob([frames[0]], { type: 'image/jpeg' }))
+    : null;
+
+  for (let i = 0; i < frames.length; i++) {
+    const bmp = await nextBitmapPromise;
+    nextBitmapPromise = i + 1 < frames.length
+      ? createImageBitmap(new Blob([frames[i + 1]], { type: 'image/jpeg' }))
+      : null;
+
     ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
     if (bmp.close) bmp.close();
-    await new Promise((r) => setTimeout(r, frameIntervalMs));
+
+    const targetElapsedMs = timestamps
+      ? (i + 1 < frames.length ? timestamps[i + 1] * 1000 : (clip.durationSec || 0) * 1000)
+      : (i + 1) * frameIntervalMs;
+    const waitMs = startMs + targetElapsedMs - performance.now();
+    if (waitMs > 2) {
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
   }
   recorder.stop();
   const webmBlob = await blobPromise;

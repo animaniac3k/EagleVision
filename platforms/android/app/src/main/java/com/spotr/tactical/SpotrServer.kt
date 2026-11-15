@@ -65,6 +65,18 @@ class SpotrServer(
             return newJsonResponse(Response.Status.OK, res.toString())
         }
 
+        // 3b. API: Pause/Resume JPEG encoding (keeps RTSP session synced during replay/gallery)
+        if (uri == "/api/rtsp/pause") {
+            val pausedRaw = (params["paused"]?.firstOrNull() ?: "1").trim().lowercase()
+            val paused = pausedRaw == "1" || pausedRaw == "true"
+            rtspSession.setEncodePaused(paused)
+            val res = JSONObject().apply {
+                put("success", true)
+                put("paused", paused)
+            }
+            return newJsonResponse(Response.Status.OK, res.toString())
+        }
+
         // 4. API: Ultra-Low-Latency Multipart MJPEG Stream
         if (uri == "/api/rtsp/stream") {
             return handleRtspStream(params)

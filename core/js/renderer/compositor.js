@@ -11,6 +11,7 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
+import { getRtspCanvas, getRtspFrameSeq } from '../camera/streamManager.js';
 import { getClickDistanceInPixels } from './overlayManager.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
@@ -293,86 +294,108 @@ export function initCompositor(videoEl) {
   mainCanvas.addEventListener('pointerup', stopPan);
   mainCanvas.addEventListener('pointercancel', stopPan);
 
+  let lastRenderKey = '';
+
   function renderLoop() {
-    if (appState.currentScreen === 'live' && !appState.replayActive && videoEl.readyState >= 2) {
-      const vw = videoEl.videoWidth || appState.streamWidth || 1920;
-      const vh = videoEl.videoHeight || appState.streamHeight || 1080;
-      const cw = mainCanvas.width;
-      const ch = mainCanvas.height;
+    if (appState.currentScreen === 'live' && !appState.replayActive) {
+      const isRtsp = Boolean(appState.isRtspStream);
+      const rtspCanv = isRtsp ? getRtspCanvas() : null;
+      const source = isRtsp ? rtspCanv : videoEl;
+      const sourceReady = isRtsp
+        ? Boolean(rtspCanv && rtspCanv.width > 0 && rtspCanv.height > 0)
+        : Boolean(videoEl && videoEl.readyState >= 2);
 
-      const videoAspect = vw / vh;
-      const canvasAspect = cw / ch;
-      let baseW = vw;
-      let baseH = vh;
-      if (canvasAspect > videoAspect) {
-        baseH = vw / canvasAspect;
-      } else {
-        baseW = vh * canvasAspect;
-      }
-
-      const zoom = appState.mainZoom;
-      const cropW = baseW / zoom;
-      const cropH = baseH / zoom;
-      const centerX = vw * (0.5 + appState.mainPanX);
-      const centerY = vh * (0.5 + appState.mainPanY);
-      const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
-      const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
-
-      if (appState.heatmapEnabled) {
-        const nowMs = performance.now();
-        if (nowMs - lastHeatComputeMs >= 48) { // Decouple heavy pixel analysis to ~20Hz to eliminate GPU readback stalls
-          updateHeatmap(videoEl, sx, sy, cropW, cropH, vw, vh, cw, ch);
-          lastHeatComputeMs = nowMs;
-        }
-      }
-
-      // 1. Render Main Canvas
-      mainCtx.drawImage(videoEl, sx, sy, cropW, cropH, 0, 0, cw, ch);
-      if (appState.heatmapEnabled) {
-        mainCtx.drawImage(
-          heatOverlayCanvas,
-          (sx / vw) * HEAT_W,
-          (sy / vh) * HEAT_H,
-          (cropW / vw) * HEAT_W,
-          (cropH / vh) * HEAT_H,
-          0,
-          0,
-          cw,
-          ch
-        );
-      }
-
-      // 2. Render Magnified PiP Zoom Window
-      if (appState.pipEnabled) {
+      if (sourceReady) {
+        const vw = (isRtsp ? source.width : videoEl.videoWidth) || appState.streamWidth || 1920;
+        const vh = (isRtsp ? source.height : videoEl.videoHeight) || appState.streamHeight || 1080;
+        const cw = mainCanvas.width;
+        const ch = mainCanvas.height;
         const pw = pipCanvas.width || 340;
         const ph = pipCanvas.height || 210;
 
-        const targetSourceX = sx + appState.roiX * cropW;
-        const targetSourceY = sy + appState.roiY * cropH;
+        if (isRtsp) {
+          const heatTick = appState.heatmapEnabled ? Math.floor(performance.now() / 48) : 0;
+          const renderKey = `${getRtspFrameSeq()}|${vw}x${vh}|${cw}x${ch}|${pw}x${ph}|${appState.mainZoom}|${appState.mainPanX}|${appState.mainPanY}|${appState.pipEnabled}|${appState.pipZoom}|${appState.roiX}|${appState.roiY}|${appState.heatmapEnabled}|${heatTick}`;
+          if (renderKey === lastRenderKey) {
+            requestAnimationFrame(renderLoop);
+            return;
+          }
+          lastRenderKey = renderKey;
+        } else {
+          lastRenderKey = '';
+        }
 
-        const pipCropW = (cropW * (pw / cw)) / appState.pipZoom;
-        const pipCropH = (cropH * (ph / ch)) / appState.pipZoom;
+        const videoAspect = vw / vh;
+        const canvasAspect = cw / ch;
+        let baseW = vw;
+        let baseH = vh;
+        if (canvasAspect > videoAspect) {
+          baseH = vw / canvasAspect;
+        } else {
+          baseW = vh * canvasAspect;
+        }
 
-        const psx = Math.max(0, Math.min(vw - pipCropW, targetSourceX - pipCropW / 2));
-        const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
+        const zoom = appState.mainZoom;
+        const cropW = baseW / zoom;
+        const cropH = baseH / zoom;
+        const centerX = vw * (0.5 + appState.mainPanX);
+        const centerY = vh * (0.5 + appState.mainPanY);
+        const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
+        const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
 
-        pipCtx.drawImage(videoEl, psx, psy, pipCropW, pipCropH, 0, 0, pw, ph);
         if (appState.heatmapEnabled) {
-          pipCtx.drawImage(
+          const nowMs = performance.now();
+          if (nowMs - lastHeatComputeMs >= 48) { // Decouple heavy pixel analysis to ~20Hz to eliminate GPU readback stalls
+            updateHeatmap(source, sx, sy, cropW, cropH, vw, vh, cw, ch);
+            lastHeatComputeMs = nowMs;
+          }
+        }
+
+        // 1. Render Main Canvas
+        mainCtx.drawImage(source, sx, sy, cropW, cropH, 0, 0, cw, ch);
+        if (appState.heatmapEnabled) {
+          mainCtx.drawImage(
             heatOverlayCanvas,
-            (psx / vw) * HEAT_W,
-            (psy / vh) * HEAT_H,
-            (pipCropW / vw) * HEAT_W,
-            (pipCropH / vh) * HEAT_H,
+            (sx / vw) * HEAT_W,
+            (sy / vh) * HEAT_H,
+            (cropW / vw) * HEAT_W,
+            (cropH / vh) * HEAT_H,
             0,
             0,
-            pw,
-            ph
+            cw,
+            ch
           );
         }
-      }
 
-      recordRenderedFrame(videoEl);
+        // 2. Render Magnified PiP Zoom Window
+        if (appState.pipEnabled) {
+          const targetSourceX = sx + appState.roiX * cropW;
+          const targetSourceY = sy + appState.roiY * cropH;
+
+          const pipCropW = (cropW * (pw / cw)) / appState.pipZoom;
+          const pipCropH = (cropH * (ph / ch)) / appState.pipZoom;
+
+          const psx = Math.max(0, Math.min(vw - pipCropW, targetSourceX - pipCropW / 2));
+          const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
+
+          pipCtx.drawImage(source, psx, psy, pipCropW, pipCropH, 0, 0, pw, ph);
+          if (appState.heatmapEnabled) {
+            pipCtx.drawImage(
+              heatOverlayCanvas,
+              (psx / vw) * HEAT_W,
+              (psy / vh) * HEAT_H,
+              (pipCropW / vw) * HEAT_W,
+              (pipCropH / vh) * HEAT_H,
+              0,
+              0,
+              pw,
+              ph
+            );
+          }
+        }
+
+        recordRenderedFrame(videoEl);
+      }
     }
 
     requestAnimationFrame(renderLoop);

@@ -53,6 +53,11 @@ class RtspSession:
         self.fps = 0
         self.error_message = None
         self.worker_thread = None
+        self.encode_paused = False
+
+    def set_encode_paused(self, paused):
+        with self.lock:
+            self.encode_paused = bool(paused)
 
     def start(self, url, transport="tcp"):
         with self.lock:
@@ -69,6 +74,7 @@ class RtspSession:
             self.is_running = True
             self.error_message = None
             self.latest_jpeg = None
+            self.encode_paused = False
             self.worker_thread = threading.Thread(target=self._capture_worker, args=(url, transport), daemon=True)
             self.worker_thread.start()
             return True
@@ -112,6 +118,9 @@ class RtspSession:
 
                 consecutive_failures = 0
 
+                if self.encode_paused:
+                    continue
+
                 ret, frame = cap.retrieve()
                 if not ret or frame is None:
                     continue
@@ -119,7 +128,7 @@ class RtspSession:
                 h, w = frame.shape[:2]
 
                 # Encode directly to JPEG for browser multipart stream
-                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
                 if not ret:
                     continue
 
@@ -215,6 +224,13 @@ class SPOTRRequestHandler(http.server.SimpleHTTPRequestHandler):
         if parsed.path == '/api/rtsp/stop':
             rtsp_session.stop()
             self.send_json_response(200, {"success": True, "message": "RTSP stream stopped"})
+            return
+        if parsed.path == '/api/rtsp/pause':
+            query = urllib.parse.parse_qs(parsed.query)
+            paused_raw = query.get('paused', ['1'])[0].strip().lower()
+            paused = paused_raw in ('1', 'true')
+            rtsp_session.set_encode_paused(paused)
+            self.send_json_response(200, {"success": True, "paused": paused})
             return
         self.send_error(404, "Endpoint not found")
 

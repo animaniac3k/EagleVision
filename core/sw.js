@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v0.1.6';
+const CACHE_NAME = 'spotr-v0.1.7';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './js/audio/voiceManifest.js',
   './js/audio/voiceAudioEngine.js',
   './js/recorder/memoryRingBuffer.js',
+  './js/recorder/jpegFramePlayer.js',
   './js/recorder/instantReplay.js',
   './js/storage/videoStore.js',
   './js/storage/settingsStore.js',

@@ -7,6 +7,11 @@ let frameCount = 0;
 let lastMark = performance.now();
 
 export function recordRenderedFrame(videoEl) {
+  if (appState.isRtspStream) {
+    frameCount = 0;
+    lastMark = performance.now();
+    return;
+  }
   frameCount += 1;
   const now = performance.now();
   const elapsed = now - lastMark;
@@ -17,7 +22,7 @@ export function recordRenderedFrame(videoEl) {
     lastMark = now;
 
     const patch = { fps };
-    if (!appState.isRtspStream && videoEl && videoEl.videoWidth && videoEl.videoHeight) {
+    if (videoEl && videoEl.videoWidth && videoEl.videoHeight) {
       patch.streamWidth = videoEl.videoWidth;
       patch.streamHeight = videoEl.videoHeight;
     }

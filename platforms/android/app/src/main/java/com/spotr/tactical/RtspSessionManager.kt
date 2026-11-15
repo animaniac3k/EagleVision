@@ -3,6 +3,7 @@ package com.spotr.tactical
 import android.media.MediaFormat
 import android.util.Log
 import org.json.JSONObject
+import java.io.BufferedOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicLong
@@ -32,12 +33,15 @@ class RtspSessionManager {
     private var streamWidth = 0
     private var streamHeight = 0
     private var fps = 0.0
-    private var rtpPacketsReceived = 0L
+    private val rtpPacketsReceived = AtomicLong(0L)
     private var framesDecoded = 0L
     private var errorMessage: String? = null
 
     private var workerThread: Thread? = null
     private var activeClient: RtspClient? = null
+    private var activeDecoder: MediaCodecJpegDecoder? = null
+    @Volatile
+    private var encodePaused = false
 
     fun start(url: String, preferTcp: Boolean = true): Long {
         val now = System.currentTimeMillis()
@@ -61,9 +65,10 @@ class RtspSessionManager {
             streamWidth = 0
             streamHeight = 0
             fps = 0.0
-            rtpPacketsReceived = 0L
+            rtpPacketsReceived.set(0L)
             framesDecoded = 0L
             errorMessage = null
+            encodePaused = false
 
             val t = Thread({
                 runCaptureWorker(sid, url, preferTcp)
@@ -88,6 +93,8 @@ class RtspSessionManager {
             }
             isRunning = false
             stage = "stopped"
+            encodePaused = false
+            activeDecoder = null
             clientToClose = activeClient
             activeClient = null
             threadToJoin = workerThread
@@ -129,11 +136,19 @@ class RtspSessionManager {
         }
     }
 
+    fun setEncodePaused(paused: Boolean) {
+        synchronized(lock) {
+            encodePaused = paused
+            activeDecoder?.encodePaused = paused
+        }
+    }
+
     /**
      * Writes raw multipart/x-mixed-replace JPEG frames directly to [out] and flushes after every frame.
      */
     fun streamMjpegTo(sessionId: Long, out: OutputStream) {
         var lastSentSeq = 0L
+        val bufferedOut = BufferedOutputStream(out, 65536)
         try {
             while (true) {
                 val jpeg = awaitNextFrame(sessionId, lastSentSeq) ?: break
@@ -148,11 +163,11 @@ class RtspSessionManager {
                         "Content-Type: image/jpeg\r\n" +
                         "Content-Length: ${jpeg.size}\r\n\r\n"
                     ).toByteArray(Charsets.US_ASCII)
-                out.write(header)
-                out.write(jpeg)
-                out.write('\r'.code)
-                out.write('\n'.code)
-                out.flush()
+                bufferedOut.write(header)
+                bufferedOut.write(jpeg)
+                bufferedOut.write('\r'.code)
+                bufferedOut.write('\n'.code)
+                bufferedOut.flush()
             }
         } catch (_: IOException) {
             // Client closed connection
@@ -193,7 +208,7 @@ class RtspSessionManager {
                 put("server", "SpotrEmbeddedGateway")
                 put("isStreaming", isRunning)
                 put("stage", stage)
-                put("rtpPackets", rtpPacketsReceived)
+                put("rtpPackets", rtpPacketsReceived.get())
                 put("framesDecoded", framesDecoded)
                 put("activeUrl", activeUrl ?: JSONObject.NULL)
                 put("width", streamWidth)
@@ -265,17 +280,29 @@ class RtspSessionManager {
                             decoder = MediaCodecJpegDecoder(
                                 mimeType = MediaFormat.MIMETYPE_VIDEO_AVC,
                                 initialConfigBytes = track.initialConfigBytes,
-                                jpegQuality = 80,
+                                jpegQuality = 75,
                                 onFrame = publishFrame
-                            ).apply { start() }
+                            ).apply {
+                                encodePaused = this@RtspSessionManager.encodePaused
+                                start()
+                            }
+                            synchronized(lock) {
+                                if (currentSessionId == sessionId) activeDecoder = decoder
+                            }
                         }
                         RtpVideoDepacketizer.VideoCodec.H265 -> {
                             decoder = MediaCodecJpegDecoder(
                                 mimeType = MediaFormat.MIMETYPE_VIDEO_HEVC,
                                 initialConfigBytes = track.initialConfigBytes,
-                                jpegQuality = 80,
+                                jpegQuality = 75,
                                 onFrame = publishFrame
-                            ).apply { start() }
+                            ).apply {
+                                encodePaused = this@RtspSessionManager.encodePaused
+                                start()
+                            }
+                            synchronized(lock) {
+                                if (currentSessionId == sessionId) activeDecoder = decoder
+                            }
                         }
                         RtpVideoDepacketizer.VideoCodec.JPEG -> {
                             Log.i(TAG, "Using direct MJPEG-over-RTP pass-through")
@@ -283,10 +310,12 @@ class RtspSessionManager {
                     }
                 },
                 onRtpPacket = { packet, len ->
-                    synchronized(lock) {
-                        if (currentSessionId == sessionId) {
-                            rtpPacketsReceived++
-                            if (framesDecoded == 0L) stage = "decoding-rtp"
+                    val pktCount = rtpPacketsReceived.incrementAndGet()
+                    if (pktCount == 1L) {
+                        synchronized(lock) {
+                            if (currentSessionId == sessionId && framesDecoded == 0L) {
+                                stage = "decoding-rtp"
+                            }
                         }
                     }
                     val dep = depacketizer ?: return@stream
@@ -327,6 +356,7 @@ class RtspSessionManager {
             synchronized(lock) {
                 if (currentSessionId == sessionId) {
                     isRunning = false
+                    if (activeDecoder === decoder) activeDecoder = null
                     if (activeClient === client) activeClient = null
                     if (errorMessage == null && stage != "stopped") {
                         stage = "ended"
@@ -334,7 +364,7 @@ class RtspSessionManager {
                     lock.notifyAll()
                 }
             }
-            Log.i(TAG, "RTSP worker #$sessionId stopped (stage=$stage, rtp=$rtpPacketsReceived, frames=$framesDecoded)")
+            Log.i(TAG, "RTSP worker #$sessionId stopped (stage=$stage, rtp=${rtpPacketsReceived.get()}, frames=$framesDecoded)")
         }
     }
 }
