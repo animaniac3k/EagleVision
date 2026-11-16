@@ -154,7 +154,7 @@ export function initSidebarAndTopControls(videoEl) {
       screenLive?.classList.add('hidden');
       screenSettings?.classList.remove('hidden');
       switchSettingsSubTab(btn.dataset.setupTab);
-      updateState({ currentScreen: 'settings', replayActive: false });
+      updateState({ currentScreen: 'settings' });
       populateCameraDropdown().catch(() => {});
     });
   });
@@ -178,7 +178,7 @@ export function initSidebarAndTopControls(videoEl) {
     screenSettings?.classList.add('hidden');
     screenController?.classList.add('hidden');
     screenReticle?.classList.remove('hidden');
-    updateState({ currentScreen: 'reticle', replayActive: false });
+    updateState({ currentScreen: 'reticle' });
   };
   btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
 
@@ -187,7 +187,7 @@ export function initSidebarAndTopControls(videoEl) {
     screenSettings?.classList.add('hidden');
     screenReticle?.classList.add('hidden');
     screenController?.classList.remove('hidden');
-    updateState({ currentScreen: 'controller', replayActive: false });
+    updateState({ currentScreen: 'controller' });
   };
   btnOpenControllerScreen?.addEventListener('click', openControllerScreen);
 

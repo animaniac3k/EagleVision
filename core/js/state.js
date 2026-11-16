@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.1.1';
+export const APP_VERSION = 'v0.1.11';
 
 const listeners = new Set();
 
@@ -101,7 +101,6 @@ export const appState = {
   bufferTargetFps: 15,  // Adjustable: 5 FPS to 30 FPS
   bufferedSeconds: 0,
   bufferBytes: 0,
-  replayActive: false,
 
   // Interface Theme Color, Global UI Opacity, Declutter Mode, Gamepad & Remote / Ring Controls
   themeColor: '#f97316',

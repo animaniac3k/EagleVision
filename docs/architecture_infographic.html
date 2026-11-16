@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (v0.1.1) — Architecture & Data Flow Infographic</title>
+  <title>SPOTR (v0.1.11) — Architecture &amp; Data Flow Infographic</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     body {
@@ -55,7 +55,7 @@
     <!-- Top Banner -->
     <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
       <div>
-        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • v0.1.1</div>
+        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • v0.1.11</div>
         <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
         <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • OpenCV RTSP Gateway &amp; WebHID Virtual Mouse</p>
       </div>
@@ -84,8 +84,8 @@
           <p class="text-[#99f6e4] text-[11px] mt-1">60fps viewport, FFP reticle drawer, PiP zoom loupe, 1-tap declutter &amp; virtual mouse.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-          <span class="text-[#2dd4bf] font-bold">2. GALLERY (#screenGallery)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Fullscreen native playback, STEP -1/+1, 0.5x slow-mo, per-video quick delete &amp; .webm export.</p>
+          <span class="text-[#2dd4bf] font-bold">2. PLAYBACK &amp; HITS (#screenGallery)</span>
+          <p class="text-[#99f6e4] text-[11px] mt-1">Unified RAM buffer + saved clips, per-tab reticle toggles, Hits peek, safe Masks &amp; .webm export.</p>
         </div>
         <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
           <span class="text-[#2dd4bf] font-bold">3. SETTINGS (#screenSettings)</span>
@@ -176,10 +176,10 @@
           </div>
           <div class="p-4 text-xs space-y-3 font-mono">
             <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Heatmap</div>
+              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Consolidated Detector</div>
               <div class="text-[#99f6e4]">• Hardware-promoted canvas (<code class="text-[#ccfbf1]">alpha: false, desync</code>)</div>
-              <div class="text-[#99f6e4]">• 20Hz decoupled analysis with <strong class="text-[#ccfbf1]">&gt;18% Shake Rejection</strong></div>
-              <div class="text-[#99f6e4]">• Sensitivity (10–95%) &amp; Duration (0.5s to <strong class="text-[#ccfbf1]">Infinity ∞</strong>)</div>
+              <div class="text-[#99f6e4]">• 20Hz detector: <strong class="text-[#ccfbf1]">5% (1/20th) Max Hit Area</strong> + &gt;18% Shake Gate</div>
+              <div class="text-[#99f6e4]">• 1:1 synced Hit Pin + Voice + Event + Optional Auto-Save (OFF)</div>
               <div class="text-[#99f6e4]">• GPU CSS filter matrix (brightness, contrast, sat, invert)</div>
             </div>
 
@@ -192,9 +192,9 @@
             </div>
 
             <div class="p-3 rounded bg-[#091a20] border border-[#1b4d57] space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">C. Digital Zoom Loupe (#pipCanvas)</div>
+              <div class="text-sm font-bold text-[#2dd4bf]">C. Digital Zoom Loupe (#pipCanvas) + Aim Loupe</div>
               <div class="text-[#99f6e4]">• Crops region centered on <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
-              <div class="text-[#99f6e4]">• Movable and corner-resizable (1.5x–12.0x zoom)</div>
+              <div class="text-[#99f6e4]">• Main-dock <strong class="text-[#ccfbf1]">Aim Loupe</strong> snaps to latest hit (1.5x–12.0x)</div>
             </div>
           </div>
         </div>
@@ -234,27 +234,27 @@
 
         <div class="node-card node-card-strong">
           <div class="node-header">
-            <span>INSTANT REPLAY + AUTO-SAVE</span>
+            <span>UNIFIED INSTANT REPLAY</span>
             <span class="badge">instantReplay.js</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong> button, Ring BTN 2/1, or gamepad Share</div>
-            <div>• Dedicated <strong class="text-[#2dd4bf]">0.5x Slow-Motion</strong> playback toggle</div>
-            <div>• Single-frame <strong class="text-[#2dd4bf]">STEP -1</strong> &amp; <strong class="text-[#2dd4bf]">STEP +1</strong> forensics</div>
-            <div>• <strong class="text-[#2dd4bf]">Automatically saves</strong> clip to IndexedDB persistent archive</div>
+            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong>, Ring BTN 2/1, or gamepad Share</div>
+            <div>• Pauses live RAM capture; opens <strong class="text-[#2dd4bf]">LIVE BUFFER</strong> unsaved</div>
+            <div>• Dedicated <strong class="text-[#2dd4bf]">0.5x Slow-Mo</strong> &amp; <strong class="text-[#2dd4bf]">-1 / +1</strong> stepping</div>
+            <div>• On-demand <strong class="text-[#2dd4bf]">Save Clip</strong> + <strong class="text-[#2dd4bf]">Reticle: OFF</strong> default</div>
           </div>
         </div>
 
         <div class="node-card">
           <div class="node-header">
-            <span>STORED VIDEO BROWSER (SCREEN 2)</span>
-            <span class="badge">videoStore + videoBrowser</span>
+            <span>PLAYBACK &amp; HITS ARCHIVE (SCREEN 2)</span>
+            <span class="badge">videoBrowser + detections</span>
           </div>
           <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">100% Fullscreen</strong> native playback with floating GUI</div>
-            <div>• <strong class="text-[#2dd4bf]">Per-Video Quick Delete</strong> red trash can icon on each card</div>
-            <div>• Collapsible left clips drawer + dual frame stepping</div>
-            <div>• <strong class="text-[#2dd4bf]">EXPORT</strong> encodes and downloads full-resolution <code class="text-[#ccfbf1]">.webm</code></div>
+            <div>• <strong class="text-[#ccfbf1]">Playback Tab:</strong> Saved clips + pinned Live Buffer + .webm export</div>
+            <div>• <strong class="text-[#2dd4bf]">Hits Tab:</strong> Reticle ON default, <strong class="text-[#2dd4bf]">Hits: ON/OFF</strong> peek</div>
+            <div>• <strong class="text-[#2dd4bf]">Safe Masks:</strong> 👁 show/hide + ✎ Edit Masks + confirmed Clear</div>
+            <div>• <strong class="text-[#2dd4bf]">Re-Zero:</strong> Re-anchors background &amp; clears hits/log</div>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@
     <!-- Bottom UI, Global Opacity & Controllers Bar -->
     <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
       <div>
-        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v0.1.1):</span>
+        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v0.1.15):</span>
         <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App (Cache-First + Stale-While-Revalidate + auto-reload on SW update). Pre-caches core assets, CSS, JS modules, audio sprites, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
       </div>
       <div>

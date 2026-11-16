@@ -544,7 +544,7 @@ export function initCompositor(videoEl) {
   let lastRenderKey = '';
 
   function renderLoop() {
-    if (appState.currentScreen === 'live' && !appState.replayActive) {
+    if (appState.currentScreen === 'live') {
       const isRtsp = Boolean(appState.isRtspStream);
       const rtspCanv = isRtsp ? getRtspCanvas() : null;
       const source = isRtsp ? rtspCanv : videoEl;

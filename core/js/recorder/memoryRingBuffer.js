@@ -27,7 +27,7 @@ let lastRtspCaptureMs = 0;
  * into the rolling in-memory timeline.
  */
 export function recordEvent(type = 'event') {
-  if (!appState.bufferEnabled) return;
+  if (!appState.bufferEnabled || appState.currentScreen !== 'live') return;
   const now = performance.now();
   ringEvents.push({ timestampMs: now, type });
   const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
@@ -134,7 +134,7 @@ export function startMemoryBuffer(videoEl) {
 
   // Direct zero-reencode RTSP JPEG ingestion
   rtspUnsubscribe = subscribeRtspJpegFrames((jpegBytes, w, h, nowMs) => {
-    if (!appState.bufferEnabled || appState.replayActive || !appState.isRtspStream) return;
+    if (!appState.bufferEnabled || appState.currentScreen !== 'live' || !appState.isRtspStream) return;
     if (nowMs - lastRtspCaptureMs < minRtspIntervalMs) return;
     lastRtspCaptureMs = nowMs;
 
@@ -160,7 +160,7 @@ export function startMemoryBuffer(videoEl) {
 
   // Fallback canvas capture loop for USB UVC & simulated streams
   captureInterval = setInterval(() => {
-    if (!appState.bufferEnabled || appState.replayActive || appState.isRtspStream || encodingInProgress) return;
+    if (!appState.bufferEnabled || appState.currentScreen !== 'live' || appState.isRtspStream || encodingInProgress) return;
     const source = currentVideoEl;
     if (!source) return;
     if (source.tagName === 'VIDEO' && source.readyState < 2) return;
@@ -182,7 +182,7 @@ export function startMemoryBuffer(videoEl) {
       captureCanvas.toBlob(
         async (blob) => {
           try {
-            if (!blob || !appState.bufferEnabled) return;
+            if (!blob || !appState.bufferEnabled || appState.currentScreen !== 'live') return;
             const jpegBuffer = await blob.arrayBuffer();
             appendFrameToRing(jpegBuffer, nativeW, nativeH, capturedAt, currentPeak, targetFps);
           } finally {
@@ -229,9 +229,17 @@ export function stopMemoryBuffer() {
 export async function snapshotMemoryBuffer() {
   if (!frameRing.length) return null;
 
+  const maxSec = appState.bufferMaxSeconds || 20;
+  const now = performance.now();
+  const cutoff = now - maxSec * 1000;
+  while (frameRing.length > 1 && frameRing[0].timestampMs < cutoff) {
+    const old = frameRing.shift();
+    totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
+  }
+  ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
+
   const firstTs = frameRing[0].timestampMs;
   const lastTs = frameRing[frameRing.length - 1].timestampMs;
-  const maxSec = appState.bufferMaxSeconds || 20;
   const durationSec = Math.max(0.5, Math.min(maxSec, (lastTs - firstTs) / 1000));
   const lastFrame = frameRing[frameRing.length - 1];
 

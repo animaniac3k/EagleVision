@@ -1,893 +1,724 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>SPOTR — Tactical Visual User Manual (v0.1.1)</title>
+  <meta charset="UTF-8" />
+  <title>SPOTR — Visual Field Manual (v0.1.11)</title>
   <style>
     @page {
       size: letter landscape;
-      margin: 10mm 12mm;
+      margin: 8mm 10mm;
     }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #0d0e12;
+      background: #090d14;
       color: #e2e8f0;
-      line-height: 1.4;
-      font-size: 11pt;
+      font-size: 9.5pt;
+      line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-
     .page {
       width: 100%;
-      height: 100%;
-      min-height: 180mm;
-      padding: 6mm 4mm;
+      height: 194mm;
+      padding: 4mm 3mm;
       page-break-after: always;
       break-after: page;
       display: flex;
       flex-direction: column;
-      position: relative;
+      gap: 3.5mm;
+      overflow: hidden;
     }
-
-    .page:last-child {
-      page-break-after: avoid;
-      break-after: avoid;
-    }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
 
     /* Header & Footer */
-    .doc-header {
+    .hdr {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid #27272a;
-      padding-bottom: 4mm;
-      margin-bottom: 5mm;
+      border-bottom: 1.5px solid #263042;
+      padding-bottom: 2.5mm;
     }
-
-    .brand-title {
-      font-size: 16pt;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: #f8fafc;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .brand-title .badge-tm {
-      font-size: 10pt;
-      color: #ffd166;
-    }
-
-    .brand-tagline {
-      font-size: 8.5pt;
-      font-weight: 700;
-      color: #2dd4bf;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-    }
-
-    .doc-meta {
-      text-align: right;
-      font-size: 8.5pt;
-      color: #94a3b8;
-      font-family: ui-monospace, monospace;
-    }
-
-    .doc-footer {
+    .brand { font-size: 14pt; font-weight: 900; letter-spacing: 2px; color: #f8fafc; }
+    .brand span { color: #f97316; }
+    .sub { font-size: 8pt; font-weight: 700; letter-spacing: 1.4px; color: #f97316; text-transform: uppercase; }
+    .pg-num { font-family: ui-monospace, monospace; font-size: 8pt; color: #94a3b8; text-align: right; }
+    .ftr {
       margin-top: auto;
-      border-top: 1px solid #27272a;
-      padding-top: 3mm;
+      border-top: 1px solid #1e293b;
+      padding-top: 2mm;
       display: flex;
       justify-content: space-between;
-      font-size: 8pt;
-      color: #64748b;
       font-family: ui-monospace, monospace;
+      font-size: 7.5pt;
+      color: #64748b;
     }
 
-    /* Grid Layouts */
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5mm;
-    }
+    /* Layout Helpers */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; flex: 1; min-height: 0; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3.5mm; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+    .live-layout { display: grid; grid-template-columns: 1.65fr 1fr; gap: 4mm; flex: 1; min-height: 0; }
 
-    .grid-3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 4mm;
-    }
-
-    .grid-4 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr 1fr;
-      gap: 3mm;
-    }
-
-    /* Cards */
+    /* Cards & Pills */
     .card {
-      background: #181920;
-      border: 1px solid #27272a;
-      border-radius: 6px;
-      padding: 4mm;
-      position: relative;
+      background: #111722;
+      border: 1px solid #263042;
+      border-radius: 7px;
+      padding: 3.5mm;
+      display: flex;
+      flex-direction: column;
+      gap: 2mm;
     }
+    .card-orange { border-top: 2.5px solid #f97316; }
+    .card-emerald { border-top: 2.5px solid #10b981; }
+    .card-sky { border-top: 2.5px solid #38bdf8; }
+    .card-amber { border-top: 2.5px solid #f59e0b; }
 
-    .card-title {
-      font-size: 10pt;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+    .ctitle {
+      font-size: 9.5pt;
+      font-weight: 800;
       color: #f8fafc;
-      margin-bottom: 2mm;
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
-    .card-teal { border-top: 3px solid #2dd4bf; }
-    .card-blue { border-top: 3px solid #38bdf8; }
-    .card-gold { border-top: 3px solid #ffd166; }
-    .card-purple { border-top: 3px solid #a855f7; }
-    .card-rose { border-top: 3px solid #fb7185; }
-
-    /* Pills / Badges */
     .pill {
       display: inline-block;
       padding: 1px 6px;
-      border-radius: 3px;
-      font-size: 7.5pt;
-      font-weight: 700;
+      border-radius: 999px;
+      font-size: 7pt;
+      font-weight: 800;
       font-family: ui-monospace, monospace;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
     }
+    .p-orange { background: rgba(249,115,22,0.18); color: #fb923c; border: 1px solid rgba(249,115,22,0.45); }
+    .p-green { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.45); }
+    .p-sky { background: rgba(56,189,248,0.18); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.45); }
+    .p-amber { background: rgba(245,158,11,0.18); color: #fcd34d; border: 1px solid rgba(245,158,11,0.45); }
 
-    .pill-teal { background: rgba(45, 212, 191, 0.15); color: #2dd4bf; border: 1px solid rgba(45, 212, 191, 0.3); }
-    .pill-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .pill-gold { background: rgba(255, 209, 102, 0.15); color: #ffd166; border: 1px solid rgba(255, 209, 102, 0.3); }
-    .pill-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-
-    /* Tables */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 8pt;
-      margin-top: 2mm;
-    }
-
-    th, td {
-      padding: 2mm 2.5mm;
-      text-align: left;
-      border-bottom: 1px solid #27272a;
-    }
-
-    th {
-      color: #94a3b8;
-      font-weight: 600;
-      text-transform: uppercase;
+    .num-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #f97316;
+      color: #090d14;
+      font-family: ui-monospace, monospace;
       font-size: 7.5pt;
-      background: #121318;
+      font-weight: 900;
+      flex-shrink: 0;
     }
-
-    td {
+    .legend-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 8pt;
       color: #cbd5e1;
+      padding: 1.5mm 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
     }
+    .legend-row:last-child { border-bottom: none; }
+    .legend-row strong { color: #f8fafc; }
 
-    tr:nth-child(even) td {
-      background: rgba(255, 255, 255, 0.015);
+    .screen-frame {
+      width: 100%;
+      background: #06090f;
+      border: 1px solid #334155;
+      border-radius: 7px;
+      overflow: hidden;
     }
+    .screen-frame svg { display: block; width: 100%; height: auto; }
 
-    .key {
+    table { width: 100%; border-collapse: collapse; font-size: 7.8pt; }
+    th, td { padding: 1.6mm 2mm; border-bottom: 1px solid #1e293b; text-align: left; }
+    th { color: #94a3b8; font-size: 7pt; text-transform: uppercase; background: #0d131d; }
+    .kbd {
       display: inline-block;
       padding: 1px 5px;
-      background: #27272a;
-      border: 1px solid #3f3f46;
+      background: #1e293b;
+      border: 1px solid #475569;
       border-radius: 3px;
-      color: #f8fafc;
       font-family: ui-monospace, monospace;
-      font-size: 7.5pt;
-      font-weight: 600;
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+      font-size: 7.2pt;
+      font-weight: 700;
+      color: #f8fafc;
     }
 
-    ul {
-      margin-left: 4mm;
-      font-size: 8.5pt;
-      color: #cbd5e1;
-    }
-
-    li {
-      margin-bottom: 1.5mm;
-    }
-
-    p {
-      font-size: 8.5pt;
-      color: #cbd5e1;
-      margin-bottom: 2mm;
-    }
-
-    /* Page 1 Cover Styles */
+    /* Cover */
     .cover {
       justify-content: center;
       align-items: center;
-      text-align: center;
-      background: radial-gradient(circle at center, #181a24 0%, #090a0f 100%);
+      background: radial-gradient(circle at 50% 42%, #172030 0%, #070a10 78%);
     }
-
-    .cover-box {
-      border: 2px solid #27272a;
-      padding: 12mm 16mm;
-      border-radius: 8px;
-      background: rgba(18, 19, 26, 0.85);
-      max-width: 220mm;
+    .cover-panel {
       width: 100%;
-    }
-
-    .cover-title {
-      font-size: 32pt;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #f8fafc;
-      margin-bottom: 2mm;
-    }
-
-    .cover-title span {
-      color: #2dd4bf;
-    }
-
-    .cover-tagline {
-      font-size: 11pt;
-      font-weight: 700;
-      letter-spacing: 3px;
-      color: #2dd4bf;
-      text-transform: uppercase;
-      margin-bottom: 4mm;
-    }
-
-    .cover-subtitle {
-      font-size: 9.5pt;
-      color: #94a3b8;
-      max-width: 180mm;
-      margin: 0 auto 6mm auto;
-      line-height: 1.5;
-    }
-
-    .cover-specs {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 3mm;
-      margin-top: 6mm;
-      border-top: 1px solid #27272a;
-      padding-top: 5mm;
-    }
-
-    .spec-item {
-      text-align: center;
-    }
-
-    .spec-val {
-      font-size: 11pt;
-      font-weight: 800;
-      color: #f8fafc;
-      font-family: ui-monospace, monospace;
-    }
-
-    .spec-lbl {
-      font-size: 7.5pt;
-      color: #64748b;
-      text-transform: uppercase;
-      margin-top: 1mm;
+      max-width: 245mm;
+      background: rgba(15, 22, 34, 0.9);
+      border: 1.5px solid #2b384e;
+      border-radius: 10px;
+      padding: 8mm 10mm;
+      display: flex;
+      flex-direction: column;
+      gap: 5mm;
     }
   </style>
 </head>
 <body>
 
-  <!-- ===================================================================== -->
-  <!-- PAGE 1: TITLE & COVER                                                 -->
-  <!-- ===================================================================== -->
+  <!-- =================================================================== -->
+  <!-- PAGE 1: VISUAL COVER & 3-STEP WORKFLOW                              -->
+  <!-- =================================================================== -->
   <div class="page cover">
-    <div class="cover-box">
-      <div class="cover-title">SPOTR<span>™</span></div>
-      <div class="cover-tagline">RECON • DETECT • ALERT • OPTICAL PRECISION</div>
-      <div class="cover-subtitle">
-        Tactical Precision Camera Stream Viewer, Scope Reticle Customizer, First Focal Plane Engine,<br>
-        Decoupled Micro-Change Heatmap, Studio Voice Synthesizer, Dual In-Memory Buffer &amp; WebHID Controller Virtual Mouse.
-      </div>
-
-      <div style="margin: 4mm 0;">
-        <span class="pill pill-gold" style="font-size: 9pt; padding: 3px 10px;">VERSION 0.1.1 SPECIFICATION</span>
-        <span class="pill pill-teal" style="font-size: 9pt; padding: 3px 10px; margin-left: 3mm;">OFFLINE PWA READY</span>
-        <span class="pill pill-blue" style="font-size: 9pt; padding: 3px 10px; margin-left: 3mm;">UVC &amp; RTSP DUAL INGESTION</span>
-      </div>
-
-      <div class="cover-specs">
-        <div class="spec-item">
-          <div class="spec-val">1080p @ 60 FPS</div>
-          <div class="spec-lbl">UVC &amp; RTSP Gateway</div>
+    <div class="cover-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <svg width="56" height="56" viewBox="0 0 160 160">
+            <rect width="160" height="160" rx="28" fill="#1b2230" stroke="#334155" stroke-width="3"/>
+            <circle cx="80" cy="80" r="34" fill="none" stroke="#f97316" stroke-width="10"/>
+            <line x1="80" y1="22" x2="80" y2="46" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+            <line x1="80" y1="114" x2="80" y2="138" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+            <line x1="22" y1="80" x2="46" y2="80" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+            <line x1="114" y1="80" x2="138" y2="80" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="80" cy="80" r="7" fill="#f97316"/>
+            <circle cx="118" cy="42" r="9" fill="#ffd166"/>
+          </svg>
+          <div>
+            <div style="font-size:28pt; font-weight:900; letter-spacing:3px; color:#f8fafc; line-height:1;">SPOTR<span style="color:#ffd166; font-size:12pt; vertical-align:super;">™</span></div>
+            <div style="font-size:9.5pt; font-weight:800; letter-spacing:2.4px; color:#f97316; margin-top:2px;">RECON • DETECT • ALERT • FIELD VISUAL GUIDE</div>
+          </div>
         </div>
-        <div class="spec-item">
-          <div class="spec-val">WebHID BT Mouse</div>
-          <div class="spec-lbl">DualShock 4/5 Touchpad &amp; L2/R2</div>
-        </div>
-        <div class="spec-item">
-          <div class="spec-val">RAM Ring Buffer</div>
-          <div class="spec-lbl">5s–60s Instant Replay</div>
-        </div>
-        <div class="spec-item">
-          <div class="spec-val">Studio Voice</div>
-          <div class="spec-lbl">Embedded Audio Sprite TTS</div>
-        </div>
-        <div class="spec-item">
-          <div class="spec-val">100% Client-Side</div>
-          <div class="spec-lbl">Zero External Dependencies</div>
+        <div style="text-align:right; font-family:ui-monospace, monospace; font-size:8.5pt; color:#94a3b8;">
+          <span class="pill p-orange">RELEASE v0.1.11</span><br/>
+          <span style="display:inline-block; margin-top:3px;">ANDROID v0.59.0 • PWA • WINDOWS</span>
         </div>
       </div>
 
-      <div style="margin-top: 8mm; font-size: 8pt; color: #64748b; font-family: ui-monospace, monospace;">
-        DOCUMENTATION IDENTIFIER: SPOTR-DOC-v0.1.1 • NOV 2026
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- PAGE 2: HARDWARE SETUP & CONTROLLER MAPPING                           -->
-  <!-- ===================================================================== -->
-  <div class="page">
-    <div class="doc-header">
-      <div>
-        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
-        <div class="brand-tagline">1. DUAL CAMERA INGESTION &amp; CONTROLLER VIRTUAL MOUSE</div>
-      </div>
-      <div class="doc-meta">
-        SECTION 1 OF 6<br>
-        PAGE 2
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- Left: Dual Camera Input -->
-      <div class="card card-teal">
-        <div class="card-title">
-          <span class="pill pill-teal">OPTICS</span> Dual Camera Ingestion: UVC USB &amp; Wi-Fi RTSP
-        </div>
-        <p>SPOTR features a universal dual video ingestion pipeline supporting both wired USB scopes and wireless network cameras.</p>
-        <ul>
-          <li><strong>UVC USB Scopes &amp; Webcams:</strong> Direct driverless HTML5 MediaDevices capture with automatic hot-plug renegotiation at 1080p/4K @ 60 FPS.</li>
-          <li><strong>Bresser Full HD Wi-Fi Eyepiece Camera:</strong> Integrated gateway (<span style="font-family: monospace;">server.py</span>) automatically dispatches UDP wake magic packets (<span style="font-family: monospace;">/api/rtsp/wake</span> to port 65534) and supports dual Anyka DSP streams:
-            <ul>
-              <li><strong>Channel 0 (1080p):</strong> Full HD optics at <span style="font-family: monospace;">rtsp://192.168.1.1:554/live/ch0</span>.</li>
-              <li><strong>Channel 1 (540p):</strong> High-framerate stream at <span style="font-family: monospace;">rtsp://192.168.1.1:554/live/ch1</span>.</li>
-            </ul>
-          </li>
-          <li><strong>Custom RTSP &amp; ONVIF IP Cameras:</strong> Connect any network IP camera via custom RTSP URL with sub-millisecond push-event frame distribution.</li>
-          <li><strong>Synthetic Test Pattern:</strong> Fallback test card with calibrated hash lines to verify compositor and reticle calibration without hardware attached.</li>
-        </ul>
-
-        <div style="margin-top: 3mm; padding: 2.5mm; background: #121318; border-radius: 4px; border-left: 3px solid #2dd4bf;">
-          <div style="font-size: 8pt; font-weight: 700; color: #2dd4bf; text-transform: uppercase;">Condition-Push Frame Distribution</div>
-          <p style="font-size: 8pt; margin: 1mm 0 0 0; color: #94a3b8;">
-            The Python OpenCV gateway coordinates worker threads via <span style="font-family: monospace;">threading.Condition</span>, delivering incoming frames immediately to browser clients with zero polling jitter.
-          </p>
-        </div>
-      </div>
-
-      <!-- Right: WebHID Bluetooth & Touchpad Virtual Mouse -->
-      <div class="card card-blue">
-        <div class="card-title">
-          <span class="pill pill-blue">INPUT BUS</span> DualShock 4/5 Wireless Controller &amp; Virtual Mouse
-        </div>
-        <p>Direct low-level USB/Bluetooth Human Interface Device integration utilizing high-speed <strong>WebHID API</strong> (Report ID 0x11).</p>
-        <ul>
-          <li><strong>Touchpad Virtual Mouse:</strong> Clicking the center touchpad activates the high-contrast Virtual Mouse cursor. Gliding smoothly drives the pointer across all toolbars and sliders.</li>
-          <li><strong>Tactical Triggers (L2 / R2):</strong>
-            <ul>
-              <li><span class="key">L2 Trigger</span>: Left Mouse Click &amp; Drag (selects buttons, scrubs timelines, drags resizable PiP loupe).</li>
-              <li><span class="key">R2 Trigger</span>: Right Mouse Context Click.</li>
-            </ul>
-          </li>
-          <li><strong>Precision Joysticks:</strong> Left Stick controls primary scope reticle aim with a calibrated 50% precision rate curve. Right Stick smoothly pans the main feed when digitally zoomed.</li>
-          <li><strong>7-Button Bluetooth Ring &amp; Remote (1-to-1 Mode):</strong> Hands-free finger ring control with ChromeOS HID swipe &amp; zone calibration (<span style="font-family: monospace;">TouchTap@qxXqy</span>), live <span style="font-family: monospace;">RAW:</span> log, and 70% default pan speed in Setup → Controllers.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Mapping Table -->
-    <div class="card card-gold" style="margin-top: 4mm;">
-      <div class="card-title">
-        <span class="pill pill-gold">CONTROL MATRIX</span> DualShock 4 &amp; Remote Ring Command Reference
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 20%;">Control Input</th>
-            <th style="width: 25%;">Primary Viewport Action</th>
-            <th style="width: 25%;">Instant Replay / Gallery Mode</th>
-            <th style="width: 30%;">Reticle Customizer Mode</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="key">Touchpad Click</span></td>
-            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
-            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
-            <td>Toggle Virtual Mouse Cursor ON / OFF</td>
-          </tr>
-          <tr>
-            <td><span class="key">Touchpad Glide</span></td>
-            <td>Precision Mouse Pointer Translation</td>
-            <td>Precision Mouse Pointer Translation</td>
-            <td>Precision Mouse Pointer Translation</td>
-          </tr>
-          <tr>
-            <td><span class="key">L2 Trigger</span></td>
-            <td>Left Mouse Click / Drag Floating Windows</td>
-            <td>Left Mouse Click / Drag Timeline Scrubber</td>
-            <td>Left Mouse Click / Drag Slider Knobs</td>
-          </tr>
-          <tr>
-            <td><span class="key">R2 Trigger</span></td>
-            <td>Right Mouse Click</td>
-            <td>Right Mouse Click</td>
-            <td>Right Mouse Click</td>
-          </tr>
-          <tr>
-            <td><span class="key">Left Joystick</span></td>
-            <td>Primary Reticle Aim (Precision 50% Speed)</td>
-            <td>—</td>
-            <td>Navigate Menu Items (Up/Down) &amp; Adjust Values (Left/Right)</td>
-          </tr>
-          <tr>
-            <td><span class="key">Right Joystick</span></td>
-            <td>Viewport Pan (when Zoom &gt; 1.0x)</td>
-            <td>—</td>
-            <td>Sculpt Concentric Rings &amp; Center Gap Diameter</td>
-          </tr>
-          <tr>
-            <td><span class="key">L1 / R1 Bumpers</span></td>
-            <td>Main Viewport Digital Zoom (− / +)</td>
-            <td>Playback Video Zoom (− / +)</td>
-            <td>Quick Step Click Indents (−1 / +1)</td>
-          </tr>
-          <tr>
-            <td><span class="key">D-Pad ▲ / ▼</span></td>
-            <td>Reticle FFP Subtension Spacing (+5% / −5%)</td>
-            <td>—</td>
-            <td>Cycle Selected Setting / Drawer Focus</td>
-          </tr>
-          <tr>
-            <td><span class="key">D-Pad ◄ / ►</span></td>
-            <td>Cyclic Quick-Tool Selector (Step Prev / Next)</td>
-            <td>Step Backward / Forward (1 Frame Forensic)</td>
-            <td>Decrease / Increase Active Value Slider</td>
-          </tr>
-          <tr>
-            <td><span class="key">Cross (✕)</span></td>
-            <td>Toggle Active Cyclic Quick Tool</td>
-            <td>Play / Pause Video Playback</td>
-            <td>Toggle Numbered Subtension Hashmark Labels</td>
-          </tr>
-          <tr>
-            <td><span class="key">Circle (◯)</span></td>
-            <td>Declutter Screen / Universal Back to Live</td>
-            <td>Close Replay &amp; Return to Live Stream</td>
-            <td>Exit Customizer Screen</td>
-          </tr>
-          <tr>
-            <td><span class="key">Square (▢)</span></td>
-            <td>Toggle Reticle Overlay / Quick Drawer</td>
-            <td>Toggle 0.5x Slow-Motion Playback</td>
-            <td>Toggle Concentric Range Rings</td>
-          </tr>
-          <tr>
-            <td><span class="key">Triangle (△)</span></td>
-            <td>Toggle Thermal Micro-Motion Heatmap</td>
-            <td>Toggle Saved Clips Drawer Panel</td>
-            <td>Toggle Center Bounding Brackets</td>
-          </tr>
-          <tr>
-            <td><span class="key">Share Button</span></td>
-            <td>Instant Replay (Auto-Saves to RAM &amp; IDB)</td>
-            <td>Export Native Video Clip (.webm)</td>
-            <td>Reset Reticle to Preset Defaults</td>
-          </tr>
-          <tr>
-            <td><span class="key">Options Button</span></td>
-            <td>Open / Close Settings &amp; Controller Screen</td>
-            <td>Exit to Live Stream</td>
-            <td>Exit to Live Stream</td>
-          </tr>
-          <tr>
-            <td><span class="key">Ring D-Pad (▲▼◄►)</span></td>
-            <td>Pan Zoomed View (&gt;1.0x, 70% default speed)</td>
-            <td>▲ Restart • ◄/► Step ±1 Frame • ▼ Return Live</td>
-            <td>Bindable in Setup → Controllers (HID Swipe / Key)</td>
-          </tr>
-          <tr>
-            <td><span class="key">Ring CENTER (●)</span></td>
-            <td>Zoom Cycle (1x → 1.5x → 2x → 2.5x → 3x → 1x)</td>
-            <td>Play / Pause Toggle</td>
-            <td>Bindable in Setup → Controllers (TouchTap Zone)</td>
-          </tr>
-          <tr>
-            <td><span class="key">Ring BTN 2 / BTN 1</span></td>
-            <td>Enter Instant Replay (BTN 2 Rec. on ChromeOS)</td>
-            <td>Exit Replay &amp; Return to Live Stream</td>
-            <td>Bindable in Setup → Controllers (TouchTap Zone)</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="doc-footer">
-      <div>SPOTR v0.1.1 USER MANUAL • SEC 1: HARDWARE &amp; CONTROLLER</div>
-      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- PAGE 3: MAIN INTERFACE, DECLUTTER & SCREEN MODES                      -->
-  <!-- ===================================================================== -->
-  <div class="page">
-    <div class="doc-header">
-      <div>
-        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
-        <div class="brand-tagline">2. TACTICAL SCREEN MODES, RETICLE DRAWER &amp; DECLUTTER</div>
-      </div>
-      <div class="doc-meta">
-        SECTION 2 OF 6<br>
-        PAGE 3
-      </div>
-    </div>
-
-    <div class="grid-4" style="margin-bottom: 4mm;">
-      <div class="card card-teal">
-        <div class="card-title"><span class="pill pill-teal">VIEW 1</span> Live Feed</div>
-        <p style="font-size: 8pt;">60 FPS live video, micro-change thermal heatmap, floating draggable PiP loupe, reticle drawer with FFP lock, and cyclic quick-tool dock.</p>
-      </div>
-      <div class="card card-blue">
-        <div class="card-title"><span class="pill pill-blue">VIEW 2</span> Instant Replay</div>
-        <p style="font-size: 8pt;">Immediate native-resolution playback of the RAM buffer. Scrub frame-by-frame, auto-save to IndexedDB, or engage 0.5x slow-motion.</p>
-      </div>
-      <div class="card card-gold">
-        <div class="card-title"><span class="pill pill-gold">VIEW 3</span> Video Archive</div>
-        <p style="font-size: 8pt;">Permanent local storage library in IndexedDB. Organize shot clips, delete with individual red trash icons, and export directly as .webm.</p>
-      </div>
-      <div class="card card-purple">
-        <div class="card-title"><span class="pill pill-purple">VIEW 4 &amp; 5</span> Reticle &amp; Controller</div>
-        <p style="font-size: 8pt;">Parametric reticle studio (mils/MOA click corrections) &amp; full-screen Gamepad &amp; Bluetooth Ring setup with Learn schematic &amp; RAW telemetry.</p>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- UI Chrome & Floating Pods -->
-      <div class="card card-teal">
-        <div class="card-title">
-          <span class="pill pill-teal">CONTROLS</span> Floating Toolbars &amp; Reticle Quick Drawer
-        </div>
-        <ul>
-          <li><strong>Top-Left Control Strip:</strong>
-            <ul>
-              <li><strong>Settings Gear:</strong> Opens central configuration (camera source, RAM meter, controller mappings).</li>
-              <li><strong>Target POI Icon:</strong> Toggles the resizable PiP Digital Zoom Loupe.</li>
-              <li><strong>Crosshair Reticle Icon:</strong> Opens the Reticle Quick Drawer with live FFP toggle, opacity, reticle scale, and palette swatches.</li>
-              <li><strong>Thermal Heatmap Flame:</strong> Toggles 20Hz micro-motion detection.</li>
-              <li><strong>Voice Announcement Speaker:</strong> Quick-toggle for studio audio sprite speech engine.</li>
-            </ul>
-          </li>
-          <li><strong>Top-Left Zoom Pod:</strong> Whole-viewport digital zoom controls (<span class="key">−</span>, <span class="key">1.0x</span>, <span class="key">+</span>, <span class="key">1:1</span>) with smooth touch and joystick panning.</li>
-          <li><strong>1-Tap Declutter Mode:</strong> Tapping anywhere on open screen space (or pressing <span class="key">Circle</span>) hides all toolbars and buttons, leaving an uninhibited, 100% full-screen sight picture.</li>
-        </ul>
-      </div>
-
-      <!-- PiP Digital Zoom Loupe -->
-      <div class="card card-blue">
-        <div class="card-title">
-          <span class="pill pill-blue">OPTICS</span> Digital Zoom Loupe (#pipCanvas)
-        </div>
-        <p>The Picture-in-Picture (PiP) Loupe provides real-time digital magnification of any specific point of interest (POI) on the target without changing the primary field of view.</p>
-        <ul>
-          <li><strong>Independent Pan &amp; Zoom:</strong> Adjust loupe magnification from 2.0x to 16.0x independently of main viewport zoom.</li>
-          <li><strong>Sub-Pixel Target Crosshair:</strong> A high-contrast target marker indicates the exact optical coordinate currently magnified in the loupe.</li>
-          <li><strong>Draggable &amp; Resizable:</strong> Drag the loupe anywhere on screen by its header. Drag the corner handles to resize.</li>
-          <li><strong>Hardware Steering:</strong> Push the Right Joystick on your gamepad to smoothly track the loupe target across the target face.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- UI Color Swatches & Opacity -->
-    <div class="card card-gold" style="margin-top: 4mm;">
-      <div class="card-title">
-        <span class="pill pill-gold">APPEARANCE</span> Tactical Color Palettes &amp; Global Interface Opacity
-      </div>
-      <div class="grid-2">
-        <div>
-          <p style="font-size: 8.5pt;">Customize UI chrome and reticle colors across 6 tactical themes:
-          <strong>Emerald Teal</strong> (#2dd4bf), <strong>Amber Gold</strong> (#ffd166), <strong>Ruby Red</strong> (#f87171), <strong>Night Blue</strong> (#60a5fa), <strong>Amethyst</strong> (#a855f7), or <strong>High-Vis White</strong> (#f8fafc).</p>
-        </div>
-        <div>
-          <p style="font-size: 8.5pt;"><strong>Interface Opacity Slider (15% to 100%):</strong> Fades background chrome, borders, and buttons into near-invisibility (<span style="font-family: monospace;">--ui-opacity</span>), allowing spotting downrange without night-blindness or screen glare.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="doc-footer">
-      <div>SPOTR v0.1.1 USER MANUAL • SEC 2: SCREEN MODES &amp; DECLUTTER</div>
-      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- PAGE 4: THERMAL HEATMAP & DIRECTIONAL SPEECH ENGINE                   -->
-  <!-- ===================================================================== -->
-  <div class="page">
-    <div class="doc-header">
-      <div>
-        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
-        <div class="brand-tagline">3. DECOUPLED HEATMAP &amp; STUDIO VOICE SYNTHESIZER</div>
-      </div>
-      <div class="doc-meta">
-        SECTION 3 OF 6<br>
-        PAGE 4
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- Heatmap Engine -->
-      <div class="card card-rose">
-        <div class="card-title">
-          <span class="pill pill-teal" style="background: rgba(244, 63, 94, 0.15); color: #fb7185; border-color: rgba(244, 63, 94, 0.4);">DETECTION</span> 20Hz Decoupled Micro-Change Heatmap Engine
-        </div>
-        <p>SPOTR features an advanced micro-movement detection algorithm that highlights subtle changes (bullet impacts, target movement, wind drift) as a high-contrast thermal glow overlay.</p>
-        <ul>
-          <li><strong>20Hz Decoupled Pipeline:</strong> Heatmap analysis executes on an independent 50ms timer, decoupling heavy frame diffing from the 60 FPS compositor to prevent UI hitching.</li>
-          <li><strong>Downsampled Luma Analysis:</strong> Evaluates a high-speed 160×90 luminance matrix (14,400 cells) against an exponential moving average background.</li>
-          <li><strong>Global Shift Rejection (&gt;18%):</strong> Automatically discards whole-frame camera movements (wind buffeting, scope recoil, tripod bumps) to prevent false alerts.</li>
-          <li><strong>Adjustable Sensitivity (10% to 95%):</strong> Fine-tune detection thresholds in Settings to spot minute paper tears at 1000 yards without triggering on heat mirage.</li>
-          <li><strong>Decay Duration (0.5s to 10s):</strong> Controls how long the visual impact heat bloom persists before fading.</li>
-        </ul>
-      </div>
-
-      <!-- Directional Speech Synthesis -->
-      <div class="card card-gold">
-        <div class="card-title">
-          <span class="pill pill-gold">SPEECH</span> Studio Voice Synthesizer &amp; Web Speech Engine
-        </div>
-        <p>When movement or bullet impact is detected, SPOTR computes the geometric centroid vector relative to your scope crosshair and vocalizes directional corrections.</p>
-        <ul>
-          <li><strong>High-Fidelity Studio Voice Sprite:</strong> Uses Web Audio API (<span style="font-family: monospace;">voiceAudioEngine.js</span>) with studio-recorded female voice clips (<span style="font-family: monospace;">voice-sprite.mp3</span>) for crystal-clear, zero-lag announcements.</li>
-          <li><strong>Browser TTS Fallback:</strong> Activates native <span style="font-family: monospace;">SpeechSynthesisUtterance</span> if Web Audio is unsupported.</li>
-          <li><strong>Clock &amp; Reticle Click Announcements:</strong> Announces target clock angle ($1$ to $12$ o'clock) and distance in graduated reticle clicks: e.g. <em>"Detection! 11 o'clock, 3 clicks"</em>.</li>
-          <li><strong>Instant Voice Mute:</strong> Click the speaker icon in the top-left toolbar or press the Mute hotkey to instantly silence audio without disabling visual heatmap rendering.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Speech Dictionary Configuration Table -->
-    <div class="card card-blue" style="margin-top: 4mm;">
-      <div class="card-title">
-        <span class="pill pill-blue">VOCABULARY</span> Directional Speech Dictionary &amp; Configuration Options
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 20%;">Relative Angle</th>
-            <th style="width: 25%;">Default Announcement</th>
-            <th style="width: 25%;">Custom Keyword Option</th>
-            <th style="width: 30%;">Operational Use Case</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>337.5° – 22.5° (12 o'clock)</td>
-            <td><strong>"Target 12 o'clock"</strong></td>
-            <td>"North" / "Top" / "Elevation Up"</td>
-            <td>Impact high of point of aim; adjust elevation down.</td>
-          </tr>
-          <tr>
-            <td>22.5° – 67.5° (2 o'clock)</td>
-            <td><strong>"Target 2 o'clock"</strong></td>
-            <td>"High Right" / "North-East"</td>
-            <td>Impact high right; windage left + elevation down.</td>
-          </tr>
-          <tr>
-            <td>67.5° – 112.5° (3 o'clock)</td>
-            <td><strong>"Target 3 o'clock"</strong></td>
-            <td>"East" / "Right" / "Windage Right"</td>
-            <td>Crosswind deflection; adjust windage turret left.</td>
-          </tr>
-          <tr>
-            <td>112.5° – 157.5° (4 o'clock)</td>
-            <td><strong>"Target 4 o'clock"</strong></td>
-            <td>"Low Right" / "South-East"</td>
-            <td>Impact low right; hold over and into wind.</td>
-          </tr>
-          <tr>
-            <td>157.5° – 202.5° (6 o'clock)</td>
-            <td><strong>"Target 6 o'clock"</strong></td>
-            <td>"South" / "Bottom" / "Elevation Down"</td>
-            <td>Impact low; adjust elevation turret up.</td>
-          </tr>
-          <tr>
-            <td>Reticle Center (&lt;5% radius)</td>
-            <td><strong>"Direct Hit" / "Bullseye"</strong></td>
-            <td>"Center" / "Hit"</td>
-            <td>Point of impact matches zero point of aim.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="doc-footer">
-      <div>SPOTR v0.1.1 USER MANUAL • SEC 3: HEATMAP &amp; VOICE ANNOUNCER</div>
-      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
-    </div>
-  </div>
-
-  <!-- ===================================================================== -->
-  <!-- PAGE 5: RAM RING BUFFER, INSTANT REPLAY & VIDEO EXPORT                -->
-  <!-- ===================================================================== -->
-  <div class="page">
-    <div class="doc-header">
-      <div>
-        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
-        <div class="brand-tagline">4. DUAL RAM BUFFER, INSTANT REPLAY &amp; VIDEO ARCHIVE</div>
-      </div>
-      <div class="doc-meta">
-        SECTION 4 OF 6<br>
-        PAGE 5
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- RAM Ring Buffer -->
-      <div class="card card-teal">
-        <div class="card-title">
-          <span class="pill pill-teal">IN-MEMORY</span> Native-Resolution Circular RAM Ring Buffer
-        </div>
-        <p>SPOTR maintains a <strong>100% RAM-only rolling queue</strong> (<span style="font-family: monospace;">memoryRingBuffer.js</span>) with zero disk writes during surveillance, protecting flash memory from wear.</p>
-        <ul>
-          <li><strong>Dual Source Ingestion:</strong> Seamlessly ingests full-resolution frames from either UVC USB video or RTSP network streams (<span style="font-family: monospace;">getRtspCanvas()</span>).</li>
-          <li><strong>Configurable Duration:</strong> Store from <strong>5 to 60 seconds</strong> of rolling historical video in RAM.</li>
-          <li><strong>Configurable Buffer FPS:</strong> Set buffer capture between <strong>5 and 30 FPS</strong> to optimize RAM footprint on low-memory devices.</li>
-          <li><strong>Live RAM Budget Meter:</strong> Real-time telemetric bar in Settings displays Current Used MB, Estimated Allocation, and Free Device RAM.</li>
-          <li><strong>Automatic Memory Guardrails:</strong> Proactively purges older frames if device memory pressure exceeds threshold.</li>
-        </ul>
-      </div>
-
-      <!-- Instant Replay Viewport -->
-      <div class="card card-blue">
-        <div class="card-title">
-          <span class="pill pill-blue">PLAYBACK</span> Instant Replay Viewport &amp; 0.5x Slow-Motion
-        </div>
-        <p>Capture critical shot strings instantly with a single button press or ring tap.</p>
-        <ul>
-          <li><strong>Instant Snapshot:</strong> Press <span class="key">Share</span> on controller, press Ring <span class="key">BTN 2</span> (or <span class="key">BTN 1</span>), or click <strong>REPLAY</strong> to freeze and inspect the circular buffer.</li>
-          <li><strong>Automatic Silent Persistence:</strong> Upon trigger, the snapshot is automatically cloned to permanent local IndexedDB storage in the background without stuttering playback.</li>
-          <li><strong>Precision Timeline Scrubber:</strong> Drag the timeline slider to locate the exact microsecond of bullet impact or target change.</li>
-          <li><strong>0.5x Slow-Motion Toggle:</strong> Dedicated <span class="key">0.5x</span> button allows smooth slow-motion trajectory and bullet impact forensics.</li>
-          <li><strong>Dual-Direction Frame Stepping:</strong> Step frame-by-frame forward (<span class="key">STEP +1</span>) and backward (<span class="key">STEP -1</span>) for precision ballistic analysis.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Video Archive & WebM Export -->
-    <div class="card card-gold" style="margin-top: 4mm;">
-      <div class="card-title">
-        <span class="pill pill-gold">STORAGE</span> Video Archive Library, Rapid Deletion &amp; WebM Exporter
-      </div>
+      <!-- 3-Step Visual Workflow -->
       <div class="grid-3">
-        <div>
-          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">1. IndexedDB Local Storage</h4>
-          <p style="font-size: 8pt; color: #cbd5e1;">Clips are stored securely in browser sandboxed storage. Clips remain accessible across browser restarts and offline field sessions without cloud connectivity.</p>
+        <div class="card card-sky">
+          <div class="ctitle"><span class="pill p-sky">STEP 1</span> Connect Optics</div>
+          <svg viewBox="0 0 220 74" width="100%">
+            <rect x="6" y="10" width="60" height="54" rx="6" fill="#0b111b" stroke="#38bdf8" stroke-width="1.5"/>
+            <text x="36" y="34" fill="#7dd3fc" font-size="9" font-weight="700" text-anchor="middle" font-family="monospace">USB UVC</text>
+            <text x="36" y="48" fill="#64748b" font-size="7" text-anchor="middle" font-family="monospace">1080p/4K</text>
+            <rect x="80" y="10" width="60" height="54" rx="6" fill="#0b111b" stroke="#f97316" stroke-width="1.5"/>
+            <text x="110" y="34" fill="#fdba74" font-size="9" font-weight="700" text-anchor="middle" font-family="monospace">WI-FI</text>
+            <text x="110" y="48" fill="#64748b" font-size="7" text-anchor="middle" font-family="monospace">Bresser/RTSP</text>
+            <rect x="154" y="10" width="60" height="54" rx="6" fill="#0b111b" stroke="#10b981" stroke-width="1.5"/>
+            <text x="184" y="34" fill="#6ee7b7" font-size="9" font-weight="700" text-anchor="middle" font-family="monospace">TEST</text>
+            <text x="184" y="48" fill="#64748b" font-size="7" text-anchor="middle" font-family="monospace">Built-in Card</text>
+          </svg>
+          <div style="font-size:8pt; color:#94a3b8;">Open <strong>Setup → Camera</strong> to pick USB, Wi-Fi/RTSP, or Test Signal.</div>
         </div>
-        <div>
-          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">2. Rapid Per-Video Deletion</h4>
-          <p style="font-size: 8pt; color: #cbd5e1;">The collapsible Clips Drawer provides an individual red trash icon on every clip card, allowing rapid single-tap deletion without loading the full video player.</p>
+
+        <div class="card card-orange">
+          <div class="ctitle"><span class="pill p-orange">STEP 2</span> Detect &amp; Aim</div>
+          <svg viewBox="0 0 220 74" width="100%">
+            <rect x="6" y="10" width="208" height="54" rx="6" fill="#0b111b" stroke="#263042" stroke-width="1.5"/>
+            <circle cx="84" cy="37" r="20" fill="none" stroke="#94a3b8" stroke-opacity="0.4" stroke-width="1.5"/>
+            <line x1="48" y1="37" x2="120" y2="37" stroke="#f97316" stroke-width="1.4"/>
+            <line x1="84" y1="14" x2="84" y2="60" stroke="#f97316" stroke-width="1.4"/>
+            <circle cx="96" cy="28" r="5" fill="#10b981" stroke="#fff" stroke-width="1.2"/>
+            <rect x="136" y="18" width="68" height="38" rx="4" fill="#111827" stroke="#f97316" stroke-width="1.5"/>
+            <circle cx="170" cy="37" r="6" fill="none" stroke="#fff" stroke-opacity="0.6"/>
+            <circle cx="170" cy="37" r="2.5" fill="#10b981"/>
+            <text x="170" y="27" fill="#fdba74" font-size="6.5" font-family="monospace" text-anchor="middle">LOUPE 3.0x</text>
+          </svg>
+          <div style="font-size:8pt; color:#94a3b8;">Enable <strong>Heatmap</strong> + <strong>Voice</strong>. Tap <strong>Aim Loupe</strong> to snap zoom to latest hit.</div>
         </div>
-        <div>
-          <h4 style="font-size: 8.5pt; color: #ffd166; margin-bottom: 1.5mm;">3. One-Click WebM Export</h4>
-          <p style="font-size: 8pt; color: #cbd5e1;">The native export engine encodes recorded frames into a standard <span style="font-family: monospace;">.webm</span> video file, saving it directly to local disk for reporting, archiving, or sharing.</p>
+
+        <div class="card card-emerald">
+          <div class="ctitle"><span class="pill p-green">STEP 3</span> Replay &amp; Inspect</div>
+          <svg viewBox="0 0 220 74" width="100%">
+            <rect x="6" y="10" width="98" height="54" rx="6" fill="#0b111b" stroke="#10b981" stroke-width="1.5"/>
+            <text x="55" y="30" fill="#6ee7b7" font-size="8.5" font-weight="700" text-anchor="middle" font-family="monospace">PLAYBACK</text>
+            <text x="55" y="44" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="monospace">LIVE BUFFER (RAM)</text>
+            <text x="55" y="55" fill="#f97316" font-size="6.5" text-anchor="middle" font-family="monospace">Reticle: OFF def.</text>
+            <rect x="116" y="10" width="98" height="54" rx="6" fill="#0b111b" stroke="#f59e0b" stroke-width="1.5"/>
+            <text x="165" y="30" fill="#fcd34d" font-size="8.5" font-weight="700" text-anchor="middle" font-family="monospace">HITS MAP</text>
+            <text x="165" y="44" fill="#94a3b8" font-size="7" text-anchor="middle" font-family="monospace">Pins • Hide • Masks</text>
+            <text x="165" y="55" fill="#10b981" font-size="6.5" text-anchor="middle" font-family="monospace">Reticle: ON def.</text>
+          </svg>
+          <div style="font-size:8pt; color:#94a3b8;">Tap <strong>Replay</strong> to review buffer (unsaved) or switch to <strong>Hits</strong> to inspect target marks.</div>
         </div>
       </div>
-    </div>
 
-    <div class="doc-footer">
-      <div>SPOTR v0.1.1 USER MANUAL • SEC 4: RAM BUFFER &amp; INSTANT REPLAY</div>
-      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+      <!-- Spec Strip -->
+      <div class="grid-4" style="border-top:1px solid #263042; padding-top:4mm;">
+        <div style="text-align:center;"><div style="font-family:ui-monospace,monospace; font-weight:800; color:#f8fafc;">60 FPS COMPOSITOR</div><div style="font-size:7.5pt; color:#64748b;">FFP Reticle + GPU Filters</div></div>
+        <div style="text-align:center;"><div style="font-family:ui-monospace,monospace; font-weight:800; color:#f8fafc;">1:1 HIT + VOICE SYNC</div><div style="font-size:7.5pt; color:#64748b;">5% (1/20) Multi-Hit Gate</div></div>
+        <div style="text-align:center;"><div style="font-family:ui-monospace,monospace; font-weight:800; color:#f8fafc;">LIVE-ONLY RAM BUFFER</div><div style="font-size:7.5pt; color:#64748b;">Pauses outside Live view</div></div>
+        <div style="text-align:center;"><div style="font-family:ui-monospace,monospace; font-weight:800; color:#f8fafc;">DUALSHOCK / 8BITDO / RING</div><div style="font-size:7.5pt; color:#64748b;">Full Remappable Controls</div></div>
+      </div>
     </div>
   </div>
 
-  <!-- ===================================================================== -->
-  <!-- PAGE 6: RETICLE STUDIO, CLICK CALCULATION & PWA SETUP                 -->
-  <!-- ===================================================================== -->
+  <!-- =================================================================== -->
+  <!-- PAGE 2: LIVE SCOPE SCREEN (ANNOTATED VISUAL MAP)                    -->
+  <!-- =================================================================== -->
   <div class="page">
-    <div class="doc-header">
+    <div class="hdr">
       <div>
-        <div class="brand-title">SPOTR<span class="badge-tm">™</span></div>
-        <div class="brand-tagline">5. RETICLE STUDIO, FIRST FOCAL PLANE &amp; PWA INSTALL</div>
+        <div class="brand">SPOTR<span>™</span></div>
+        <div class="sub">1. LIVE CAMERA WORKSPACE — VISUAL CONTROL MAP</div>
       </div>
-      <div class="doc-meta">
-        SECTION 5 OF 6<br>
-        PAGE 6
+      <div class="pg-num">PAGE 2 OF 5</div>
+    </div>
+
+    <div class="live-layout">
+      <!-- Annotated Live UI SVG -->
+      <div class="screen-frame">
+        <svg viewBox="0 0 640 380">
+          <!-- Backdrop -->
+          <rect width="640" height="380" fill="#070b12"/>
+          <circle cx="320" cy="185" r="95" fill="none" stroke="#334155" stroke-width="1.5"/>
+          <circle cx="320" cy="185" r="52" fill="none" stroke="#334155" stroke-width="1.5"/>
+          <circle cx="320" cy="185" r="10" fill="#ef4444" fill-opacity="0.35"/>
+          <!-- Reticle -->
+          <g stroke="#f97316" stroke-width="1.5">
+            <line x1="90" y1="185" x2="292" y2="185"/><line x1="348" y1="185" x2="550" y2="185"/>
+            <line x1="320" y1="35" x2="320" y2="157"/><line x1="320" y1="213" x2="320" y2="335"/>
+            <line x1="265" y1="180" x2="265" y2="190"/><line x1="235" y1="176" x2="235" y2="194"/>
+            <line x1="375" y1="180" x2="375" y2="190"/><line x1="405" y1="176" x2="405" y2="194"/>
+          </g>
+          <!-- Latest Hit + ROI Crosshair -->
+          <circle cx="352" cy="158" r="22" fill="none" stroke="#ffffff" stroke-opacity="0.65" stroke-dasharray="4 3" stroke-width="1.3"/>
+          <circle cx="352" cy="158" r="4.5" fill="#10b981"/>
+
+          <!-- Top-Left Strip -->
+          <rect x="14" y="14" width="66" height="24" rx="12" fill="#111827" stroke="#334155"/>
+          <text x="47" y="29" fill="#e2e8f0" font-size="9.5" font-weight="700" text-anchor="middle">⚙ Setup</text>
+          <rect x="86" y="14" width="76" height="24" rx="12" fill="#111827" stroke="#334155"/>
+          <text x="124" y="29" fill="#e2e8f0" font-size="9.5" font-weight="700" text-anchor="middle">Clean View</text>
+
+          <!-- Top-Right Strip -->
+          <rect x="408" y="14" width="68" height="24" rx="12" fill="#111827" stroke="#10b981"/>
+          <circle cx="420" cy="26" r="3.5" fill="#10b981"/>
+          <text x="446" y="29" fill="#e2e8f0" font-size="9" font-family="monospace" text-anchor="middle">20/20s</text>
+          <rect x="484" y="14" width="142" height="24" rx="12" fill="#111827" stroke="#334155"/>
+          <text x="520" y="29" fill="#e2e8f0" font-size="9" font-weight="700" text-anchor="middle">Clips 2</text>
+          <line x1="556" y1="19" x2="556" y2="33" stroke="#334155"/>
+          <text x="592" y="29" fill="#fcd34d" font-size="9" font-weight="700" text-anchor="middle">3 Hits</text>
+
+          <!-- PiP Loupe Window -->
+          <rect x="476" y="54" width="150" height="104" rx="8" fill="#0b1220" stroke="#475569" stroke-width="1.5"/>
+          <rect x="484" y="61" width="34" height="16" rx="8" fill="#090d14" stroke="#334155"/>
+          <text x="501" y="72" fill="#f8fafc" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">3.0x</text>
+          <rect x="556" y="61" width="62" height="16" rx="8" fill="#090d14" stroke="#334155"/>
+          <text x="587" y="72" fill="#cbd5e1" font-size="8" font-family="monospace" text-anchor="middle">⌖  −  +</text>
+          <circle cx="551" cy="112" r="20" fill="none" stroke="#334155"/>
+          <circle cx="551" cy="112" r="5" fill="#10b981"/>
+          <line x1="540" y1="112" x2="562" y2="112" stroke="#fff" stroke-opacity="0.5"/>
+          <line x1="551" y1="101" x2="551" y2="123" stroke="#fff" stroke-opacity="0.5"/>
+
+          <!-- Bottom Unified Dock -->
+          <rect x="34" y="332" width="572" height="34" rx="10" fill="#111827" stroke="#334155"/>
+          <rect x="42" y="338" width="48" height="22" rx="6" fill="rgba(249,115,22,0.2)" stroke="#f97316"/>
+          <text x="66" y="352" fill="#fdba74" font-size="8.5" font-weight="700" text-anchor="middle">Reticle</text>
+          <rect x="95" y="338" width="54" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="#334155"/>
+          <text x="122" y="352" fill="#e2e8f0" font-size="8.5" text-anchor="middle">Heatmap</text>
+          <rect x="154" y="338" width="48" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="#334155"/>
+          <text x="178" y="352" fill="#cbd5e1" font-size="8.5" text-anchor="middle">Re-Zero</text>
+          <rect x="207" y="338" width="28" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="#334155"/>
+          <text x="221" y="352" fill="#fda4af" font-size="8.5" text-anchor="middle">🔇</text>
+          <rect x="240" y="338" width="46" height="22" rx="6" fill="rgba(249,115,22,0.2)" stroke="#f97316"/>
+          <text x="263" y="352" fill="#fdba74" font-size="8.5" font-weight="700" text-anchor="middle">Loupe</text>
+          <rect x="291" y="338" width="60" height="22" rx="6" fill="rgba(16,185,129,0.18)" stroke="#10b981"/>
+          <text x="321" y="352" fill="#6ee7b7" font-size="8.5" font-weight="700" text-anchor="middle">Aim Loupe</text>
+          <rect x="356" y="338" width="24" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="#334155"/>
+          <text x="368" y="352" fill="#cbd5e1" font-size="8.5" text-anchor="middle">ⓘ</text>
+          <text x="424" y="352" fill="#f8fafc" font-size="8.5" font-family="monospace" text-anchor="middle">− 1.0x + 1:1</text>
+          <rect x="476" y="338" width="90" height="22" rx="6" fill="#f97316"/>
+          <text x="521" y="352" fill="#090d14" font-size="8.5" font-weight="800" text-anchor="middle">⏪ Replay · 20s</text>
+          <rect x="571" y="338" width="28" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="#334155"/>
+          <text x="585" y="352" fill="#e2e8f0" font-size="8.5" text-anchor="middle">📷</text>
+
+          <!-- Callout Badges -->
+          <circle cx="47" cy="46" r="9" fill="#f97316"/><text x="47" y="49.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">1</text>
+          <circle cx="124" cy="46" r="9" fill="#f97316"/><text x="124" y="49.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">2</text>
+          <circle cx="442" cy="46" r="9" fill="#f97316"/><text x="442" y="49.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">3</text>
+          <circle cx="555" cy="46" r="9" fill="#f97316"/><text x="555" y="49.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">4</text>
+          <circle cx="464" cy="106" r="9" fill="#f97316"/><text x="464" y="109.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">5</text>
+          <circle cx="122" cy="322" r="9" fill="#f97316"/><text x="122" y="325.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">6</text>
+          <circle cx="321" cy="322" r="9" fill="#10b981"/><text x="321" y="325.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">7</text>
+          <circle cx="521" cy="322" r="9" fill="#f97316"/><text x="521" y="325.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">8</text>
+        </svg>
       </div>
+
+      <!-- Callout Legend -->
+      <div class="card card-orange">
+        <div class="ctitle"><span class="pill p-orange">CONTROLS</span> Live View Legend</div>
+        <div class="legend-row"><span class="num-dot">1</span><div><strong>Setup:</strong> Camera source, RAM buffer, Detection/Voice, Display, Reticle &amp; Controllers.</div></div>
+        <div class="legend-row"><span class="num-dot">2</span><div><strong>Clean View:</strong> Hides all HUD buttons for an unobstructed view (tap <em>Show UI</em> to restore).</div></div>
+        <div class="legend-row"><span class="num-dot">3</span><div><strong>RAM Buffer Pill:</strong> Live rolling buffer status; click to pause/resume RAM capture.</div></div>
+        <div class="legend-row"><span class="num-dot">4</span><div><strong>Clips | Hits:</strong> Opens Unified Playback (Clips) or Spatial Hits Map directly.</div></div>
+        <div class="legend-row"><span class="num-dot">5</span><div><strong>Digital Loupe (PiP):</strong> Drag header to move, drag corners to resize, drag crosshair to inspect any POI at 1.5x–12.0x.</div></div>
+        <div class="legend-row"><span class="num-dot">6</span><div><strong>Reticle / Heatmap / Re-Zero / Voice:</strong> Toggle overlays, clear thermal buildup, or mute callouts.</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#10b981;">7</span><div><strong>Aim Loupe:</strong> Snaps the Digital Loupe crosshair straight onto the latest logged hit.</div></div>
+        <div class="legend-row"><span class="num-dot">8</span><div><strong>Replay · 20s &amp; 📷:</strong> Opens Unified Playback on the RAM buffer (pauses capture) or saves PNG snapshot.</div></div>
+      </div>
+    </div>
+
+    <div class="ftr">
+      <div>SPOTR v0.1.11 VISUAL MANUAL • PAGE 2: LIVE WORKSPACE</div>
+      <div>RECON • DETECT • ALERT</div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- PAGE 3: UNIFIED PLAYBACK & HITS SCREEN (VISUAL COMPARISON)          -->
+  <!-- =================================================================== -->
+  <div class="page">
+    <div class="hdr">
+      <div>
+        <div class="brand">SPOTR<span>™</span></div>
+        <div class="sub">2. UNIFIED PLAYBACK &amp; SPATIAL HITS MAP</div>
+      </div>
+      <div class="pg-num">PAGE 3 OF 5</div>
     </div>
 
     <div class="grid-2">
-      <!-- Reticle Studio & Stick Sculpting -->
-      <div class="card card-purple">
-        <div class="card-title">
-          <span class="pill pill-purple">RETICLE</span> Parametric Reticle Studio &amp; First Focal Plane (FFP)
+      <!-- Left: Unified Playback -->
+      <div class="card card-sky">
+        <div class="ctitle"><span class="pill p-sky">PLAYBACK TAB</span> Instant Replay + Saved Clips</div>
+        <div class="screen-frame">
+          <svg viewBox="0 0 420 225">
+            <rect width="420" height="225" fill="#070b12"/>
+            <rect x="140" y="55" width="140" height="115" rx="6" fill="#cbd5e1" fill-opacity="0.1" stroke="#475569"/>
+            <circle cx="210" cy="112" r="36" fill="none" stroke="#475569"/>
+            <circle cx="196" cy="96" r="3.5" fill="#020617" stroke="#e2e8f0" stroke-width="0.9"/>
+            <!-- Top-Left -->
+            <rect x="8" y="8" width="44" height="18" rx="9" fill="#111827" stroke="#334155"/>
+            <text x="30" y="20" fill="#e2e8f0" font-size="7.5" font-weight="700" text-anchor="middle">← Live</text>
+            <rect x="56" y="8" width="84" height="18" rx="9" fill="#111827" stroke="#334155"/>
+            <rect x="58" y="10" width="44" height="14" rx="7" fill="#f97316"/>
+            <text x="80" y="20" fill="#090d14" font-size="7" font-weight="800" text-anchor="middle">Playback</text>
+            <text x="120" y="20" fill="#94a3b8" font-size="7" font-weight="700" text-anchor="middle">Hits</text>
+            <rect x="144" y="8" width="42" height="18" rx="9" fill="#111827" stroke="#334155"/>
+            <text x="165" y="20" fill="#e2e8f0" font-size="7.2" text-anchor="middle">☰ Clips</text>
+            <!-- Top-Right -->
+            <rect x="196" y="8" width="216" height="22" rx="11" fill="#111827" stroke="#334155"/>
+            <circle cx="206" cy="19" r="2.5" fill="#f97316"/>
+            <text x="234" y="22" fill="#f8fafc" font-size="6.8" font-family="monospace" font-weight="700" text-anchor="middle">LIVE BUFFER</text>
+            <rect x="266" y="11" width="48" height="16" rx="8" fill="#1e293b" stroke="#475569"/>
+            <text x="290" y="21.5" fill="#cbd5e1" font-size="6.5" font-weight="700" text-anchor="middle">Reticle: OFF</text>
+            <rect x="318" y="11" width="42" height="16" rx="8" fill="#f97316"/>
+            <text x="339" y="21.5" fill="#090d14" font-size="6.5" font-weight="800" text-anchor="middle">Save Clip</text>
+            <text x="384" y="22" fill="#e2e8f0" font-size="7.5" text-anchor="middle">📷 Export</text>
+            <!-- Bottom Transport -->
+            <rect x="8" y="188" width="404" height="28" rx="7" fill="#111827" stroke="#334155"/>
+            <text x="72" y="205" fill="#f8fafc" font-size="7.5" font-family="monospace" text-anchor="middle">⏸  0.5x  ◀Evt  Evt▶  -1  +1</text>
+            <rect x="148" y="198" width="194" height="7" rx="3" fill="#06090f" stroke="#334155"/>
+            <rect x="148" y="198" width="112" height="7" rx="3" fill="#f97316"/>
+            <text x="380" y="205" fill="#cbd5e1" font-size="7" font-family="monospace" text-anchor="middle">11.4s / 20s</text>
+          </svg>
         </div>
-        <p>Craft the ideal sighting overlay for any optics magnification or target geometry in View 4 (#screenReticle) or via the Quick Drawer:</p>
-        <ul>
-          <li><strong>First Focal Plane (FFP) Lock:</strong> Dynamically scales hashmark spacing and reticle subtensions in lockstep with whole-image digital zoom, maintaining true angular mil/MOA values.</li>
-          <li><strong>Extended 30-Click Elevation/Windage Ladder:</strong> Display up to 30 clicks per arm with major graduation labels (every 5 or 10 clicks) across vertical and horizontal axes.</li>
-          <li><strong>Optical Dead-Center Measurement:</strong> All click distances and voice callout turret adjustments are calculated strictly from true optical dead-center (0, 0), completely independent of visual center gap diameter.</li>
-          <li><strong>4 Selectable Center Aiming Symbols:</strong>
-            <ul>
-              <li><strong>EMPTY:</strong> Open unobstructed center viewing window.</li>
-              <li><strong>DOT:</strong> Precision center aiming dot at the optical origin.</li>
-              <li><strong>CROSS:</strong> Fine mini-crosshair intersection at dead-center.</li>
-              <li><strong>CHEVRON:</strong> Tactical inverted caret (&Lambda;) whose sharp apex points directly to the center pixel.</li>
-            </ul>
-          </li>
-          <li><strong>Direct Controller Sculpting &amp; Cycle:</strong> Adjust click count, spacing, gap, stroke weight, or press <span class="key">Key C</span> / Quick Tool dock to cycle center point styles live.</li>
-        </ul>
+        <div class="legend-row"><span class="num-dot" style="background:#38bdf8;">A</span><div><strong>No Auto-Save Spam:</strong> Pressing <em>Replay</em> opens <code>LIVE BUFFER (RAM)</code> unsaved. Tap <strong>Save Clip</strong> only when you want to keep it.</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#38bdf8;">B</span><div><strong>Live Capture Pauses:</strong> Ring buffer capture pauses automatically while reviewing Replay/Clips/Hits.</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#38bdf8;">C</span><div><strong>Reticle Default OFF:</strong> Toggle <strong>Reticle: OFF/ON</strong> anytime in the top-right pill (preserved in 📷 snapshots).</div></div>
       </div>
 
-      <!-- Scope Turret Click Calibration Engine -->
-      <div class="card card-gold">
-        <div class="card-title">
-          <span class="pill pill-gold">CALIBRATION</span> MOA &amp; MRAD Turret Click Calculator
+      <!-- Right: Spatial Hits Map -->
+      <div class="card card-amber">
+        <div class="ctitle"><span class="pill p-amber">HITS TAB</span> Clean Target Pins &amp; Safe Masks</div>
+        <div class="screen-frame">
+          <svg viewBox="0 0 420 225">
+            <rect width="420" height="225" fill="#070b12"/>
+            <rect x="140" y="55" width="140" height="115" rx="6" fill="#cbd5e1" fill-opacity="0.1" stroke="#475569"/>
+            <circle cx="210" cy="112" r="36" fill="none" stroke="#475569"/>
+            <!-- Reticle ON by default -->
+            <g stroke="#f97316" stroke-width="1.2" opacity="0.8">
+              <line x1="65" y1="112" x2="192" y2="112"/><line x1="228" y1="112" x2="355" y2="112"/>
+              <line x1="210" y1="36" x2="210" y2="94"/><line x1="210" y1="130" x2="210" y2="184"/>
+            </g>
+            <!-- Ignore Mask Box -->
+            <rect x="44" y="108" width="58" height="48" rx="4" fill="rgba(245,158,11,0.16)" stroke="#f59e0b" stroke-dasharray="4 3"/>
+            <text x="73" y="135" fill="#fcd34d" font-size="6.5" font-family="monospace" text-anchor="middle">MASK</text>
+            <!-- Clean Pins (no text callout boxes) -->
+            <circle cx="195" cy="96" r="8" fill="#64748b" stroke="#090d14" stroke-width="1.5"/>
+            <text x="195" y="99" fill="#fff" font-size="7.5" font-weight="800" font-family="monospace" text-anchor="middle">1</text>
+            <circle cx="222" cy="108" r="9.5" fill="#10b981" stroke="#fff" stroke-width="1.8"/>
+            <text x="222" y="111" fill="#052e16" font-size="8" font-weight="900" font-family="monospace" text-anchor="middle">2</text>
+
+            <!-- Top-Right Hits Pill -->
+            <rect x="116" y="8" width="296" height="22" rx="11" fill="#111827" stroke="#334155"/>
+            <text x="144" y="21.5" fill="#fdba74" font-size="6.4" font-weight="700" text-anchor="middle">Reticle: ON</text>
+            <text x="188" y="21.5" fill="#6ee7b7" font-size="6.4" font-weight="700" text-anchor="middle">Hits: ON</text>
+            <text x="242" y="21.5" fill="#fcd34d" font-size="6.4" font-weight="700" text-anchor="middle">👁 Masks (1)</text>
+            <text x="304" y="21.5" fill="#e2e8f0" font-size="6.4" font-weight="700" text-anchor="middle">✎ Edit Masks</text>
+            <text x="360" y="21.5" fill="#e2e8f0" font-size="6.4" font-weight="700" text-anchor="middle">Re-Zero</text>
+            <text x="396" y="21.5" fill="#fda4af" font-size="6.4" font-weight="700" text-anchor="middle">Clear</text>
+
+            <!-- Bottom Hits Bar -->
+            <rect x="8" y="188" width="404" height="28" rx="7" fill="#111827" stroke="#334155"/>
+            <text x="48" y="205" fill="#f8fafc" font-size="7.8" font-family="monospace" text-anchor="middle">◀   #2 / 2   ▶</text>
+            <rect x="378" y="193" width="26" height="18" rx="5" fill="#1e293b" stroke="#475569"/>
+            <text x="391" y="205" fill="#f8fafc" font-size="8" text-anchor="middle">📷</text>
+          </svg>
         </div>
-        <p>Eliminate sighting guesswork by calculating exact optical turret click offsets directly from observed bullet impacts:</p>
-        <ul>
-          <li><strong>Target Distance Input:</strong> Enter engagement distance in Yards or Meters.</li>
-          <li><strong>Turret Value Selection:</strong> Select your scope turret click standard (1/4 MOA, 1/8 MOA, 1/2 MOA, 0.1 MRAD, or 0.05 MRAD).</li>
-          <li><strong>Point of Impact (POI) vs Point of Aim (POA):</strong> Measure target offset in millimeters or inches on the digital display.</li>
-          <li><strong>Instant Turret Solution:</strong> SPOTR calculates exact turret clicks (e.g. <em>"Elevation: +6 Clicks UP | Windage: -4 Clicks LEFT"</em>) to achieve pinpoint zero.</li>
-        </ul>
+        <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">A</span><div><strong>Reticle Default ON &amp; Hide Hits:</strong> Toggle <strong>Hits: OFF</strong> to hide numbered pins and inspect actual marks underneath.</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">B</span><div><strong>Safe Masks UX:</strong> <strong>👁 Masks (N)</strong> hides/shows masks visually without deleting; <strong>✎ Edit Masks</strong> unlocks drag-draw, <code>×</code> delete, and confirmed <strong>Clear All</strong>.</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">C</span><div><strong>Re-Zero &amp; Clean Pins:</strong> Pins show numbers only (no popup text). <strong>Re-Zero</strong> resets background and clears hits + log.</div></div>
       </div>
     </div>
 
-    <!-- PWA Installation Guide -->
-    <div class="card card-teal" style="margin-top: 4mm;">
-      <div class="card-title">
-        <span class="pill pill-teal">DEPLOYMENT</span> Progressive Web App (PWA) Offline Installation Guide
-      </div>
-      <p style="font-size: 8.5pt;">SPOTR is built as a self-contained, offline-first Progressive Web App. Precached by Service Worker <span style="font-family: monospace;">spotr-v0.1.1</span> (auto-reloading on update, with live build version pills in Setup headers):</p>
+    <div class="ftr">
+      <div>SPOTR v0.1.11 VISUAL MANUAL • PAGE 3: UNIFIED PLAYBACK &amp; HITS MAP</div>
+      <div>RECON • DETECT • ALERT</div>
+    </div>
+  </div>
 
-      <div class="grid-4" style="margin-top: 2mm;">
-        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
-          <div style="font-size: 8pt; font-weight: 700; color: #2dd4bf;">Portable Windows (One-Click)</div>
-          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">Double-click <strong>start_spotr.bat</strong>. Automatically boots the Python RTSP gateway and launches in your default browser.</p>
+  <!-- =================================================================== -->
+  <!-- PAGE 4: CONSOLIDATED DETECTION PIPELINE & RETICLE STUDIO            -->
+  <!-- =================================================================== -->
+  <div class="page">
+    <div class="hdr">
+      <div>
+        <div class="brand">SPOTR<span>™</span></div>
+        <div class="sub">3. CONSOLIDATED DETECTION (1:1 VOICE SYNC) &amp; RETICLE STUDIO</div>
+      </div>
+      <div class="pg-num">PAGE 4 OF 5</div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Left: Detection Pipeline Visual -->
+      <div class="card card-emerald">
+        <div class="ctitle"><span class="pill p-green">DETECTION</span> Single Synced Algorithm (Hits = Voice)</div>
+        <div class="screen-frame" style="padding: 2mm;">
+          <svg viewBox="0 0 400 205">
+            <!-- Stage 1 -->
+            <rect x="10" y="12" width="115" height="44" rx="6" fill="#111827" stroke="#38bdf8"/>
+            <text x="67.5" y="31" fill="#7dd3fc" font-size="8" font-weight="700" text-anchor="middle" font-family="monospace">160×90 LUMA GRID</text>
+            <text x="67.5" y="44" fill="#94a3b8" font-size="7" text-anchor="middle">20Hz • Skips Masks</text>
+            <line x1="125" y1="34" x2="145" y2="34" stroke="#475569" stroke-width="2"/>
+            <!-- Stage 2 -->
+            <rect x="145" y="12" width="118" height="44" rx="6" fill="#111827" stroke="#f59e0b"/>
+            <text x="204" y="31" fill="#fcd34d" font-size="8" font-weight="700" text-anchor="middle" font-family="monospace">SIZE &amp; SHAKE GATES</text>
+            <text x="204" y="44" fill="#94a3b8" font-size="7" text-anchor="middle">Min Cells ≤ Hit ≤ 5% (1/20)</text>
+            <line x1="263" y1="34" x2="283" y2="34" stroke="#475569" stroke-width="2"/>
+            <!-- Stage 3 -->
+            <rect x="283" y="12" width="107" height="44" rx="6" fill="#111827" stroke="#10b981"/>
+            <text x="336.5" y="31" fill="#6ee7b7" font-size="8" font-weight="700" text-anchor="middle" font-family="monospace">1:1 MERGE GATE</text>
+            <text x="336.5" y="44" fill="#94a3b8" font-size="7" text-anchor="middle">1500ms / 0.055 dist</text>
+
+            <!-- Fan out -->
+            <line x1="336" y1="56" x2="336" y2="74" stroke="#10b981" stroke-width="2"/>
+            <line x1="55" y1="74" x2="345" y2="74" stroke="#10b981" stroke-width="2"/>
+            <line x1="55" y1="74" x2="55" y2="88" stroke="#10b981" stroke-width="2"/>
+            <line x1="150" y1="74" x2="150" y2="88" stroke="#10b981" stroke-width="2"/>
+            <line x1="248" y1="74" x2="248" y2="88" stroke="#10b981" stroke-width="2"/>
+            <line x1="345" y1="74" x2="345" y2="88" stroke="#10b981" stroke-width="2"/>
+
+            <rect x="10" y="88" width="90" height="42" rx="6" fill="#0f172a" stroke="#10b981"/>
+            <text x="55" y="106" fill="#6ee7b7" font-size="8" font-weight="700" text-anchor="middle">HIT PIN</text>
+            <text x="55" y="119" fill="#94a3b8" font-size="6.8" text-anchor="middle">Logged to Hits Map</text>
+
+            <rect x="106" y="88" width="88" height="42" rx="6" fill="#0f172a" stroke="#f97316"/>
+            <text x="150" y="106" fill="#fdba74" font-size="8" font-weight="700" text-anchor="middle">VOICE CALLOUT</text>
+            <text x="150" y="119" fill="#94a3b8" font-size="6.8" text-anchor="middle">"11 o'clock, 3 clicks"</text>
+
+            <rect x="202" y="88" width="92" height="42" rx="6" fill="#0f172a" stroke="#38bdf8"/>
+            <text x="248" y="106" fill="#7dd3fc" font-size="8" font-weight="700" text-anchor="middle">EVENT MARKER</text>
+            <text x="248" y="119" fill="#94a3b8" font-size="6.8" text-anchor="middle">Replay Scrubber Tick</text>
+
+            <rect x="302" y="88" width="88" height="42" rx="6" fill="#0f172a" stroke="#475569"/>
+            <text x="346" y="106" fill="#cbd5e1" font-size="8" font-weight="700" text-anchor="middle">AUTO-SAVE</text>
+            <text x="346" y="119" fill="#94a3b8" font-size="6.8" text-anchor="middle">Default: OFF (Setup)</text>
+
+            <!-- Area Gate Diagram -->
+            <rect x="10" y="144" width="184" height="50" rx="6" fill="rgba(16,185,129,0.1)" stroke="#10b981"/>
+            <rect x="22" y="158" width="16" height="16" rx="2" fill="#10b981"/>
+            <text x="112" y="165" fill="#6ee7b7" font-size="8" font-weight="700" text-anchor="middle">VALID HIT (≤ 5%)</text>
+            <text x="112" y="179" fill="#94a3b8" font-size="7" text-anchor="middle">Localized impact logged</text>
+
+            <rect x="206" y="144" width="184" height="50" rx="6" fill="rgba(244,63,94,0.1)" stroke="#f43f5e"/>
+            <rect x="216" y="153" width="38" height="32" rx="2" fill="rgba(244,63,94,0.55)" stroke="#f43f5e"/>
+            <text x="318" y="165" fill="#fda4af" font-size="8" font-weight="700" text-anchor="middle">SUPPRESSED (&gt; 5%)</text>
+            <text x="318" y="179" fill="#94a3b8" font-size="7" text-anchor="middle">Multi-hit / wind / shake ignored</text>
+          </svg>
         </div>
-        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
-          <div style="font-size: 8pt; font-weight: 700; color: #38bdf8;">ChromeOS / Chromebook</div>
-          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">In Chrome, click the <strong>Install SPOTR</strong> icon in the omnibox. Runs as a standalone app window 100% offline.</p>
+        <div class="legend-row"><span class="num-dot" style="background:#10b981;">1</span><div><strong>Setup → Detection &amp; Voice:</strong> Customize <strong>Max Hit Area</strong> (<code>1%–20%</code>, default <code>5% / 1/20</code>), <strong>Min Hit Size</strong> (<code>1–20</code> cells), and <strong>Auto-Save Clip on Hit</strong> (<code>OFF</code> by default).</div></div>
+        <div class="legend-row"><span class="num-dot" style="background:#10b981;">2</span><div><strong>1:1 Voice Sync:</strong> Turning on Voice uses the exact same detector so every logged hit matches every spoken callout.</div></div>
+      </div>
+
+      <!-- Right: Reticle Studio & FFP Visual -->
+      <div class="card card-orange">
+        <div class="ctitle"><span class="pill p-orange">RETICLE STUDIO</span> Center Styles &amp; FFP Lock</div>
+        <div class="screen-frame" style="padding: 2mm;">
+          <svg viewBox="0 0 400 205">
+            <!-- 4 Center Styles -->
+            <text x="12" y="20" fill="#94a3b8" font-size="7.5" font-weight="700" font-family="monospace">4 CENTER AIMING POINTS</text>
+            <g transform="translate(12,28)">
+              <rect width="88" height="66" rx="6" fill="#111827" stroke="#334155"/>
+              <line x1="14" y1="30" x2="34" y2="30" stroke="#f97316" stroke-width="2"/>
+              <line x1="54" y1="30" x2="74" y2="30" stroke="#f97316" stroke-width="2"/>
+              <line x1="44" y1="10" x2="44" y2="20" stroke="#f97316" stroke-width="2"/>
+              <line x1="44" y1="40" x2="44" y2="50" stroke="#f97316" stroke-width="2"/>
+              <text x="44" y="60" fill="#e2e8f0" font-size="7.5" font-family="monospace" text-anchor="middle">EMPTY</text>
+            </g>
+            <g transform="translate(108,28)">
+              <rect width="88" height="66" rx="6" fill="#111827" stroke="#334155"/>
+              <line x1="14" y1="30" x2="34" y2="30" stroke="#f97316" stroke-width="2"/>
+              <line x1="54" y1="30" x2="74" y2="30" stroke="#f97316" stroke-width="2"/>
+              <circle cx="44" cy="30" r="3.5" fill="#f97316"/>
+              <text x="44" y="60" fill="#e2e8f0" font-size="7.5" font-family="monospace" text-anchor="middle">DOT</text>
+            </g>
+            <g transform="translate(204,28)">
+              <rect width="88" height="66" rx="6" fill="#111827" stroke="#334155"/>
+              <line x1="36" y1="30" x2="52" y2="30" stroke="#f97316" stroke-width="1.8"/>
+              <line x1="44" y1="22" x2="44" y2="38" stroke="#f97316" stroke-width="1.8"/>
+              <text x="44" y="60" fill="#e2e8f0" font-size="7.5" font-family="monospace" text-anchor="middle">CROSS</text>
+            </g>
+            <g transform="translate(300,28)">
+              <rect width="88" height="66" rx="6" fill="#111827" stroke="#334155"/>
+              <path d="M34 40 L44 26 L54 40" fill="none" stroke="#f97316" stroke-width="2.2"/>
+              <text x="44" y="60" fill="#e2e8f0" font-size="7.5" font-family="monospace" text-anchor="middle">CHEVRON</text>
+            </g>
+
+            <!-- FFP Comparison -->
+            <text x="12" y="114" fill="#94a3b8" font-size="7.5" font-weight="700" font-family="monospace">FIRST FOCAL PLANE (FFP: ON)</text>
+            <rect x="12" y="122" width="182" height="72" rx="6" fill="#0f172a" stroke="#334155"/>
+            <circle cx="103" cy="156" r="14" fill="none" stroke="#475569"/>
+            <line x1="65" y1="156" x2="141" y2="156" stroke="#f97316" stroke-width="1.4"/>
+            <line x1="90" y1="152" x2="90" y2="160" stroke="#f97316" stroke-width="1.4"/>
+            <line x1="116" y1="152" x2="116" y2="160" stroke="#f97316" stroke-width="1.4"/>
+            <text x="103" y="187" fill="#cbd5e1" font-size="7.2" font-family="monospace" text-anchor="middle">1.0x ZOOM (1 click = target rim)</text>
+
+            <rect x="206" y="122" width="182" height="72" rx="6" fill="#0f172a" stroke="#f97316"/>
+            <circle cx="297" cy="156" r="24" fill="none" stroke="#475569"/>
+            <line x1="230" y1="156" x2="364" y2="156" stroke="#f97316" stroke-width="2"/>
+            <line x1="273" y1="150" x2="273" y2="162" stroke="#f97316" stroke-width="2"/>
+            <line x1="321" y1="150" x2="321" y2="162" stroke="#f97316" stroke-width="2"/>
+            <text x="297" y="187" fill="#fdba74" font-size="7.2" font-family="monospace" text-anchor="middle">2.0x ZOOM (Subtension stays true)</text>
+          </svg>
         </div>
-        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
-          <div style="font-size: 8pt; font-weight: 700; color: #ffd166;">Android Tablets &amp; Phones</div>
-          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">Tap browser menu (<span style="font-family: monospace;">⋮</span>) &gt; <strong>Install App / Add to Home Screen</strong>. Operates in full-screen immersive landscape mode.</p>
-        </div>
-        <div style="background: #121318; padding: 2.5mm; border-radius: 4px; border: 1px solid #27272a;">
-          <div style="font-size: 8pt; font-weight: 700; color: #c084fc;">macOS &amp; Linux</div>
-          <p style="font-size: 7.5pt; color: #94a3b8; margin: 1mm 0 0 0;">Run <span style="font-family: monospace;">python server.py 8080</span> and navigate to <span style="font-family: monospace;">http://localhost:8080</span> in Chrome, Edge, or Brave.</p>
-        </div>
+        <div class="legend-row"><span class="num-dot">1</span><div><strong>Setup → Reticle:</strong> Configure Clicks/Arm (2–30), Click Spacing, Center Gap (0–280), Rings, Stroke &amp; Scene Backdrops (Night/Jungle/Desert/Arctic).</div></div>
+        <div class="legend-row"><span class="num-dot">2</span><div><strong>Custom Image:</strong> Upload any PNG/SVG reticle and toggle per-screen visibility independently across Live, Playback, and Hits.</div></div>
       </div>
     </div>
 
-    <div class="doc-footer">
-      <div>SPOTR v0.1.1 USER MANUAL • SEC 5: RETICLE STUDIO &amp; PWA DEPLOYMENT</div>
-      <div>CONFIDENTIAL &amp; PROPRIETARY</div>
+    <div class="ftr">
+      <div>SPOTR v0.1.11 VISUAL MANUAL • PAGE 4: DETECTION &amp; RETICLE STUDIO</div>
+      <div>RECON • DETECT • ALERT</div>
+    </div>
+  </div>
+
+  <!-- =================================================================== -->
+  <!-- PAGE 5: CONTROLLERS & QUICK REFERENCE                               -->
+  <!-- =================================================================== -->
+  <div class="page">
+    <div class="hdr">
+      <div>
+        <div class="brand">SPOTR<span>™</span></div>
+        <div class="sub">4. HARDWARE CONTROLLERS &amp; QUICK REFERENCE</div>
+      </div>
+      <div class="pg-num">PAGE 5 OF 5</div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:2mm;">
+      <div class="card card-sky">
+        <div class="ctitle"><span class="pill p-sky">GAMEPAD</span> DualShock 4 / 5</div>
+        <svg viewBox="0 0 210 64" width="100%">
+          <rect x="10" y="8" width="190" height="48" rx="14" fill="#0b111b" stroke="#38bdf8"/>
+          <rect x="75" y="14" width="60" height="22" rx="4" fill="#1e293b" stroke="#475569"/>
+          <text x="105" y="28" fill="#7dd3fc" font-size="7" font-family="monospace" text-anchor="middle">TOUCHPAD</text>
+          <circle cx="42" cy="34" r="10" fill="#1e293b" stroke="#475569"/><text x="42" y="37" fill="#e2e8f0" font-size="7" text-anchor="middle">✚</text>
+          <circle cx="168" cy="34" r="10" fill="#1e293b" stroke="#475569"/><text x="168" y="37" fill="#e2e8f0" font-size="7" text-anchor="middle">△▢✕◯</text>
+        </svg>
+        <div style="font-size:7.8pt; color:#94a3b8;">Touchpad drives virtual mouse; <strong>L2</strong> click-drags; <strong>L1/R1</strong> zoom; <strong>Share</strong> opens Replay.</div>
+      </div>
+
+      <div class="card card-orange">
+        <div class="ctitle"><span class="pill p-orange">RING</span> Bluetooth Ring / Remote</div>
+        <svg viewBox="0 0 210 64" width="100%">
+          <rect x="52" y="6" width="106" height="52" rx="10" fill="#0b111b" stroke="#f97316"/>
+          <circle cx="105" cy="32" r="10" fill="#f97316"/><text x="105" y="35" fill="#090d14" font-size="7" font-weight="800" text-anchor="middle">●</text>
+          <text x="105" y="17" fill="#e2e8f0" font-size="8" text-anchor="middle">▲</text>
+          <text x="105" y="52" fill="#e2e8f0" font-size="8" text-anchor="middle">▼</text>
+          <text x="74" y="35" fill="#e2e8f0" font-size="8" text-anchor="middle">◄</text>
+          <text x="136" y="35" fill="#e2e8f0" font-size="8" text-anchor="middle">►</text>
+        </svg>
+        <div style="font-size:7.8pt; color:#94a3b8;"><strong>●</strong> cycles Zoom (Live) or Play/Pause (Playback); <strong>BTN 1/2</strong> toggles Replay; Learn HID swipes in Setup.</div>
+      </div>
+
+      <div class="card card-emerald">
+        <div class="ctitle"><span class="pill p-green">K-MODE</span> 8BitDo Micro</div>
+        <svg viewBox="0 0 210 64" width="100%">
+          <rect x="20" y="10" width="170" height="44" rx="16" fill="#0b111b" stroke="#10b981"/>
+          <text x="55" y="35" fill="#e2e8f0" font-size="10" text-anchor="middle">✚</text>
+          <text x="105" y="35" fill="#6ee7b7" font-size="7.5" font-family="monospace" font-weight="700" text-anchor="middle">−  ★  ⌂  +</text>
+          <text x="155" y="35" fill="#fdba74" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">X Y A B</text>
+        </svg>
+        <div style="font-size:7.8pt; color:#94a3b8;">Set bottom switch to <strong>K</strong> (HID keyboard) for zero-sleep 16-button control.</div>
+      </div>
+    </div>
+
+    <!-- Concise Reference Table -->
+    <div class="card card-orange" style="flex:1;">
+      <div class="ctitle"><span class="pill p-orange">QUICK REFERENCE</span> Input &amp; Screen Actions</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:18%;">Input</th>
+            <th style="width:28%;">Live Screen</th>
+            <th style="width:28%;">Unified Playback</th>
+            <th style="width:26%;">Reticle Customizer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="kbd">L1 / R1</span></td>
+            <td>Main Zoom − / +</td>
+            <td>Playback Zoom − / +</td>
+            <td>Clicks Per Arm −1 / +1</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">D-Pad ◄ / ►</span></td>
+            <td>Cycle Quick Tool</td>
+            <td>Frame Step −1 / +1</td>
+            <td>Adjust Selected Slider</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Cross (✕)</span></td>
+            <td>Toggle Active Quick Tool</td>
+            <td>Play / Pause</td>
+            <td>Test Voice Callout</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Circle (◯)</span></td>
+            <td>Clean View (Declutter)</td>
+            <td>Return to Live (← Live)</td>
+            <td>Return to Live</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Square (▢)</span></td>
+            <td>Toggle Reticle Overlay</td>
+            <td>Toggle 0.5x Slow-Mo</td>
+            <td>Toggle Range Rings</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Share</span> / <span class="kbd">BTN 1-2</span></td>
+            <td>Open Instant Replay (RAM)</td>
+            <td>Exit Playback to Live</td>
+            <td>Reset Reticle</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Ring ● (Center)</span></td>
+            <td>Cycle Zoom (1x→1.5x→2x→2.5x→3x)</td>
+            <td>Play / Pause</td>
+            <td>Configurable in Controllers</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ftr">
+      <div>SPOTR v0.1.11 VISUAL MANUAL • PAGE 5: CONTROLLERS &amp; REFERENCE</div>
+      <div>BUILD: ANDROID v0.59.0 • OFFLINE PWA READY</div>
     </div>
   </div>
 

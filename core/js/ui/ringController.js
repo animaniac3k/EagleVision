@@ -55,7 +55,7 @@ export function shouldHoldCanvasPan(panStartTime) {
 }
 
 export function getActiveRemoteMode() {
-  if (appState.currentScreen === 'gallery' || appState.replayActive) {
+  if (appState.currentScreen === 'gallery') {
     return 'REPLAY';
   }
   return 'DIRECT';

@@ -1155,9 +1155,6 @@ function dispatchControllerInputs(actionState) {
     } else if (screen === 'gallery') {
       document.getElementById('btnGalleryPlayPause')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CROSS (PLAY/PAUSE)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnReplayPlayPause')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: CROSS (PLAY/PAUSE)' });
     } else {
       const act = getBoundAction('cross') || 'quick_tool_toggle';
       executeMappedAction(act);
@@ -1179,9 +1176,6 @@ function dispatchControllerInputs(actionState) {
     } else if (screen === 'controller') {
       document.getElementById('btnControllerBackToLive')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnCloseReplay')?.click();
-      updateState({ lastGamepadAction: 'BUTTON: CIRCLE (CLOSE REPLAY)' });
     } else {
       updateState({
         uiDecluttered: !appState.uiDecluttered,
@@ -1380,9 +1374,6 @@ function dispatchControllerInputs(actionState) {
     } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStepBack')?.click();
       updateState({ lastGamepadAction: 'D-PAD: LEFT (STEP -1)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnReplayStepBack')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: LEFT (STEP -1)' });
     } else {
       const act = getBoundAction('dpad-left') || 'quick_tool_cycle_prev';
       executeMappedAction(act);
@@ -1398,9 +1389,6 @@ function dispatchControllerInputs(actionState) {
       updateState({ lastGamepadAction: `RETICLE: ${res || 'INCREASE'}` });
     } else if (screen === 'gallery') {
       document.getElementById('btnGalleryStep')?.click();
-      updateState({ lastGamepadAction: 'D-PAD: RIGHT (STEP +1)' });
-    } else if (appState.replayActive) {
-      document.getElementById('btnReplayStep')?.click();
       updateState({ lastGamepadAction: 'D-PAD: RIGHT (STEP +1)' });
     } else {
       const act = getBoundAction('dpad-right') || 'quick_tool_cycle_next';

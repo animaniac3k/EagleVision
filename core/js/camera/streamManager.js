@@ -24,7 +24,7 @@ subscribeState((state) => {
     lastGatewayPaused = false;
     return;
   }
-  const shouldPause = Boolean(state.replayActive || state.currentScreen === 'gallery');
+  const shouldPause = state.currentScreen === 'gallery';
   if (shouldPause !== lastGatewayPaused) {
     lastGatewayPaused = shouldPause;
     fetch(`${activeMjpegPauseUrl}?paused=${shouldPause ? '1' : '0'}`, { method: 'POST' }).catch(() => {});
@@ -586,7 +586,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
   const scheduleDecode = () => {
     if (decodingFrame || !pendingJpeg || !rtspDrawLoopActive || abortCtrl.signal.aborted) return;
     // Skip browser-side JPEG decode & canvas draw when live viewport is hidden (replay/gallery/settings)
-    if (appState.replayActive || appState.currentScreen !== 'live') {
+    if (appState.currentScreen !== 'live') {
       pendingJpeg = null;
       return;
     }

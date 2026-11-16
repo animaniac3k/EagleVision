@@ -349,7 +349,7 @@ export function initReticleScreen() {
   btnReticleBackToLive?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenLive?.classList.remove('hidden');
-    updateState({ currentScreen: 'live', replayActive: false });
+    updateState({ currentScreen: 'live' });
   });
 
   // Stage Scene Backdrop Switcher (Jungle / Desert / Arctic / Night)
@@ -382,13 +382,13 @@ export function initReticleScreen() {
   btnReticleToController?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenController?.classList.remove('hidden');
-    updateState({ currentScreen: 'controller', replayActive: false });
+    updateState({ currentScreen: 'controller' });
   });
 
   btnReticleToSettings?.addEventListener('click', () => {
     screenReticle?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
-    updateState({ currentScreen: 'settings', replayActive: false });
+    updateState({ currentScreen: 'settings' });
   });
 
   // Reset reticle defaults

@@ -1,5 +1,5 @@
 ================================================================================
-SPOTR - PROJECT PLAN & TECHNICAL DOCUMENTATION (v0.1.1)
+SPOTR - PROJECT PLAN & TECHNICAL DOCUMENTATION (v0.1.11)
 Target Platform: Progressive Web App (PWA) for ChromeOS / Android (Lenovo Duet 3)
                  & Portable Windows/macOS/Linux Systems with RTSP Gateway
 ================================================================================
@@ -65,15 +65,18 @@ Core Capabilities:
       * High-contrast thermal markings; global motion gate (>18%) rejects camera shake & tripod bumps
       * Dirty checking state machine skips canvas rendering when scene is static
       * Configurable sensitivity (10% - 95%) and display duration (0.5s - 10.0s up to infinity)
-  - Native-Resolution In-Memory Video Buffer (5s-60s @ 5-30 FPS) with live RAM meter
+  - Native-Resolution In-Memory Video Buffer (5s-60s @ 5-30 FPS) with live RAM meter:
       * Dual-source ingestion: grabs full-res frames from <video> (USB) or getRtspCanvas() (RTSP)
-  - One-Tap Instant Replay with Auto-Save to IndexedDB:
-      * 0.5x Slow-Motion button for bullet trajectory and impact forensics
-      * STEP -1 / STEP +1 dual-direction frame stepping
-  - Fullscreen Stored Video Player (Screen 2):
-      * Floating GUI overlay and collapsible Clips drawer
-      * Individual red trash icon on each clip card for rapid deletion without opening player
-      * Dual STEP -1 / STEP +1 frame buttons and native-res .webm export
+      * Pauses capture automatically whenever `currentScreen !== 'live'` and prunes stale frames on snapshot
+  - Unified Instant Replay & Stored Video Player (Screen 2 — Playback | Hits):
+      * Pressing Replay opens Screen 2 (`Playback`) on an unsaved `LIVE BUFFER (RAM)` source (tap `Save Clip` to persist)
+      * Independent reticle toggles: OFF by default in Playback, ON by default in Hits
+      * 0.5x Slow-Motion, STEP -1 / STEP +1 frame stepping, and native-res .webm export
+      * Hits Map: `Hits: ON/OFF` peek toggle, `👁 Masks (N)` visual toggle + `✎ Edit Masks`, confirmed `Clear All`, clean numbered pins, and `Re-Zero` clearing background + hits
+  - Main-Screen `Aim Loupe` & Consolidated 20Hz Detection:
+      * `Aim Loupe` button on Live dock snaps Digital Loupe onto latest hit
+      * Single consolidated detection pipeline syncs Hit Pins, 1:1 Voice Callouts, Timeline Markers, and optional Auto-Save (OFF by default)
+      * Customizable `Max Hit Area` (default 5% = 1/20th of screen) & `Min Hit Size` (default 2 cells)
 
 
 2. DIRECTORY & MODULE STRUCTURE
