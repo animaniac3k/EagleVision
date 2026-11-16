@@ -1,18 +1,30 @@
 /**
- * Screen 2: Fullscreen Stored Video Player with Floating GUI Overlay
+ * Screen 2: Unified Fullscreen Playback (Live RAM Buffer + Saved Video Archive)
  *
- * Renders saved clips at 100% fullscreen in their native recorded resolution
- * using createImageBitmap lookahead decoding, with a collapsible left clip
- * drawer and floating bottom transport bar.
+ * Renders either a live RAM ring-buffer snapshot (Instant Replay) or saved
+ * IndexedDB clips at native resolution using createImageBitmap lookahead
+ * decoding, with a collapsible left source drawer, optional reticle overlay,
+ * and floating bottom transport bar.
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { createJpegFramePlayer } from '../recorder/jpegFramePlayer.js';
-import { listVideoClips, getVideoClip, deleteVideoClip, exportClipToDisk } from '../storage/videoStore.js';
+import {
+  listVideoClips,
+  getVideoClip,
+  saveVideoClip,
+  deleteVideoClip,
+  exportClipToDisk
+} from '../storage/videoStore.js';
 import { renderCctvTrack } from './cctvScrubBar.js';
 import { shouldHoldCanvasPan } from './ringController.js';
 import { exportAnnotatedCanvasPng } from '../renderer/compositor.js';
+import { renderReticleOverlayLayer } from '../renderer/overlayManager.js';
+import { saveSettings } from '../storage/settingsStore.js';
+
+const LIVE_BUFFER_ID = '__live_buffer__';
 
 let cachedClips = [];
+let activeBufferClip = null;
 let selectedClipId = null;
 let clipDuration = 0;
 let playheadSec = 0;
@@ -27,12 +39,45 @@ let galleryEventNavHelper = null;
 let galleryPlayer = null;
 let lastTimeLabel = '';
 let lastPlayBtnText = '';
+let setDrawerOpenFn = null;
+let openingLiveBuffer = false;
 
 function stopPlayerLoop() {
   if (rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
+}
+
+function syncPlaybackReticleOverlay() {
+  const layerEl = document.getElementById('galleryReticleLayer');
+  const svgEl = document.getElementById('galleryReticleSvg');
+  const customImg = document.getElementById('galleryReticleCustomImg');
+  const btnReticle = document.getElementById('btnTogglePlaybackReticle');
+  const enabled = Boolean(appState.playbackReticleEnabled);
+
+  if (btnReticle) {
+    btnReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
+    btnReticle.classList.toggle('radar-btn-active', enabled);
+  }
+  renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, galleryZoom);
+}
+
+function syncSourceActionButtons() {
+  const isBuffer = selectedClipId === LIVE_BUFFER_ID && Boolean(activeBufferClip);
+  const btnSaveBuffer = document.getElementById('btnSaveBufferClip');
+  const btnDelete = document.getElementById('btnGalleryDelete');
+  const btnDownload = document.getElementById('btnGalleryDownload');
+  const btnSnapshot = document.getElementById('btnGallerySnapshot');
+  const hasSource = isBuffer || Boolean(selectedClipId);
+
+  if (btnSaveBuffer) btnSaveBuffer.classList.toggle('hidden', !isBuffer);
+  if (btnDelete) {
+    btnDelete.classList.toggle('hidden', isBuffer);
+    btnDelete.disabled = !selectedClipId;
+  }
+  if (btnDownload) btnDownload.disabled = !hasSource;
+  if (btnSnapshot) btnSnapshot.disabled = !hasSource;
 }
 
 function renderGalleryFrame() {
@@ -97,7 +142,9 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
 
   badge.textContent = String(cachedClips.length);
 
-  if (!cachedClips.length) {
+  const isViewingBuffer = selectedClipId === LIVE_BUFFER_ID && Boolean(activeBufferClip);
+
+  if (!cachedClips.length && !activeBufferClip) {
     stopPlayerLoop();
     galleryPlayer?.unload();
     selectedClipId = null;
@@ -105,23 +152,30 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
       <div class="clip-card" style="cursor:default;">
         <div>
           <div class="clip-name">NO SAVED RECORDINGS</div>
-          <div class="clip-meta">Tap REPLAY on the live feed to view & auto-save clips.</div>
+          <div class="clip-meta">Tap Replay on Live to inspect RAM buffer, or enable Auto-Save in Setup.</div>
         </div>
       </div>
     `;
     titleEl.textContent = 'NO CLIP SELECTED';
     metaEl.textContent = '—';
+    syncSourceActionButtons();
     renderGalleryFrame();
     return;
   }
 
   const galleryVisible = appState.currentScreen === 'gallery';
-  let currentClip = cachedClips.find((c) => c.id === selectedClipId);
-  if (galleryVisible && (!currentClip || autoSelectFirst)) {
-    currentClip = cachedClips[0];
-    selectClip(currentClip, true);
-  } else if (!currentClip) {
-    selectedClipId = cachedClips[0].id;
+  if (!isViewingBuffer) {
+    let currentClip = cachedClips.find((c) => c.id === selectedClipId);
+    if (galleryVisible && (!currentClip || autoSelectFirst)) {
+      if (cachedClips.length) {
+        currentClip = cachedClips[0];
+        selectClip(currentClip, true);
+      } else if (activeBufferClip) {
+        selectClip(activeBufferClip, true);
+      }
+    } else if (!currentClip && cachedClips.length) {
+      selectedClipId = cachedClips[0].id;
+    }
   }
 
   renderClipList();
@@ -129,33 +183,52 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
 
 function renderClipList() {
   const listEl = document.getElementById('clipsList');
-  listEl.innerHTML = cachedClips
-    .map((clip) => {
-      const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
-      const isSelected = clip.id === selectedClipId;
-      return `
-        <div class="clip-card ${isSelected ? 'active' : ''}" data-clip-id="${clip.id}">
-          <div style="flex:1; min-width:0; padding-right:8px;">
-            <div class="clip-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${clip.name}</div>
-            <div class="clip-meta">${clip.width}×${clip.height} • ${clip.durationSec}s (${clip.fps || 15} FPS) • ${mb} MB</div>
+  const parts = [];
+
+  if (activeBufferClip) {
+    const mb = ((activeBufferClip.sizeBytes || 0) / (1024 * 1024)).toFixed(1);
+    const isSelected = selectedClipId === LIVE_BUFFER_ID;
+    parts.push(`
+      <div class="clip-card clip-card-buffer ${isSelected ? 'active' : ''}" data-clip-id="${LIVE_BUFFER_ID}">
+        <div style="flex:1; min-width:0; padding-right:8px;">
+          <div class="clip-name" style="display:flex; align-items:center; gap:6px;">
+            <span class="status-dot" style="width:7px; height:7px;"></span>
+            <span>LIVE BUFFER (RAM)</span>
           </div>
-          <button type="button" class="btn-quick-delete-clip" data-delete-id="${clip.id}" title="Delete ${clip.name}" aria-label="Delete ${clip.name}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
+          <div class="clip-meta">${activeBufferClip.width}×${activeBufferClip.height} • ${activeBufferClip.durationSec}s (${activeBufferClip.fps || 15} FPS) • ${mb} MB • Unsaved</div>
         </div>
-      `;
-    })
-    .join('');
+      </div>
+    `);
+  }
+
+  for (const clip of cachedClips) {
+    const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
+    const isSelected = clip.id === selectedClipId;
+    parts.push(`
+      <div class="clip-card ${isSelected ? 'active' : ''}" data-clip-id="${clip.id}">
+        <div style="flex:1; min-width:0; padding-right:8px;">
+          <div class="clip-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${clip.name}</div>
+          <div class="clip-meta">${clip.width}×${clip.height} • ${clip.durationSec}s (${clip.fps || 15} FPS) • ${mb} MB</div>
+        </div>
+        <button type="button" class="btn-quick-delete-clip" data-delete-id="${clip.id}" title="Delete ${clip.name}" aria-label="Delete ${clip.name}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    `);
+  }
+
+  listEl.innerHTML = parts.join('');
 
   listEl.querySelectorAll('.clip-card[data-clip-id]').forEach((card) => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.btn-quick-delete-clip')) return;
-      const found = cachedClips.find((c) => c.id === card.dataset.clipId);
+      const cid = card.dataset.clipId;
+      const found = cid === LIVE_BUFFER_ID ? activeBufferClip : cachedClips.find((c) => c.id === cid);
       if (found) {
         selectClip(found, true);
         renderClipList();
@@ -205,18 +278,24 @@ async function selectClip(clip, autoPlay = true) {
   scrubber.max = String(clipDuration.toFixed(2));
   scrubber.value = '0';
 
-  const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
-  titleEl.textContent = clip.name;
-  metaEl.textContent = `${clip.width}×${clip.height} @ ${clip.fps || 15} FPS • ${clip.durationSec}s • ${mb} MB`;
+  const mb = ((clip.sizeBytes || 0) / (1024 * 1024)).toFixed(1);
+  if (clip.isBuffer) {
+    titleEl.textContent = 'LIVE BUFFER';
+    metaEl.textContent = `${clip.width}×${clip.height} @ ${clip.fps || 15} FPS • ${clip.durationSec}s • RAM`;
+  } else {
+    titleEl.textContent = clip.name;
+    metaEl.textContent = `${clip.width}×${clip.height} @ ${clip.fps || 15} FPS • ${clip.durationSec}s • ${mb} MB`;
+  }
+  syncSourceActionButtons();
 
-  const fullClip = await getVideoClip(clip.id);
+  const fullClip = clip.isBuffer ? clip : await getVideoClip(clip.id);
   if (!fullClip || !Array.isArray(fullClip.jpegFrames) || selectedClipId !== clip.id) {
     return;
   }
 
   galleryPlayer?.load(fullClip.jpegFrames, clipDuration, fullClip.frameTimestamps || null);
 
-  // Render CCTV Waveform & Event Markers for this stored recording
+  // Render CCTV Waveform & Event Markers for this source
   const waveformEl = document.getElementById('galleryWaveform');
   const markersEl = document.getElementById('galleryMarkers');
   const timeline = fullClip.timeline || clip.timeline || { soundPeaks: [], events: [] };
@@ -237,6 +316,36 @@ async function selectClip(clip, autoPlay = true) {
 }
 
 /**
+ * Opens a RAM ring-buffer snapshot directly in the unified Playback screen (without auto-saving).
+ */
+export async function openLiveBufferInPlayer(snap) {
+  if (!snap || !Array.isArray(snap.jpegFrames) || !snap.jpegFrames.length) return false;
+  activeBufferClip = {
+    id: LIVE_BUFFER_ID,
+    isBuffer: true,
+    name: 'LIVE BUFFER',
+    createdAt: Date.now(),
+    jpegFrames: snap.jpegFrames,
+    frameTimestamps: snap.frameTimestamps || null,
+    fps: snap.fps || 15,
+    durationSec: snap.durationSec,
+    sizeBytes: snap.sizeBytes || 0,
+    width: snap.width || 1920,
+    height: snap.height || 1080,
+    timeline: snap.timeline || { soundPeaks: [], events: [] }
+  };
+  selectedClipId = LIVE_BUFFER_ID;
+  openingLiveBuffer = true;
+  setDrawerOpenFn?.(false);
+  updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
+  openingLiveBuffer = false;
+  await refreshGalleryClips(false);
+  await selectClip(activeBufferClip, true);
+  renderClipList();
+  return true;
+}
+
+/**
  * Opens the Stored Clips Gallery directly on a saved clip seeked to a target timestamp (seconds).
  */
 export async function openClipAtTime(clipId, startSec = 0) {
@@ -254,8 +363,6 @@ export async function openClipAtTime(clipId, startSec = 0) {
 }
 
 export function initVideoBrowser() {
-  const screenLive = document.getElementById('screenLive');
-  const screenGallery = document.getElementById('screenGallery');
   const btnSwitchScreen = document.getElementById('btnSwitchScreen');
   const btnBackToLive = document.getElementById('btnBackToLive');
 
@@ -277,6 +384,8 @@ export function initVideoBrowser() {
   const btnStep = document.getElementById('btnGalleryStep');
   const btnDownload = document.getElementById('btnGalleryDownload');
   const btnDelete = document.getElementById('btnGalleryDelete');
+  const btnSaveBufferClip = document.getElementById('btnSaveBufferClip');
+  const btnTogglePlaybackReticle = document.getElementById('btnTogglePlaybackReticle');
 
   const btnZoomMinus = document.getElementById('galleryZoomMinus');
   const btnZoomPlus = document.getElementById('galleryZoomPlus');
@@ -289,6 +398,7 @@ export function initVideoBrowser() {
     if (btnZoomReset) btnZoomReset.classList.toggle('hidden', galleryZoom <= 1.01);
     canvasEl.style.cursor = galleryZoom > 1.01 ? 'grab' : 'default';
     galleryPlayer.draw();
+    syncPlaybackReticleOverlay();
   }
 
   btnZoomMinus?.addEventListener('click', () => {
@@ -363,12 +473,16 @@ export function initVideoBrowser() {
     galleryDrawer.classList.toggle('hidden', !next);
     btnToggleGalleryDrawer.classList.toggle('radar-btn-active', next);
   }
+  setDrawerOpenFn = setDrawerOpen;
 
   btnToggleGalleryDrawer.addEventListener('click', () => setDrawerOpen());
   btnCloseGalleryDrawer.addEventListener('click', () => setDrawerOpen(false));
   setDrawerOpen(Boolean(appState.galleryDrawerOpen));
 
   btnSwitchScreen.addEventListener('click', () => {
+    if (selectedClipId === LIVE_BUFFER_ID) {
+      selectedClipId = cachedClips[0]?.id || LIVE_BUFFER_ID;
+    }
     updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
   });
 
@@ -379,6 +493,45 @@ export function initVideoBrowser() {
     updateState({ currentScreen: 'live' });
   });
 
+  btnTogglePlaybackReticle?.addEventListener('click', () => {
+    updateState({ playbackReticleEnabled: !appState.playbackReticleEnabled });
+    saveSettings(appState);
+  });
+
+  btnSaveBufferClip?.addEventListener('click', async () => {
+    if (!activeBufferClip || selectedClipId !== LIVE_BUFFER_ID) return;
+    const orig = btnSaveBufferClip.textContent;
+    btnSaveBufferClip.disabled = true;
+    btnSaveBufferClip.textContent = 'Saving...';
+    try {
+      const savedMeta = await saveVideoClip({
+        jpegFrames: activeBufferClip.jpegFrames,
+        frameTimestamps: activeBufferClip.frameTimestamps,
+        fps: activeBufferClip.fps,
+        durationSec: activeBufferClip.durationSec,
+        sizeBytes: activeBufferClip.sizeBytes,
+        width: activeBufferClip.width,
+        height: activeBufferClip.height,
+        timeline: activeBufferClip.timeline
+      });
+      activeBufferClip = null;
+      selectedClipId = savedMeta.id;
+      await refreshGalleryClips(false);
+      const titleEl = document.getElementById('activeClipTitle');
+      const metaEl = document.getElementById('activeClipMeta');
+      const mb = (savedMeta.sizeBytes / (1024 * 1024)).toFixed(1);
+      if (titleEl) titleEl.textContent = savedMeta.name;
+      if (metaEl) metaEl.textContent = `${savedMeta.width}×${savedMeta.height} @ ${savedMeta.fps || 15} FPS • ${savedMeta.durationSec}s • ${mb} MB`;
+      syncSourceActionButtons();
+      renderClipList();
+    } catch (err) {
+      console.warn('Save buffer clip failed:', err);
+    } finally {
+      btnSaveBufferClip.disabled = false;
+      btnSaveBufferClip.textContent = orig;
+    }
+  });
+
   subscribeState((state, patch) => {
     if (patch.currentScreen !== undefined && state.currentScreen !== 'gallery') {
       if (isPlaying || galleryPlayer.getFrameCount() > 0) {
@@ -387,20 +540,42 @@ export function initVideoBrowser() {
         galleryPlayer.unload();
       }
     }
-    if (state.currentScreen === 'gallery') {
+    if (
+      patch.playbackReticleEnabled !== undefined ||
+      patch.overlayType !== undefined ||
+      patch.overlayOpacity !== undefined ||
+      patch.overlayScale !== undefined ||
+      patch.reticleFfpMode !== undefined ||
+      patch.customOverlayUrl !== undefined ||
+      patch.reticleConfig !== undefined ||
+      patch.themeColor !== undefined
+    ) {
+      syncPlaybackReticleOverlay();
+    }
+    if (state.currentScreen === 'gallery' && !openingLiveBuffer) {
       if (patch.galleryArchiveTab === 'clips') {
         syncGalleryZoomUI();
+        renderGalleryFrame();
       }
       if (patch.galleryArchiveTab === 'hits') {
         if (isPlaying) {
           isPlaying = false;
           stopPlayerLoop();
+          lastPlayBtnText = '';
+          renderGalleryFrame();
         }
       } else if (
         patch.currentScreen === 'gallery' ||
         (patch.galleryArchiveTab === 'clips' && !galleryPlayer.getFrameCount())
       ) {
-        refreshGalleryClips(true).catch(() => {});
+        if (selectedClipId === LIVE_BUFFER_ID && activeBufferClip) {
+          if (!galleryPlayer.getFrameCount()) {
+            selectClip(activeBufferClip, true);
+          }
+          refreshGalleryClips(false).catch(() => {});
+        } else {
+          refreshGalleryClips(true).catch(() => {});
+        }
       }
     }
   });
@@ -473,12 +648,21 @@ export function initVideoBrowser() {
 
   const btnGallerySnapshot = document.getElementById('btnGallerySnapshot');
   btnGallerySnapshot?.addEventListener('click', async () => {
-    await exportAnnotatedCanvasPng(canvasEl, { includeReticle: true, prefix: 'SPOTR_Clip' });
+    await exportAnnotatedCanvasPng(canvasEl, {
+      includeReticle: Boolean(appState.playbackReticleEnabled),
+      reticleZoom: galleryZoom,
+      prefix: 'SPOTR_Clip'
+    });
   });
 
   btnDownload.addEventListener('click', async () => {
     if (!selectedClipId) return;
-    const clip = await getVideoClip(selectedClipId);
+    const clip = selectedClipId === LIVE_BUFFER_ID && activeBufferClip
+      ? {
+          ...activeBufferClip,
+          name: `LIVE_BUFFER_${Date.now()}.WEBM`
+        }
+      : await getVideoClip(selectedClipId);
     if (!clip) return;
     const orig = btnDownload.textContent;
     btnDownload.textContent = 'EXPORTING...';
@@ -487,7 +671,7 @@ export function initVideoBrowser() {
   });
 
   btnDelete.addEventListener('click', async () => {
-    if (!selectedClipId) return;
+    if (!selectedClipId || selectedClipId === LIVE_BUFFER_ID) return;
     const clip = cachedClips.find((c) => c.id === selectedClipId);
     const clipName = clip ? clip.name : 'this recording';
     if (!window.confirm(`Permanently delete "${clipName}" from the video archive?`)) {
@@ -498,5 +682,7 @@ export function initVideoBrowser() {
     await refreshGalleryClips(true);
   });
 
+  syncPlaybackReticleOverlay();
+  syncSourceActionButtons();
   refreshGalleryClips(false).catch((err) => console.warn('Gallery clips refresh deferred:', err));
 }

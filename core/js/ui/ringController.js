@@ -208,12 +208,6 @@ export function initRingController() {
       return;
     }
 
-    if (appState.replayActive) {
-      document.getElementById('btnCloseReplay')?.click();
-      flashRingHud(`${label}: RETURN TO LIVE FEED`);
-      return;
-    }
-
     document.getElementById('btnReplay20s')?.click();
     flashRingHud(`${label}: INSTANT REPLAY`);
   }
@@ -234,13 +228,6 @@ export function initRingController() {
       return;
     }
 
-    // In Instant Replay
-    if (appState.replayActive) {
-      document.getElementById('btnReplayPlayPause')?.click();
-      flashRingHud('● REPLAY PLAY / PAUSE');
-      return;
-    }
-
     // Live Mode: Single-mode Zoom Cycle (1.0x → 1.5x → 2.0x → 2.5x → 3.0x → 1.0x)
     const curZoom = appState.mainZoom || 1.0;
     const nextZoom = ZOOM_CYCLE_STOPS.find((z) => z > curZoom + 0.05) ?? 1.0;
@@ -258,7 +245,7 @@ export function initRingController() {
   }
 
   function executeDirectionalAction(act) {
-    // A. Fullscreen Saved Video Gallery Player
+    // A. Unified Playback / Hits Gallery
     if (appState.currentScreen === 'gallery') {
       if (act === 'LEFT') {
         const scrubber = document.getElementById('galleryScrubber');
@@ -277,29 +264,7 @@ export function initRingController() {
       return;
     }
 
-    // B. Instant Replay Active on Live Screen
-    if (appState.replayActive) {
-      const scrubber = document.getElementById('replayScrubber');
-      if (act === 'LEFT') {
-        scrubRangeElement(scrubber, -1);
-        flashRingHud('◀ STEP BACK (-1 FRAME)');
-      } else if (act === 'RIGHT') {
-        scrubRangeElement(scrubber, 1);
-        flashRingHud('▶ STEP FORWARD (+1 FRAME)');
-      } else if (act === 'UP') {
-        if (scrubber) {
-          scrubber.value = '0';
-          scrubber.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        flashRingHud('▲ RESTART REPLAY');
-      } else if (act === 'DOWN') {
-        document.getElementById('btnCloseReplay')?.click();
-        flashRingHud('▼ RETURN TO LIVE');
-      }
-      return;
-    }
-
-    // C. Live Camera Feed — Aim Loupe OR Direct 1-to-1 Pan
+    // B. Live Camera Feed — Aim Loupe OR Direct 1-to-1 Pan
     if (appState.dpadMode === 'aim') {
       const aimStep = ((appState.reticleAimSpeed ?? 50) / 100) * 0.022;
       let rx = appState.roiX ?? 0.5;

@@ -11,6 +11,8 @@ import { appState, subscribeState } from '../state.js';
 export const RETICLE_VIEWBOX_W = 800;
 export const RETICLE_VIEWBOX_H = 500;
 
+const reticleMarkupCache = new WeakMap();
+
 /**
  * Returns the exact on-screen pixel distance of 1 reticle click / indent,
  * dynamically taking into account viewport dimensions and Guide Scale (25%..200%).
@@ -58,7 +60,7 @@ export function getCenterGapDistanceInPixels(viewportW, viewportH, overlayScaleP
 
 /**
  * Builds the complete SVG markup for the customizable graduated reticle.
- * Can be rendered on the main feed (#svgOverlay) or inside the Reticle Customizer preview stage.
+ * Can be rendered on the main feed (#svgOverlay), Playback, Hits, or Reticle Customizer preview stage.
  */
 export function buildGraduatedCrosshairSvg(customConfig = null) {
   const cfg = Object.assign(
@@ -101,24 +103,19 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   const maxArmOffset = Math.max(gapHalf + 10, armLen, 380);
 
   // Center Aiming Point: 'empty' | 'dot' | 'cross' | 'chevron'
-  // Placed at the exact optical dead-center pixel (cx, cy) where clicks are measured from
-  // Sized and weighted to strictly match the crosshair stroke weight (sw)
   const centerStyle = String(cfg.centerStyle || 'empty').toLowerCase();
   if (centerStyle === 'dot') {
-    // Sharp precision center aiming dot at (cx, cy) with diameter harmonized to line weight sw
     const dotR = Math.max(0.75, sw * 0.6);
     lines.push(
       `<circle cx="${cx}" cy="${cy}" r="${dotR.toFixed(2)}" fill="${strokeColor}" />`
     );
   } else if (centerStyle === 'cross') {
-    // Fine precision center mini-crosshair centered at (cx, cy) matching crosshair stroke weight sw
     const crossLen = gapHalf > 0 ? Math.min(12, Math.max(6, gapHalf * 0.45)) : 8;
     lines.push(
       `<line x1="${(cx - crossLen).toFixed(1)}" y1="${cy}" x2="${(cx + crossLen).toFixed(1)}" y2="${cy}" stroke="${strokeColor}" stroke-width="${sw}" />`,
       `<line x1="${cx}" y1="${(cy - crossLen).toFixed(1)}" x2="${cx}" y2="${(cy + crossLen).toFixed(1)}" stroke="${strokeColor}" stroke-width="${sw}" />`
     );
   } else if (centerStyle === 'chevron') {
-    // Tactical inverted-V / chevron caret pointing directly to the exact measurement dead-center pixel (cx, cy) matching crosshair stroke weight sw
     const chW = 8;
     const chH = 10;
     lines.push(
@@ -126,7 +123,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     );
   }
 
-  // Main Arms - Horizontal (Left & Right extending from gap outward to maxArmOffset)
+  // Main Arms - Horizontal
   const xArmStart = cx - maxArmOffset;
   const xArmEnd = cx + maxArmOffset;
   if (gapHalf > 0) {
@@ -140,7 +137,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     );
   }
 
-  // Main Arms - Vertical (Top & Bottom extending from gap outward to maxArmOffset)
+  // Main Arms - Vertical
   const yArmStart = cy - maxArmOffset;
   const yArmEnd = cy + maxArmOffset;
   if (gapHalf > 0) {
@@ -167,19 +164,18 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     }
   }
 
-  // Horizontal Indents / Tick Marks (Left & Right - 1 to clicks, measured from dead center)
+  // Horizontal Indents / Tick Marks
   for (let t = 1; t <= clicks; t++) {
     const offset = t * step;
-    if (offset <= gapHalf) continue; // inside the open center gap
+    if (offset <= gapHalf) continue;
     const isMajor = majorInt > 0 && t % majorInt === 0;
     const tickLen = isMajor ? majorLen : minorLen;
-    const tickW = sw; // All ticks share the exact same thinness sw; major ticks differentiated by length
+    const tickW = sw;
     const half = tickLen / 2;
 
     const xL = cx - offset;
     const xR = cx + offset;
 
-    // Left tick
     lines.push(
       `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
@@ -189,7 +185,6 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       );
     }
 
-    // Right tick
     lines.push(
       `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
@@ -200,19 +195,18 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
     }
   }
 
-  // Vertical Indents / Tick Marks (Top & Bottom - 1 to clicks up to 30, measured from dead center)
+  // Vertical Indents / Tick Marks
   for (let t = 1; t <= clicks; t++) {
     const offset = t * step;
-    if (offset <= gapHalf) continue; // inside the open center gap
+    if (offset <= gapHalf) continue;
     const isMajor = majorInt > 0 && t % majorInt === 0;
     const tickLen = isMajor ? majorLen : minorLen;
-    const tickW = sw; // All ticks share the exact same thinness sw; major ticks differentiated by length
+    const tickW = sw;
     const half = tickLen / 2;
 
     const yT = cy - offset;
     const yB = cy + offset;
 
-    // Top tick
     lines.push(
       `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
@@ -222,7 +216,6 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       );
     }
 
-    // Bottom tick
     lines.push(
       `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
@@ -236,40 +229,54 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   return lines.join('\n');
 }
 
+/**
+ * Shared renderer for any reticle overlay container (Live, Playback, or Hits).
+ */
+export function renderReticleOverlayLayer(layerEl, svgEl, customImgEl, state, enabled, zoomForFfp = 1.0) {
+  if (!layerEl || !svgEl) return;
+  layerEl.classList.toggle('hidden', !enabled);
+  if (!enabled) return;
+
+  layerEl.style.opacity = String((state.overlayOpacity ?? 75) / 100);
+
+  const ffpFactor = state.reticleFfpMode ? Math.max(1.0, Number(zoomForFfp) || 1.0) : 1.0;
+  const scaleVal = ((state.overlayScale ?? 100) / 100) * ffpFactor;
+  svgEl.style.transform = `scale(${scaleVal})`;
+  if (customImgEl) customImgEl.style.transform = `scale(${scaleVal})`;
+
+  if (state.overlayType === 'custom' && state.customOverlayUrl && customImgEl) {
+    svgEl.classList.add('hidden');
+    customImgEl.classList.remove('hidden');
+    if (customImgEl.src !== state.customOverlayUrl) {
+      customImgEl.src = state.customOverlayUrl;
+    }
+  } else {
+    if (customImgEl) customImgEl.classList.add('hidden');
+    svgEl.classList.remove('hidden');
+    const reticleKey = `${state.overlayType}_${state.themeColor}_${JSON.stringify(state.reticleConfig || {})}`;
+    if (reticleMarkupCache.get(svgEl) !== reticleKey) {
+      reticleMarkupCache.set(svgEl, reticleKey);
+      svgEl.innerHTML = buildGraduatedCrosshairSvg(state.reticleConfig);
+    }
+  }
+}
+
 export function initOverlayManager() {
   const overlayLayer = document.getElementById('overlayLayer');
   const svgOverlay = document.getElementById('svgOverlay');
   const customImg = document.getElementById('customOverlayImg');
-  let lastReticleMarkupKey = '';
 
-  function renderOverlay(state) {
-    if (!overlayLayer || !svgOverlay) return;
-    overlayLayer.classList.toggle('hidden', !state.overlayEnabled);
-    overlayLayer.style.opacity = String(state.overlayOpacity / 100);
-
-    // In First Focal Plane (FFP) mode, scale overlay in lockstep with main image digital zoom
-    const ffpFactor = state.reticleFfpMode ? Math.max(1.0, Number(state.mainZoom) || 1.0) : 1.0;
-    const scaleVal = (state.overlayScale / 100) * ffpFactor;
-    svgOverlay.style.transform = `scale(${scaleVal})`;
-    if (customImg) customImg.style.transform = `scale(${scaleVal})`;
-
-    if (state.overlayType === 'custom' && state.customOverlayUrl && customImg) {
-      svgOverlay.classList.add('hidden');
-      customImg.classList.remove('hidden');
-      if (customImg.src !== state.customOverlayUrl) {
-        customImg.src = state.customOverlayUrl;
-      }
-    } else {
-      if (customImg) customImg.classList.add('hidden');
-      svgOverlay.classList.remove('hidden');
-      const reticleKey = `${state.overlayType}_${state.themeColor}_${JSON.stringify(state.reticleConfig || {})}`;
-      if (reticleKey !== lastReticleMarkupKey) {
-        lastReticleMarkupKey = reticleKey;
-        svgOverlay.innerHTML = buildGraduatedCrosshairSvg(state.reticleConfig);
-      }
-    }
+  function renderLiveOverlay(state) {
+    renderReticleOverlayLayer(
+      overlayLayer,
+      svgOverlay,
+      customImg,
+      state,
+      Boolean(state.overlayEnabled),
+      state.mainZoom || 1.0
+    );
   }
 
-  renderOverlay(appState);
-  subscribeState(renderOverlay);
+  renderLiveOverlay(appState);
+  subscribeState(renderLiveOverlay);
 }

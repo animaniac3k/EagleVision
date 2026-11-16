@@ -10,6 +10,87 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { shouldHoldCanvasPan } from '../ui/ringController.js';
 
+/**
+ * Aims the digital Loupe crosshair onto a normalized source frame coordinate on the Live screen.
+ */
+export function aimLoupeAtHit(hit) {
+  if (!hit) return false;
+  const nx = Math.max(0.02, Math.min(0.98, Number(hit.normX) || 0.5));
+  const ny = Math.max(0.02, Math.min(0.98, Number(hit.normY) || 0.5));
+  const zoom = Math.max(1.0, appState.mainZoom || 1.0);
+
+  const vw = hit.frameW || appState.streamWidth || 1920;
+  const vh = hit.frameH || appState.streamHeight || 1080;
+  const mainCanvas = document.getElementById('mainCanvas');
+  const cw = mainCanvas?.width || window.innerWidth || vw;
+  const ch = mainCanvas?.height || window.innerHeight || vh;
+
+  const videoAspect = vw / Math.max(1, vh);
+  const canvasAspect = cw / Math.max(1, ch);
+  let baseW = vw;
+  let baseH = vh;
+  if (canvasAspect > videoAspect) {
+    baseH = vw / canvasAspect;
+  } else {
+    baseW = vh * canvasAspect;
+  }
+
+  const cropW = baseW / zoom;
+  const cropH = baseH / zoom;
+  const targetSourceX = nx * vw;
+  const targetSourceY = ny * vh;
+
+  let nextPanX = appState.mainPanX || 0;
+  let nextPanY = appState.mainPanY || 0;
+
+  if (zoom > 1.01) {
+    nextPanX = nx - 0.5;
+    nextPanY = ny - 0.5;
+  } else {
+    const curCenterX = vw * (0.5 + nextPanX);
+    const curCenterY = vh * (0.5 + nextPanY);
+    if (Math.abs(targetSourceX - curCenterX) > cropW * 0.45) {
+      nextPanX = nx - 0.5;
+    }
+    if (Math.abs(targetSourceY - curCenterY) > cropH * 0.45) {
+      nextPanY = ny - 0.5;
+    }
+  }
+
+  const centerX = vw * (0.5 + nextPanX);
+  const centerY = vh * (0.5 + nextPanY);
+  const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
+  const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
+
+  nextPanX = (sx + cropW / 2) / vw - 0.5;
+  nextPanY = (sy + cropH / 2) / vh - 0.5;
+
+  const roiX = Math.max(0.04, Math.min(0.96, (targetSourceX - sx) / Math.max(1, cropW)));
+  const roiY = Math.max(0.04, Math.min(0.96, (targetSourceY - sy) / Math.max(1, cropH)));
+
+  updateState({
+    mainPanX: nextPanX,
+    mainPanY: nextPanY,
+    roiX,
+    roiY,
+    pipEnabled: true,
+    roiTargetVisible: true,
+    currentScreen: 'live'
+  });
+  return true;
+}
+
+/**
+ * Snaps the Digital Loupe crosshair onto the newest logged detection hit.
+ */
+export function snapLoupeToLatestHit() {
+  const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+  if (!hits.length) return false;
+  const latest = hits[hits.length - 1];
+  updateState({ selectedHitId: latest.id });
+  return aimLoupeAtHit(latest);
+}
+
 const trackedFloatingPanels = new Set();
 
 export function clampFloatingPanelToParent(panelEl) {

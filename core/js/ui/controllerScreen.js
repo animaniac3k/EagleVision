@@ -13,7 +13,7 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { cycleTheme } from '../input/gamepadController.js';
 import { getActiveRemoteMode, getLearningAction, setLearningAction } from './ringController.js';
-import { snapLoupeToLatestHit } from './detectionsScreen.js';
+import { snapLoupeToLatestHit } from '../renderer/zoomWindow.js';
 import { rezeroHeatmap, captureAnnotatedSnapshot } from '../renderer/compositor.js';
 
 // Mappable Action Registry
@@ -1871,24 +1871,18 @@ export function executeMappedAction(actionId) {
     case 'play_pause':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryPlayPause')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayPlayPause')?.click();
       }
       break;
 
     case 'step_forward':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStep')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStep')?.click();
       }
       break;
 
     case 'step_backward':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStepBack')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStepBack')?.click();
       }
       break;
 
@@ -1915,8 +1909,6 @@ export function executeMappedAction(actionId) {
         document.getElementById('btnReticleBackToLive')?.click();
       } else if (screen === 'controller') {
         document.getElementById('btnControllerBackToLive')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnCloseReplay')?.click();
       }
       break;
 
@@ -1987,8 +1979,6 @@ export function executeMappedAction(actionId) {
     case 'quick_tool_cycle_next':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStep')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStep')?.click();
       } else {
         cycleQuickTool(1);
       }
@@ -1997,8 +1987,6 @@ export function executeMappedAction(actionId) {
     case 'quick_tool_cycle_prev':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStepBack')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStepBack')?.click();
       } else {
         cycleQuickTool(-1);
       }
@@ -2007,8 +1995,6 @@ export function executeMappedAction(actionId) {
     case 'quick_tool_toggle':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryPlayPause')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayPlayPause')?.click();
       } else {
         toggleQuickTool();
       }
@@ -2050,8 +2036,6 @@ export function executeMappedAction(actionId) {
     case 'dpad_left':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStepBack')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStepBack')?.click();
       } else {
         steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', -1, 0);
       }
@@ -2060,8 +2044,6 @@ export function executeMappedAction(actionId) {
     case 'dpad_right':
       if (screen === 'gallery') {
         document.getElementById('btnGalleryStep')?.click();
-      } else if (appState.replayActive) {
-        document.getElementById('btnReplayStep')?.click();
       } else {
         steerViewOrLoupe(appState.dpadMode === 'aim' ? 'aim' : 'pan', 1, 0);
       }

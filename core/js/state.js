@@ -48,6 +48,8 @@ export const appState = {
 
   // Superimposed Overlay Guide & Reticle Customization
   overlayEnabled: true,
+  playbackReticleEnabled: false, // Playback reticle toggle (OFF by default)
+  hitsReticleEnabled: true,      // Hits map reticle toggle (ON by default)
   overlayType: 'crosshair',
   overlayOpacity: 75,
   overlayScale: 100,
@@ -80,6 +82,8 @@ export const appState = {
   heatmapEnabled: false,
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
+  heatmapMaxAreaPct: 5,   // Max simultaneous changed area (% of screen, default 5% = 1/20th)
+  heatmapMinCells: 2,     // Minimum changed spike cells (160x90 grid) to register a hit
   heatmapSpeechEnabled: false, // Voice callouts ("Detection! 11 o'clock, 3 clicks")
   heatmapAutoSave: false, // Auto-snapshot rolling RAM buffer on localized hit (rate-limited)
   heatmapIgnoreMasks: [], // Normalized exclude zones: Array<{ x, y, w, h }> in [0..1]

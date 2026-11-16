@@ -13,7 +13,7 @@ import {
   clearHeatmapIgnoreZones,
   exportAnnotatedCanvasPng
 } from '../renderer/compositor.js';
-import { openReplayAtTimestamp } from '../recorder/instantReplay.js';
+import { renderReticleOverlayLayer } from '../renderer/overlayManager.js';
 import { saveSettings } from '../storage/settingsStore.js';
 
 let initialized = false;
@@ -31,89 +31,6 @@ function getAgeClass(tsMs) {
   if (sec <= 60) return 'pin-fresh';
   if (sec <= 300) return 'pin-warm';
   return 'pin-stale';
-}
-
-/**
- * Aims the digital Loupe crosshair onto a normalized source frame coordinate and opens Live view.
- */
-export function aimLoupeAtHit(hit) {
-  if (!hit) return false;
-  const nx = Math.max(0.02, Math.min(0.98, Number(hit.normX) || 0.5));
-  const ny = Math.max(0.02, Math.min(0.98, Number(hit.normY) || 0.5));
-  const zoom = Math.max(1.0, appState.mainZoom || 1.0);
-
-  const vw = hit.frameW || appState.streamWidth || 1920;
-  const vh = hit.frameH || appState.streamHeight || 1080;
-  const mainCanvas = document.getElementById('mainCanvas');
-  const cw = mainCanvas?.width || window.innerWidth || vw;
-  const ch = mainCanvas?.height || window.innerHeight || vh;
-
-  const videoAspect = vw / Math.max(1, vh);
-  const canvasAspect = cw / Math.max(1, ch);
-  let baseW = vw;
-  let baseH = vh;
-  if (canvasAspect > videoAspect) {
-    baseH = vw / canvasAspect;
-  } else {
-    baseW = vh * canvasAspect;
-  }
-
-  const cropW = baseW / zoom;
-  const cropH = baseH / zoom;
-  const targetSourceX = nx * vw;
-  const targetSourceY = ny * vh;
-
-  let nextPanX = appState.mainPanX || 0;
-  let nextPanY = appState.mainPanY || 0;
-
-  if (zoom > 1.01) {
-    nextPanX = nx - 0.5;
-    nextPanY = ny - 0.5;
-  } else {
-    // Keep current pan unless aspect cropping puts the hit outside visible main canvas bounds
-    const curCenterX = vw * (0.5 + nextPanX);
-    const curCenterY = vh * (0.5 + nextPanY);
-    if (Math.abs(targetSourceX - curCenterX) > cropW * 0.45) {
-      nextPanX = nx - 0.5;
-    }
-    if (Math.abs(targetSourceY - curCenterY) > cropH * 0.45) {
-      nextPanY = ny - 0.5;
-    }
-  }
-
-  const centerX = vw * (0.5 + nextPanX);
-  const centerY = vh * (0.5 + nextPanY);
-  const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
-  const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
-
-  // Normalize actual clamped pan back cleanly
-  nextPanX = (sx + cropW / 2) / vw - 0.5;
-  nextPanY = (sy + cropH / 2) / vh - 0.5;
-
-  const roiX = Math.max(0.04, Math.min(0.96, (targetSourceX - sx) / Math.max(1, cropW)));
-  const roiY = Math.max(0.04, Math.min(0.96, (targetSourceY - sy) / Math.max(1, cropH)));
-
-  updateState({
-    mainPanX: nextPanX,
-    mainPanY: nextPanY,
-    roiX,
-    roiY,
-    pipEnabled: true,
-    roiTargetVisible: true,
-    currentScreen: 'live'
-  });
-  return true;
-}
-
-/**
- * Convenience shortcut: snaps the Loupe to the newest logged motion hit (or re-arms Live).
- */
-export function snapLoupeToLatestHit() {
-  const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
-  if (!hits.length) return false;
-  const latest = hits[hits.length - 1];
-  updateState({ selectedHitId: latest.id });
-  return aimLoupeAtHit(latest);
 }
 
 export function initDetectionsScreen(subscribeState) {
@@ -155,6 +72,9 @@ export function initDetectionsScreen(subscribeState) {
   const btnZoomReset = document.getElementById('galleryZoomReset');
   const zoomBadge = document.getElementById('galleryZoomBadge');
 
+  const btnToggleHitsReticle = document.getElementById('btnToggleHitsReticle');
+  const btnToggleHitsVisible = document.getElementById('btnToggleHitsVisible');
+  const btnToggleMasksVisible = document.getElementById('btnToggleMasksVisible');
   const btnToggleMaskDraw = document.getElementById('btnToggleMaskDraw');
   const btnClearMasks = document.getElementById('btnClearMasks');
   const btnHitsRezero = document.getElementById('btnHitsRezero');
@@ -163,12 +83,11 @@ export function initDetectionsScreen(subscribeState) {
   const btnHitPrev = document.getElementById('btnHitPrev');
   const btnHitNext = document.getElementById('btnHitNext');
   const hitSelectedSummary = document.getElementById('hitSelectedSummary');
-  const btnHitAimLoupe = document.getElementById('btnHitAimLoupe');
-  const btnHitPlayClip = document.getElementById('btnHitPlayClip');
-  const btnHitIgnoreArea = document.getElementById('btnHitIgnoreArea');
   const btnHitSnapshot = document.getElementById('btnHitSnapshot');
 
   let maskDrawActive = false;
+  let masksVisible = true;
+  let hitsVisible = true;
   let hitsDrawerOpen = false;
   let drawStart = null;
   let ageTicker = null;
@@ -258,6 +177,8 @@ export function initDetectionsScreen(subscribeState) {
     btnToggleHitsDrawer?.classList.toggle('hidden', !isHits);
     hitsBottomBar?.classList.toggle('hidden', !isHits);
     if (!isHits) {
+      maskDrawActive = false;
+      renderIgnoreZones();
       hitsDrawer?.classList.add('hidden');
       hitsDrawerOpen = false;
       btnToggleHitsDrawer?.classList.remove('radar-btn-active');
@@ -284,11 +205,50 @@ export function initDetectionsScreen(subscribeState) {
     return match || hits[hits.length - 1];
   }
 
+  function syncHitsReticleOverlay() {
+    const layerEl = document.getElementById('hitsReticleLayer');
+    const svgEl = document.getElementById('hitsReticleSvg');
+    const customImg = document.getElementById('hitsReticleCustomImg');
+    const enabled = appState.hitsReticleEnabled !== false;
+    if (btnToggleHitsReticle) {
+      btnToggleHitsReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
+      btnToggleHitsReticle.classList.toggle('radar-btn-active', enabled);
+    }
+    renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, 1.0);
+  }
+
+  function syncHitsPinsVisibility() {
+    if (hitsPinsLayer) {
+      hitsPinsLayer.classList.toggle('hidden', !hitsVisible);
+    }
+    if (btnToggleHitsVisible) {
+      btnToggleHitsVisible.textContent = hitsVisible ? 'Hits: ON' : 'Hits: OFF';
+      btnToggleHitsVisible.classList.toggle('radar-btn-active', hitsVisible);
+    }
+  }
+
   function renderIgnoreZones() {
-    if (!hitsIgnoreLayer || !btnClearMasks) return;
+    if (!hitsIgnoreLayer) return;
     const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
-    btnClearMasks.classList.toggle('hidden', masks.length === 0);
-    btnClearMasks.textContent = `${masks.length} Mask${masks.length === 1 ? '' : 's'}`;
+
+    if (btnToggleMasksVisible) {
+      btnToggleMasksVisible.disabled = masks.length === 0;
+      btnToggleMasksVisible.classList.toggle('radar-btn-active', masksVisible && masks.length > 0);
+      btnToggleMasksVisible.textContent = masksVisible
+        ? `👁 Masks (${masks.length})`
+        : `🙈 Hidden (${masks.length})`;
+    }
+    if (btnClearMasks) {
+      btnClearMasks.classList.toggle('hidden', !maskDrawActive || masks.length === 0);
+    }
+    if (btnToggleMaskDraw) {
+      btnToggleMaskDraw.classList.toggle('radar-btn-active', maskDrawActive);
+      btnToggleMaskDraw.textContent = maskDrawActive ? '✓ Done Masks' : '✎ Edit Masks';
+    }
+
+    hitsIgnoreLayer.classList.toggle('hidden', !masksVisible);
+    hitsIgnoreLayer.classList.toggle('mask-edit-active', maskDrawActive);
+    hitsMapViewport?.classList.toggle('mask-draw-active', maskDrawActive);
 
     hitsIgnoreLayer.innerHTML = '';
     masks.forEach((m, idx) => {
@@ -306,6 +266,7 @@ export function initDetectionsScreen(subscribeState) {
       rm.textContent = '×';
       rm.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!maskDrawActive) return;
         const next = masks.filter((_, i) => i !== idx);
         updateState({ heatmapIgnoreMasks: next });
         saveSettings(appState);
@@ -350,14 +311,14 @@ export function initDetectionsScreen(subscribeState) {
 
     if (hitSelectedSummary) {
       if (!selectedHit) {
-        hitSelectedSummary.textContent = 'No hits';
+        hitSelectedSummary.textContent = '—';
       } else {
         const idx = hits.indexOf(selectedHit) + 1;
-        hitSelectedSummary.textContent = `#${idx}/${count} • ${selectedHit.dirLabel} • ${formatAgeShort(selectedHit.timestampMs)}`;
+        hitSelectedSummary.textContent = `#${idx} / ${count}`;
       }
     }
 
-    [btnHitPrev, btnHitNext, btnHitAimLoupe, btnHitPlayClip, btnHitIgnoreArea].forEach((btn) => {
+    [btnHitPrev, btnHitNext].forEach((btn) => {
       if (btn) btn.disabled = !hasHits;
     });
 
@@ -372,11 +333,6 @@ export function initDetectionsScreen(subscribeState) {
         pin.style.top = `${(hit.normY * 100).toFixed(2)}%`;
         pin.textContent = String(idx + 1);
 
-        const lbl = document.createElement('span');
-        lbl.className = 'hit-pin-label';
-        lbl.textContent = `#${idx + 1} • ${hit.dirLabel} • ${formatAgeShort(hit.timestampMs)}`;
-        pin.appendChild(lbl);
-
         pin.addEventListener('click', (e) => {
           e.stopPropagation();
           updateState({ selectedHitId: hit.id });
@@ -384,6 +340,8 @@ export function initDetectionsScreen(subscribeState) {
         hitsPinsLayer.appendChild(pin);
       });
     }
+    syncHitsPinsVisibility();
+    syncHitsReticleOverlay();
 
     if (hitsLogList) {
       if (!hits.length) {
@@ -548,22 +506,45 @@ export function initDetectionsScreen(subscribeState) {
     btnToggleHitsDrawer?.classList.remove('radar-btn-active');
   });
 
+  btnToggleHitsReticle?.addEventListener('click', () => {
+    const cur = appState.hitsReticleEnabled !== false;
+    updateState({ hitsReticleEnabled: !cur });
+    saveSettings(appState);
+  });
+
+  btnToggleHitsVisible?.addEventListener('click', () => {
+    hitsVisible = !hitsVisible;
+    syncHitsPinsVisibility();
+  });
+
+  btnToggleMasksVisible?.addEventListener('click', () => {
+    masksVisible = !masksVisible;
+    renderIgnoreZones();
+  });
+
   btnToggleMaskDraw?.addEventListener('click', () => {
     maskDrawActive = !maskDrawActive;
-    btnToggleMaskDraw.classList.toggle('radar-btn-active', maskDrawActive);
-    btnToggleMaskDraw.textContent = maskDrawActive ? 'Mask: ON (Drag)' : 'Mask: OFF';
-    hitsMapViewport?.classList.toggle('mask-draw-active', maskDrawActive);
+    if (maskDrawActive) {
+      masksVisible = true;
+    }
+    renderIgnoreZones();
     applyHitsTransform();
   });
 
   btnClearMasks?.addEventListener('click', () => {
+    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+    if (!masks.length) return;
+    if (!window.confirm(`Remove all ${masks.length} ignore mask${masks.length === 1 ? '' : 's'}?`)) {
+      return;
+    }
+    maskDrawActive = false;
     clearHeatmapIgnoreZones();
     saveSettings(appState);
   });
 
   btnHitsRezero?.addEventListener('click', () => {
     rezeroHeatmap();
-    if (hitSelectedSummary) hitSelectedSummary.textContent = 'Background re-zeroed';
+    clearDetectionHits();
   });
 
   btnHitsClear?.addEventListener('click', () => {
@@ -588,34 +569,6 @@ export function initDetectionsScreen(subscribeState) {
     updateState({ selectedHitId: hits[nextIdx].id });
   });
 
-  btnHitAimLoupe?.addEventListener('click', () => {
-    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
-    aimLoupeAtHit(getSelectedHit(hits));
-  });
-
-  btnHitPlayClip?.addEventListener('click', async () => {
-    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
-    const hit = getSelectedHit(hits);
-    if (!hit) return;
-    const played = await openReplayAtTimestamp(hit.perfMs, hit.timestampMs);
-    if (!played && hitSelectedSummary) {
-      hitSelectedSummary.textContent = 'No matching replay or saved clip';
-    }
-  });
-
-  btnHitIgnoreArea?.addEventListener('click', () => {
-    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
-    const hit = getSelectedHit(hits);
-    if (!hit) return;
-    addHeatmapIgnoreZone({
-      x: hit.normX - 0.05,
-      y: hit.normY - 0.05,
-      w: 0.1,
-      h: 0.1
-    });
-    saveSettings(appState);
-  });
-
   btnHitSnapshot?.addEventListener('click', async () => {
     const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
     const selectedHit = getSelectedHit(hits);
@@ -635,35 +588,40 @@ export function initDetectionsScreen(subscribeState) {
     }
 
     await exportAnnotatedCanvasPng(tempCanvas, {
-      includeReticle: false,
+      includeReticle: appState.hitsReticleEnabled !== false,
+      reticleZoom: 1.0,
       prefix: 'SPOTR_Hits',
       drawExtra: async (ctx, w, h) => {
         const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
         ctx.save();
-        masks.forEach((m) => {
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
-          ctx.strokeStyle = '#f59e0b';
-          ctx.lineWidth = 2;
-          ctx.fillRect(m.x * w, m.y * h, m.w * w, m.h * h);
-          ctx.strokeRect(m.x * w, m.y * h, m.w * w, m.h * h);
-        });
-        hits.forEach((hit, idx) => {
-          const px = hit.normX * w;
-          const py = hit.normY * h;
-          const isSel = selectedHit && hit.id === selectedHit.id;
-          ctx.beginPath();
-          ctx.arc(px, py, isSel ? 16 : 13, 0, Math.PI * 2);
-          ctx.fillStyle = isSel ? '#f97316' : '#f59e0b';
-          ctx.fill();
-          ctx.lineWidth = 2.5;
-          ctx.strokeStyle = isSel ? '#ffffff' : '#0b0f17';
-          ctx.stroke();
-          ctx.fillStyle = '#0b0f17';
-          ctx.font = 'bold 13px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(idx + 1), px, py);
-        });
+        if (masksVisible) {
+          masks.forEach((m) => {
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            ctx.fillRect(m.x * w, m.y * h, m.w * w, m.h * h);
+            ctx.strokeRect(m.x * w, m.y * h, m.w * w, m.h * h);
+          });
+        }
+        if (hitsVisible) {
+          hits.forEach((hit, idx) => {
+            const px = hit.normX * w;
+            const py = hit.normY * h;
+            const isSel = selectedHit && hit.id === selectedHit.id;
+            ctx.beginPath();
+            ctx.arc(px, py, isSel ? 16 : 13, 0, Math.PI * 2);
+            ctx.fillStyle = isSel ? '#f97316' : '#f59e0b';
+            ctx.fill();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = isSel ? '#ffffff' : '#0b0f17';
+            ctx.stroke();
+            ctx.fillStyle = '#0b0f17';
+            ctx.font = 'bold 13px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(idx + 1), px, py);
+          });
+        }
         ctx.restore();
       }
     });
@@ -676,6 +634,17 @@ export function initDetectionsScreen(subscribeState) {
       if (state.currentScreen === 'gallery') {
         syncArchiveTabUi(state.galleryArchiveTab || 'clips');
       }
+    }
+    if (
+      patch.hitsReticleEnabled !== undefined ||
+      patch.overlayType !== undefined ||
+      patch.overlayOpacity !== undefined ||
+      patch.overlayScale !== undefined ||
+      patch.customOverlayUrl !== undefined ||
+      patch.reticleConfig !== undefined ||
+      patch.themeColor !== undefined
+    ) {
+      syncHitsReticleOverlay();
     }
     if (
       patch.detectionHits !== undefined ||

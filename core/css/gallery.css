@@ -34,6 +34,32 @@
   transform: translateZ(0);
 }
 
+/* Shared Reticle Overlay for Playback & Hits Stages */
+.stage-reticle-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.stage-reticle-layer svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.stage-reticle-layer img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .gallery-floating-drawer,
   .gallery-transport-bar,
@@ -51,10 +77,13 @@
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-panel);
-  padding: 6px 14px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  gap: 8px;
 }
 
 /* Collapsible Slide-Over Drawer for Saved Clips */
@@ -294,6 +323,14 @@
   pointer-events: auto;
 }
 
+.hits-ignore-layer:not(.mask-edit-active) .hits-ignore-box {
+  pointer-events: none;
+}
+
+.hits-ignore-layer:not(.mask-edit-active) .hits-ignore-box-remove {
+  display: none;
+}
+
 .hits-ignore-box-remove {
   position: absolute;
   top: 2px;
@@ -316,40 +353,6 @@
   border: 2px solid #fbbf24;
   background: rgba(251, 191, 36, 0.18);
   pointer-events: none;
-}
-
-.hits-crosshair-ref {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 24px;
-  height: 24px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  opacity: 0.45;
-}
-
-.hits-crosshair-ref::before,
-.hits-crosshair-ref::after {
-  content: "";
-  position: absolute;
-  background: var(--radar-accent);
-}
-
-.hits-crosshair-ref::before {
-  left: 50%;
-  top: 0;
-  width: 1px;
-  height: 100%;
-  transform: translateX(-50%);
-}
-
-.hits-crosshair-ref::after {
-  top: 50%;
-  left: 0;
-  height: 1px;
-  width: 100%;
-  transform: translateY(-50%);
 }
 
 .hit-pin {
@@ -393,27 +396,6 @@
   z-index: 6;
 }
 
-.hit-pin-label {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(11, 15, 23, 0.92);
-  border: 1px solid var(--radar-border-strong);
-  color: #f8fafc;
-  font-size: 11px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.hit-pin.selected .hit-pin-label {
-  display: block;
-}
-
 /* Compact Single-Row Bottom Action Bar */
 .hits-bottom-bar {
   width: 100%;
@@ -442,7 +424,7 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--radar-text);
-  min-width: 120px;
+  min-width: 64px;
   text-align: center;
 }
 

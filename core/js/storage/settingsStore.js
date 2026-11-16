@@ -8,6 +8,14 @@ export function loadSavedSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     if (!parsed) return null;
+    parsed.playbackReticleEnabled = Boolean(parsed.playbackReticleEnabled);
+    parsed.hitsReticleEnabled = parsed.hitsReticleEnabled !== false;
+    parsed.heatmapMaxAreaPct = Number.isFinite(Number(parsed.heatmapMaxAreaPct))
+      ? Math.max(1, Math.min(20, Number(parsed.heatmapMaxAreaPct)))
+      : 5;
+    parsed.heatmapMinCells = Number.isFinite(Number(parsed.heatmapMinCells))
+      ? Math.max(1, Math.min(20, Number(parsed.heatmapMinCells)))
+      : 2;
     if (parsed.reticleConfig) {
       parsed.reticleConfig = Object.assign(
         {
@@ -39,6 +47,8 @@ export function saveSettings(state) {
       pipEnabled: state.pipEnabled,
       pipZoom: state.pipZoom,
       overlayEnabled: state.overlayEnabled,
+      playbackReticleEnabled: Boolean(state.playbackReticleEnabled),
+      hitsReticleEnabled: state.hitsReticleEnabled !== false,
       overlayType: state.overlayType || 'crosshair',
       overlayOpacity: state.overlayOpacity,
       overlayScale: state.overlayScale,
@@ -53,6 +63,8 @@ export function saveSettings(state) {
       heatmapEnabled: Boolean(state.heatmapEnabled),
       heatmapSensitivity: state.heatmapSensitivity,
       heatmapDuration: state.heatmapDuration || 30.0,
+      heatmapMaxAreaPct: state.heatmapMaxAreaPct ?? 5,
+      heatmapMinCells: state.heatmapMinCells ?? 2,
       heatmapSpeechEnabled: Boolean(state.heatmapSpeechEnabled),
       heatmapAutoSave: Boolean(state.heatmapAutoSave),
       heatmapIgnoreMasks: Array.isArray(state.heatmapIgnoreMasks) ? state.heatmapIgnoreMasks : [],

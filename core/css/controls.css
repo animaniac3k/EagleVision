@@ -395,52 +395,6 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   transition: width 0.2s ease;
 }
 
-/* Replay Scrubber Bar */
-#replayBar {
-  flex: 1 1 0%;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  background: var(--radar-panel);
-  border: 1px solid var(--radar-border);
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-#replayBar > .radar-btn-sm {
-  flex-shrink: 0;
-}
-
-#replayTimeText {
-  flex-shrink: 0;
-  min-width: 105px;
-  text-align: right;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Hide normal live dock while replay is active */
-#screenLive.replay-active .live-bottom-dock,
-#screenLive.replay-active #replayTriggerPod {
-  display: none !important;
-}
-
-#screenLive.replay-active #btnReplayBackToLive {
-  display: inline-flex !important;
-}
-#screenLive.replay-active #btnDeclutterUi,
-#screenLive.replay-active #btnToggleOptions {
-  display: none !important;
-}
-
 /* CCTV Scrubber Track */
 .cctv-scrub-wrap {
   flex: 1 1 auto;
@@ -557,20 +511,6 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   }
 }
 
-@media (max-width: 768px) {
-  #screenLive.replay-active #ringHudPill {
-    display: none !important;
-  }
-  #replayBar {
-    gap: 8px;
-    padding: 6px 10px;
-  }
-  #replayTimeText {
-    min-width: 100px;
-    font-size: 12px;
-  }
-}
-
 /* Interface Color Swatches & Picker */
 .swatch-row {
   display: grid;
@@ -683,8 +623,7 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   .control-pod,
   .live-bottom-dock,
   .ring-hud-pill,
-  .quick-tool-pill,
-  #replayBar {
+  .quick-tool-pill {
     backdrop-filter: none !important;
     background: rgba(13, 19, 26, 0.94) !important;
     contain: paint;

@@ -101,15 +101,6 @@
             <div id="pipResizeSE" class="pip-resize-handle pip-resize-se" title="Drag corner to resize"></div>
           </div>
         </section>
-
-        <!-- Instant Replay Video Overlay -->
-        <div id="instantReplayModal" class="hidden">
-          <div class="replay-status-banner">
-            <span class="replay-pulse-dot"></span>
-            <span id="replayBannerText">INSTANT REPLAY — AUTO-SAVED CLIP</span>
-          </div>
-          <canvas id="replayCanvas" width="1920" height="1080"></canvas>
-        </div>
       </div>
 
       <!-- Real-Time Reticle FFP Scale Toast -->
@@ -128,10 +119,6 @@
 
       <!-- TOP-LEFT: Quiet Setup + Clean View Pills -->
       <nav class="floating-strip strip-top-left">
-        <button id="btnReplayBackToLive" class="radar-btn radar-btn-pill radar-btn-active hidden" title="Return to Live Camera Stream">
-          <span>← Live</span>
-        </button>
-
         <button id="btnToggleOptions" class="radar-btn radar-btn-pill" title="Open Unified Setup (Camera, Detection, Reticle, Controllers)">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -239,6 +226,13 @@
               <span class="dock-btn-lbl">Loupe</span>
             </button>
 
+            <button id="btnLiveAimLoupe" class="radar-btn dock-btn-dimmed" disabled title="Snap Digital Loupe to Latest Hit">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              </svg>
+              <span class="dock-btn-lbl">Aim Loupe</span>
+            </button>
+
             <button id="btnToggleHud" class="radar-btn" title="Show / Hide Telemetry HUD">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 16v-4M12 8h.01"/>
@@ -257,7 +251,7 @@
             <div class="dock-divider"></div>
 
             <div id="replayTriggerPod" style="display:inline-flex; gap:4px; align-items:center;">
-              <button id="btnReplay20s" class="radar-btn radar-btn-primary" title="Instant Replay &amp; Save Clip">
+              <button id="btnReplay20s" class="radar-btn radar-btn-primary" title="Instant Replay (Open RAM Buffer)">
                 <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
                 </svg>
@@ -267,40 +261,19 @@
             </div>
           </div>
         </div>
-
-        <!-- Instant Replay Scrubber Bar (Replaces dock during replay) -->
-        <div id="replayBar" class="hidden">
-          <div class="player-btn-group">
-            <button id="btnReplayPlayPause" class="radar-btn radar-btn-sm radar-btn-active" title="Play / Pause">⏸</button>
-            <button id="btnReplaySlowMo" class="radar-btn radar-btn-sm" title="0.5x Slow Motion">0.5x</button>
-            <button id="btnReplayPrevEvt" class="radar-btn radar-btn-sm" title="Previous Event">◀ Evt</button>
-            <button id="btnReplayNextEvt" class="radar-btn radar-btn-sm" title="Next Event">Evt ▶</button>
-            <button id="btnReplayStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">-1</button>
-            <button id="btnReplayStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">+1</button>
-          </div>
-
-          <div class="cctv-scrub-wrap">
-            <div class="cctv-scrub-track" id="replayScrubTrack">
-              <div class="cctv-waveform-container" id="replayWaveform"></div>
-              <div class="cctv-markers-container" id="replayMarkers"></div>
-              <input id="replayScrubber" type="range" min="0" max="20" step="0.02" value="0" class="radar-slider cctv-slider-input" />
-            </div>
-            <span id="replayTimeText" class="slider-val">0.0s / 20.0s</span>
-          </div>
-
-          <div class="player-btn-group">
-            <button id="btnCloseReplay" class="radar-btn radar-btn-sm radar-btn-primary" title="Exit Replay">Live</button>
-          </div>
-        </div>
       </footer>
     </main>
 
     <!-- =================================================================== -->
-    <!-- SCREEN 2: FULLSCREEN STORED VIDEO PLAYER                            -->
+    <!-- SCREEN 2: UNIFIED PLAYBACK & SPATIAL HITS                           -->
     <!-- =================================================================== -->
     <section id="screenGallery" class="screen-view hidden">
       <div id="galleryClipsStage" class="gallery-fullscreen-stage">
         <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
+        <div id="galleryReticleLayer" class="stage-reticle-layer hidden" style="opacity: 0.75;">
+          <svg id="galleryReticleSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+          <img id="galleryReticleCustomImg" class="hidden" alt="Custom Reticle Overlay" />
+        </div>
       </div>
 
       <!-- Spatial Detections Map Stage (Hidden unless 'Hits' tab selected) -->
@@ -310,7 +283,10 @@
             <img id="hitsRefImage" class="hits-ref-image hidden" alt="Detection reference frame" />
             <div id="hitsIgnoreLayer" class="hits-ignore-layer"></div>
             <div id="hitsDrawPreview" class="hits-draw-preview hidden"></div>
-            <div id="hitsCrosshairRef" class="hits-crosshair-ref" aria-hidden="true"></div>
+            <div id="hitsReticleLayer" class="stage-reticle-layer" style="opacity: 0.75;">
+              <svg id="hitsReticleSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+              <img id="hitsReticleCustomImg" class="hidden" alt="Custom Reticle Overlay" />
+            </div>
             <div id="hitsPinsLayer" class="hits-pins-layer"></div>
           </div>
           <div id="hitsEmptyBanner" class="hits-empty-banner">
@@ -320,18 +296,18 @@
         </div>
       </div>
 
-      <!-- Top-Left: Navigation, Archive Mode (Clips | Hits), Slide-Over Drawer & Zoom -->
+      <!-- Top-Left: Navigation, Archive Mode (Playback | Hits), Slide-Over Drawer & Zoom -->
       <nav class="floating-strip strip-top-left">
         <button id="btnBackToLive" class="radar-btn radar-btn-pill" title="Return to Live Camera Stream">
           <span>← Live</span>
         </button>
 
         <div class="gallery-tab-switch" role="tablist" aria-label="Archive Section">
-          <button id="tabArchiveClips" type="button" class="gallery-tab-btn active">Clips</button>
+          <button id="tabArchiveClips" type="button" class="gallery-tab-btn active">Playback</button>
           <button id="tabArchiveHits" type="button" class="gallery-tab-btn">Hits <span id="galleryHitsCountBadge" class="hit-count-num">0</span></button>
         </div>
 
-        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-pill" title="Show / Hide Saved Clips">
+        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-pill" title="Show / Hide Playback Sources">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
@@ -353,7 +329,7 @@
         </div>
       </nav>
 
-      <!-- Top-Right: Active Clip Info (Clips tab) or Mask/Re-Zero Pill (Hits tab) -->
+      <!-- Top-Right: Active Clip Info (Playback tab) or Reticle/Hits/Mask Pill (Hits tab) -->
       <div class="floating-strip strip-top-right">
         <div id="galleryClipInfoPill" class="gallery-info-pill">
           <div style="text-align:right;">
@@ -361,6 +337,8 @@
             <div id="activeClipMeta" class="clip-meta">—</div>
           </div>
           <div style="width:1px; height:26px; background:var(--radar-border);"></div>
+          <button id="btnTogglePlaybackReticle" class="radar-btn radar-btn-sm" title="Show / Hide Reticle in Playback">Reticle: OFF</button>
+          <button id="btnSaveBufferClip" class="radar-btn radar-btn-sm radar-btn-primary hidden" title="Save RAM Buffer Clip to Archive">Save Clip</button>
           <button id="btnGallerySnapshot" class="radar-btn radar-btn-sm" title="Save Annotated PNG Snapshot">📷</button>
           <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video (.webm)">Export</button>
           <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Active Recording">
@@ -372,9 +350,12 @@
         </div>
 
         <div id="hitsTopRightPill" class="gallery-info-pill hidden">
-          <button id="btnToggleMaskDraw" class="radar-btn radar-btn-sm" title="Drag on the map to draw an Ignore Wind/Foliage box">Mask: OFF</button>
-          <button id="btnClearMasks" class="radar-btn radar-btn-sm hidden" title="Remove All Ignore Mask Zones">0 Masks</button>
-          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background Reference">Re-Zero</button>
+          <button id="btnToggleHitsReticle" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Reticle on Hits Map">Reticle: ON</button>
+          <button id="btnToggleHitsVisible" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Hit Pins to See Target Underneath">Hits: ON</button>
+          <button id="btnToggleMasksVisible" class="radar-btn radar-btn-sm" title="Show / Hide Ignore Masks Visually (Masking Remains Active)">👁 Masks (0)</button>
+          <button id="btnToggleMaskDraw" class="radar-btn radar-btn-sm" title="Draw New Masks or Remove Individual Masks">✎ Edit Masks</button>
+          <button id="btnClearMasks" class="radar-btn radar-btn-sm radar-btn-danger hidden" title="Clear All Ignore Mask Zones (Confirm)">Clear All</button>
+          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background &amp; Clear Logged Hits">Re-Zero</button>
           <button id="btnHitsClear" class="radar-btn radar-btn-sm radar-btn-danger" title="Clear All Logged Hits">Clear</button>
         </div>
       </div>
@@ -423,14 +404,11 @@
         <div id="hitsBottomBar" class="hits-bottom-bar hidden">
           <div class="hits-nav-group">
             <button id="btnHitPrev" class="radar-btn radar-btn-sm" title="Previous Detection">◀</button>
-            <span id="hitSelectedSummary" class="hits-summary-readout">No hits</span>
+            <span id="hitSelectedSummary" class="hits-summary-readout">—</span>
             <button id="btnHitNext" class="radar-btn radar-btn-sm" title="Next Detection">▶</button>
           </div>
 
           <div class="hits-actions-group">
-            <button id="btnHitAimLoupe" class="radar-btn radar-btn-sm radar-btn-primary" title="Snap Digital Loupe Crosshair to Selected Hit & Return to Live">Aim Loupe</button>
-            <button id="btnHitPlayClip" class="radar-btn radar-btn-sm" title="Jump to Hit Timestamp in Replay">▶ 5s</button>
-            <button id="btnHitIgnoreArea" class="radar-btn radar-btn-sm" title="Ignore Future Motion Around This Pin">🚫 Ignore</button>
             <button id="btnHitSnapshot" class="radar-btn radar-btn-sm" title="Save Annotated Detections PNG Snapshot">📷</button>
           </div>
         </div>
@@ -623,10 +601,33 @@
               <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" />
             </div>
 
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Max Hit Area (Multi-Hit Gate)</span>
+                <span id="valHeatmapMaxArea" class="slider-val">5% (1/20)</span>
+              </div>
+              <div class="duration-preset-row">
+                <button type="button" class="radar-btn radar-btn-sm max-area-preset-btn" data-area="2">2%</button>
+                <button type="button" class="radar-btn radar-btn-sm max-area-preset-btn radar-btn-active" data-area="5">5% (1/20)</button>
+                <button type="button" class="radar-btn radar-btn-sm max-area-preset-btn" data-area="10">10%</button>
+                <button type="button" class="radar-btn radar-btn-sm max-area-preset-btn" data-area="15">15%</button>
+              </div>
+              <input id="sliderHeatmapMaxArea" type="range" min="1" max="20" step="1" value="5" class="radar-slider" />
+              <div style="font-size:11px; color:var(--radar-text-muted);">Ignores simultaneous motion larger than this % of the screen.</div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Min Hit Size</span>
+                <span id="valHeatmapMinCells" class="slider-val">2 cells</span>
+              </div>
+              <input id="sliderHeatmapMinCells" type="range" min="1" max="20" step="1" value="2" class="radar-slider" />
+            </div>
+
             <div class="settings-card-header" style="margin-top:8px;">
               <div>
                 <span class="settings-label" style="font-size:12px;">Auto-Save Clip on Hit</span>
-                <div style="font-size:11px; color:var(--radar-text-muted);">Saves RAM buffer clip when motion triggers (12s cooldown).</div>
+                <div style="font-size:11px; color:var(--radar-text-muted);">Saves RAM buffer only when Heatmap logs a valid hit (OFF by default; 15s+ cooldown).</div>
               </div>
               <button id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
             </div>

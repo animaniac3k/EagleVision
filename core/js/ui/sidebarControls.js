@@ -19,6 +19,7 @@ import {
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, rezeroHeatmap, captureAnnotatedSnapshot } from '../renderer/compositor.js';
+import { snapLoupeToLatestHit } from '../renderer/zoomWindow.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
@@ -199,10 +200,21 @@ export function initSidebarAndTopControls(videoEl) {
     screenSettings?.classList.remove('hidden');
   }
 
-  // 2. Show/Hide Digital Zoom Window
+  // 2. Show/Hide Digital Zoom Window & Aim Loupe to Latest Hit
   btnTogglePip.addEventListener('click', () => {
     updateState({ pipEnabled: !appState.pipEnabled });
     saveSettings(appState);
+  });
+
+  const btnLiveAimLoupe = document.getElementById('btnLiveAimLoupe');
+  let aimLoupeFeedbackTimer = null;
+  btnLiveAimLoupe?.addEventListener('click', () => {
+    if (!snapLoupeToLatestHit()) return;
+    btnLiveAimLoupe.classList.add('radar-btn-active');
+    clearTimeout(aimLoupeFeedbackTimer);
+    aimLoupeFeedbackTimer = setTimeout(() => {
+      btnLiveAimLoupe.classList.remove('radar-btn-active');
+    }, 650);
   });
 
   // 2b. Toggle Overlay Guide from Top-Left Bar
@@ -714,6 +726,52 @@ export function initSidebarAndTopControls(videoEl) {
   sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
   valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
 
+  const sliderHeatmapMaxArea = document.getElementById('sliderHeatmapMaxArea');
+  const valHeatmapMaxArea = document.getElementById('valHeatmapMaxArea');
+  const sliderHeatmapMinCells = document.getElementById('sliderHeatmapMinCells');
+  const valHeatmapMinCells = document.getElementById('valHeatmapMinCells');
+
+  function syncMaxAreaUI(pct) {
+    const clamped = Math.max(1, Math.min(20, Number(pct) || 5));
+    if (sliderHeatmapMaxArea) sliderHeatmapMaxArea.value = String(clamped);
+    if (valHeatmapMaxArea) valHeatmapMaxArea.textContent = clamped === 5 ? '5% (1/20)' : `${clamped}%`;
+    document.querySelectorAll('.max-area-preset-btn').forEach((btn) => {
+      btn.classList.toggle('radar-btn-active', Number(btn.dataset.area) === clamped);
+    });
+  }
+
+  function syncMinCellsUI(cells) {
+    const clamped = Math.max(1, Math.min(20, Number(cells) || 2));
+    if (sliderHeatmapMinCells) sliderHeatmapMinCells.value = String(clamped);
+    if (valHeatmapMinCells) valHeatmapMinCells.textContent = `${clamped} cell${clamped === 1 ? '' : 's'}`;
+  }
+
+  syncMaxAreaUI(appState.heatmapMaxAreaPct ?? 5);
+  syncMinCellsUI(appState.heatmapMinCells ?? 2);
+
+  sliderHeatmapMaxArea?.addEventListener('input', (e) => {
+    const val = Number(e.target.value) || 5;
+    syncMaxAreaUI(val);
+    updateState({ heatmapMaxAreaPct: val });
+    saveSettings(appState);
+  });
+
+  document.querySelectorAll('.max-area-preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const val = Number(btn.dataset.area) || 5;
+      syncMaxAreaUI(val);
+      updateState({ heatmapMaxAreaPct: val });
+      saveSettings(appState);
+    });
+  });
+
+  sliderHeatmapMinCells?.addEventListener('input', (e) => {
+    const val = Number(e.target.value) || 2;
+    syncMinCellsUI(val);
+    updateState({ heatmapMinCells: val });
+    saveSettings(appState);
+  });
+
   function setHeatmapDuration(dur) {
     if (dur >= 99999 || dur === Infinity) {
       if (sliderHeatmapDuration) sliderHeatmapDuration.value = '125';
@@ -1051,9 +1109,15 @@ export function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+    const detectorActive = Boolean(state.heatmapEnabled || state.heatmapSpeechEnabled);
     if (btnLiveRezero) {
-      btnLiveRezero.disabled = !state.heatmapEnabled;
-      btnLiveRezero.classList.toggle('dock-btn-dimmed', !state.heatmapEnabled);
+      btnLiveRezero.disabled = !detectorActive;
+      btnLiveRezero.classList.toggle('dock-btn-dimmed', !detectorActive);
+    }
+    if (btnLiveAimLoupe) {
+      const hasHits = Array.isArray(state.detectionHits) && state.detectionHits.length > 0;
+      btnLiveAimLoupe.disabled = !hasHits;
+      btnLiveAimLoupe.classList.toggle('dock-btn-dimmed', !hasHits);
     }
     syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled));
     syncAutoSaveUI(Boolean(state.heatmapAutoSave));
