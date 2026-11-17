@@ -31,6 +31,11 @@
   transform: scale(0.97);
 }
 
+.radar-btn:disabled {
+  opacity: 0.36;
+  pointer-events: none;
+}
+
 /* Toggle Active State: Calm tinted glass + accent border (doesn't scream like a primary CTA) */
 .radar-btn-active {
   background-color: color-mix(in srgb, var(--radar-accent) 18%, rgba(15, 22, 30, 0.88)) !important;
@@ -75,6 +80,17 @@
   color: #fff1f2;
 }
 
+.radar-btn.radar-btn-armed {
+  width: auto !important;
+  padding: 0 10px !important;
+  background-color: var(--radar-danger) !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  font-size: 12px !important;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.55);
+}
+
 /* Status Indicator Dot */
 .status-dot {
   width: 9px;
@@ -90,6 +106,24 @@
   background-color: var(--radar-text-muted);
   box-shadow: none;
   opacity: 0.55;
+}
+
+.voice-mode-lbl {
+  display: inline-block;
+  min-width: 3ch;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+#btnToggleVoiceAnnounce.voice-mode-poi {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.55) !important;
+}
+
+#btnToggleVoiceAnnounce.voice-mode-poa {
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.55) !important;
 }
 
 /* Control Pod Containers */
@@ -125,11 +159,17 @@
   font-weight: 700;
   color: var(--radar-text);
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 6px;
-  transition: background-color 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.zoom-readout.zoom-can-reset {
+  border-color: color-mix(in srgb, var(--radar-accent) 45%, transparent);
+  background-color: color-mix(in srgb, var(--radar-accent) 14%, transparent);
+}
 }
 
 .zoom-readout:hover {
@@ -559,54 +599,6 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   border-radius: 5px;
 }
 
-/* Compact 5-Button Bluetooth Ring Mode Pill */
-.ring-hud-pill {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  background: var(--radar-panel);
-  border: 1px solid var(--radar-border);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(12px);
-  cursor: pointer;
-  user-select: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.ring-hud-pill:hover,
-.ring-hud-pill.ring-hud-active {
-  border-color: var(--radar-border-strong);
-}
-
-.ring-mode-badge {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--radar-text);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ring-mode-badge::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--radar-accent);
-}
-
-.ring-action-text {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--radar-text-muted);
-  white-space: nowrap;
-}
-
 .ring-signal-readout {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -622,8 +614,8 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   .floating-strip .radar-btn,
   .control-pod,
   .live-bottom-dock,
-  .ring-hud-pill,
-  .quick-tool-pill {
+  .quick-tool-pill,
+  .heatmap-tune-popover {
     backdrop-filter: none !important;
     background: rgba(13, 19, 26, 0.94) !important;
     contain: paint;
@@ -682,4 +674,251 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   line-height: 16px;
   text-align: center;
   pointer-events: none;
+}
+
+/* Integrated Heatmap Split Trigger & Anchored Live Setup Popover */
+.heatmap-dock-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.heatmap-dock-group.is-heatmap-on {
+  border-color: color-mix(in srgb, var(--radar-accent) 45%, transparent);
+}
+
+.heatmap-dock-group #btnToggleHeatmap {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.heatmap-dock-group .heatmap-tune-caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding: 0 9px;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--radar-text-muted);
+  min-width: auto;
+}
+
+.heatmap-dock-group.is-heatmap-on .heatmap-tune-caret {
+  color: var(--radar-text);
+  background-color: color-mix(in srgb, var(--radar-accent) 14%, rgba(255, 255, 255, 0.04));
+}
+
+.heatmap-tune-caret.radar-btn-active .heatmap-caret-glyph {
+  transform: rotate(180deg);
+}
+
+.heatmap-caret-glyph {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.14s ease;
+}
+
+.heatmap-tune-popover {
+  position: absolute;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(370px, calc(100vw - 24px));
+  z-index: 45;
+  background: rgba(10, 15, 22, 0.9);
+  border: 1px solid color-mix(in srgb, var(--radar-accent) 55%, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-md);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.68), 0 0 1px rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  pointer-events: auto;
+}
+
+.heatmap-pop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.heatmap-pop-title-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.heatmap-pop-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--radar-accent);
+  box-shadow: 0 0 8px var(--radar-accent);
+  flex-shrink: 0;
+}
+
+.heatmap-pop-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--radar-text);
+  white-space: nowrap;
+}
+
+.heatmap-gate-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--radar-text-muted);
+  white-space: nowrap;
+}
+
+.heatmap-gate-pill.gate-valid {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.heatmap-gate-pill.gate-warn {
+  color: #67e8f9;
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.14);
+}
+
+.heatmap-gate-pill.gate-suppressed {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.55);
+  background: rgba(244, 63, 94, 0.18);
+}
+
+.heatmap-pop-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.heatmap-pop-header-actions .radar-btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.heatmap-pop-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.heatmap-pop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Live Noise-Floor Meter */
+.heatmap-noise-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.heatmap-noise-bar-track {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.heatmap-noise-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #10b981;
+  transition: width 0.08s linear, background-color 0.14s ease;
+}
+
+.heatmap-noise-fill.level-warn {
+  background: #f59e0b;
+}
+
+.heatmap-noise-fill.level-hot {
+  background: #f43f5e;
+}
+
+.heatmap-noise-peak {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 3px;
+  border-radius: 2px;
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.9);
+  transform: translateX(-50%);
+  transition: left 0.08s linear;
+}
+
+.heatmap-noise-gate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.95);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.heatmap-noise-readout-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--radar-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.heatmap-pop-masks-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.heatmap-pop-masks-row .radar-btn-sm {
+  flex: 1;
+  height: 32px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.heatmap-mask-hint {
+  font-size: 11px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  text-align: center;
 }

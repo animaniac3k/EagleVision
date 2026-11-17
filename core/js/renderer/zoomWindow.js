@@ -336,7 +336,6 @@ export function initZoomWindow() {
   const pipWindowEl = document.getElementById('pipZoomWindow');
   const pipCanvas = document.getElementById('pipCanvas');
   const pipZoomBadge = document.getElementById('pipZoomBadge');
-  const btnPipToggleRoi = document.getElementById('btnPipToggleRoi');
   const btnPipMinus = document.getElementById('pipZoomMinus');
   const btnPipPlus = document.getElementById('pipZoomPlus');
 
@@ -386,9 +385,10 @@ export function initZoomWindow() {
     trackedFloatingPanels.forEach((panel) => clampFloatingPanelToParent(panel));
   });
 
-  // 4. Single ROI Crosshair Show/Hide Button inside Zoom Window Header
-  btnPipToggleRoi.addEventListener('click', () => {
-    updateState({ roiTargetVisible: !appState.roiTargetVisible });
+  // 4. Tap Zoom Badge inside Loupe to reset 3.0x
+  pipZoomBadge?.addEventListener('click', () => {
+    updateState({ pipZoom: 3.0 });
+    saveSettings(appState);
   });
 
   // 5. Zoom Window +/- Buttons
@@ -409,7 +409,6 @@ export function initZoomWindow() {
     pipWindowEl.classList.toggle('hidden', !state.pipEnabled);
     const showCrosshair = state.pipEnabled && state.roiTargetVisible;
     crosshairEl.classList.toggle('hidden', !showCrosshair);
-    btnPipToggleRoi.classList.toggle('radar-btn-active', state.roiTargetVisible);
     pipZoomBadge.textContent = `${state.pipZoom.toFixed(1)}x`;
     if (
       patch &&

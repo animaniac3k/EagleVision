@@ -58,10 +58,6 @@ export function getSoundPeak() {
   }
 }
 
-export function isSoundSamplerActive() {
-  return isListening;
-}
-
 export function stopSoundSampler() {
   if (micStream) {
     micStream.getTracks().forEach((t) => t.stop());

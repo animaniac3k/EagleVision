@@ -63,6 +63,35 @@ function syncPlaybackReticleOverlay() {
   renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, galleryZoom);
 }
 
+function disarmDeleteBtn(btn) {
+  if (!btn) return;
+  if (btn._armTimer) {
+    clearTimeout(btn._armTimer);
+    btn._armTimer = null;
+  }
+  if (btn.dataset.armed === '1') {
+    delete btn.dataset.armed;
+    btn.classList.remove('radar-btn-armed');
+    if (btn.dataset.origHtml !== undefined) {
+      btn.innerHTML = btn.dataset.origHtml;
+    }
+  }
+}
+
+async function handleTwoTapDelete(btn, onConfirm) {
+  if (!btn) return;
+  if (btn.dataset.armed === '1') {
+    disarmDeleteBtn(btn);
+    await onConfirm();
+    return;
+  }
+  btn.dataset.origHtml = btn.innerHTML;
+  btn.dataset.armed = '1';
+  btn.classList.add('radar-btn-armed');
+  btn.textContent = 'Sure?';
+  btn._armTimer = setTimeout(() => disarmDeleteBtn(btn), 2500);
+}
+
 function syncSourceActionButtons() {
   const isBuffer = selectedClipId === LIVE_BUFFER_ID && Boolean(activeBufferClip);
   const btnSaveBuffer = document.getElementById('btnSaveBufferClip');
@@ -73,11 +102,43 @@ function syncSourceActionButtons() {
 
   if (btnSaveBuffer) btnSaveBuffer.classList.toggle('hidden', !isBuffer);
   if (btnDelete) {
+    disarmDeleteBtn(btnDelete);
     btnDelete.classList.toggle('hidden', isBuffer);
     btnDelete.disabled = !selectedClipId;
   }
   if (btnDownload) btnDownload.disabled = !hasSource;
   if (btnSnapshot) btnSnapshot.disabled = !hasSource;
+}
+
+function syncEventNavButtons() {
+  const hasEvents = Boolean(galleryEventNavHelper?.hasEvents);
+  const btnPrevEvt = document.getElementById('btnGalleryPrevEvt');
+  const btnNextEvt = document.getElementById('btnGalleryNextEvt');
+  if (btnPrevEvt) btnPrevEvt.disabled = !hasEvents;
+  if (btnNextEvt) btnNextEvt.disabled = !hasEvents;
+}
+
+function clearPlaybackTrackUI() {
+  const waveformEl = document.getElementById('galleryWaveform');
+  const markersEl = document.getElementById('galleryMarkers');
+  const scrubber = document.getElementById('galleryScrubber');
+  const btnPlayPause = document.getElementById('btnGalleryPlayPause');
+  if (waveformEl) waveformEl.innerHTML = '';
+  if (markersEl) markersEl.innerHTML = '';
+  galleryEventNavHelper = null;
+  clipDuration = 0;
+  playheadSec = 0;
+  isPlaying = false;
+  lastTimeLabel = '';
+  lastPlayBtnText = '';
+  if (scrubber) {
+    scrubber.max = '0';
+    scrubber.value = '0';
+  }
+  if (btnPlayPause) {
+    btnPlayPause.textContent = '▶';
+  }
+  syncEventNavButtons();
 }
 
 function renderGalleryFrame() {
@@ -148,6 +209,7 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
     stopPlayerLoop();
     galleryPlayer?.unload();
     selectedClipId = null;
+    clearPlaybackTrackUI();
     listEl.innerHTML = `
       <div class="clip-card" style="cursor:default;">
         <div>
@@ -237,20 +299,17 @@ function renderClipList() {
   });
 
   listEl.querySelectorAll('.btn-quick-delete-clip').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const clipId = btn.dataset.deleteId;
-      const clip = cachedClips.find((c) => c.id === clipId);
-      const clipName = clip ? clip.name : 'this recording';
-      if (!window.confirm(`Permanently delete "${clipName}"?`)) {
-        return;
-      }
-      await deleteVideoClip(clipId);
-      const wasSelected = selectedClipId === clipId;
-      if (wasSelected) {
-        selectedClipId = null;
-      }
-      await refreshGalleryClips(wasSelected);
+      handleTwoTapDelete(btn, async () => {
+        await deleteVideoClip(clipId);
+        const wasSelected = selectedClipId === clipId;
+        if (wasSelected) {
+          selectedClipId = null;
+        }
+        await refreshGalleryClips(wasSelected);
+      });
     });
   });
 }
@@ -258,6 +317,7 @@ function renderClipList() {
 async function selectClip(clip, autoPlay = true) {
   stopPlayerLoop();
   galleryPlayer?.unload();
+  clearPlaybackTrackUI();
 
   selectedClipId = clip.id;
   const titleEl = document.getElementById('activeClipTitle');
@@ -310,6 +370,7 @@ async function selectClip(clip, autoPlay = true) {
       renderGalleryFrame();
     }
   });
+  syncEventNavButtons();
 
   renderGalleryFrame();
   rafId = requestAnimationFrame(galleryTickLoop);
@@ -342,23 +403,6 @@ export async function openLiveBufferInPlayer(snap) {
   await refreshGalleryClips(false);
   await selectClip(activeBufferClip, true);
   renderClipList();
-  return true;
-}
-
-/**
- * Opens the Stored Clips Gallery directly on a saved clip seeked to a target timestamp (seconds).
- */
-export async function openClipAtTime(clipId, startSec = 0) {
-  await refreshGalleryClips(false);
-  const target = cachedClips.find((c) => c.id === clipId);
-  if (!target) return false;
-  updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
-  await selectClip(target, true);
-  if (selectedClipId === target.id && clipDuration > 0) {
-    playheadSec = Math.max(0, Math.min(Math.max(0.1, clipDuration - 0.1), Number(startSec) || 0));
-    lastTickMs = performance.now();
-    renderGalleryFrame();
-  }
   return true;
 }
 
@@ -490,6 +534,7 @@ export function initVideoBrowser() {
     isPlaying = false;
     stopPlayerLoop();
     galleryPlayer.unload();
+    clearPlaybackTrackUI();
     updateState({ currentScreen: 'live' });
   });
 
@@ -534,10 +579,11 @@ export function initVideoBrowser() {
 
   subscribeState((state, patch) => {
     if (patch.currentScreen !== undefined && state.currentScreen !== 'gallery') {
-      if (isPlaying || galleryPlayer.getFrameCount() > 0) {
+      if (isPlaying || galleryPlayer.getFrameCount() > 0 || galleryEventNavHelper) {
         isPlaying = false;
         stopPlayerLoop();
         galleryPlayer.unload();
+        clearPlaybackTrackUI();
       }
     }
     if (
@@ -670,19 +716,17 @@ export function initVideoBrowser() {
     btnDownload.textContent = orig;
   });
 
-  btnDelete.addEventListener('click', async () => {
+  btnDelete.addEventListener('click', () => {
     if (!selectedClipId || selectedClipId === LIVE_BUFFER_ID) return;
-    const clip = cachedClips.find((c) => c.id === selectedClipId);
-    const clipName = clip ? clip.name : 'this recording';
-    if (!window.confirm(`Permanently delete "${clipName}" from the video archive?`)) {
-      return;
-    }
-    await deleteVideoClip(selectedClipId);
-    selectedClipId = null;
-    await refreshGalleryClips(true);
+    handleTwoTapDelete(btnDelete, async () => {
+      await deleteVideoClip(selectedClipId);
+      selectedClipId = null;
+      await refreshGalleryClips(true);
+    });
   });
 
   syncPlaybackReticleOverlay();
   syncSourceActionButtons();
+  syncEventNavButtons();
   refreshGalleryClips(false).catch((err) => console.warn('Gallery clips refresh deferred:', err));
 }

@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.1.11';
+export const APP_VERSION = 'v0.1.12';
 
 const listeners = new Set();
 
@@ -21,11 +21,8 @@ export const appState = {
   rtspOnvifPort: 554,
   rtspOnvifPath: '/onvif1',
   rtspOnvifUser: '',
-  rtspOnvifPass: '',
   rtspCustomUrl: '',
   rtspGatewayHost: '',         // Optional gateway host/IP (e.g. 'http://192.168.0.50:8080')
-  rtspWakeStatus: 'idle',      // 'idle' | 'waking' | 'live' | 'error'
-  rtspAvailableChannels: [],
 
   // Main Viewport Zoom & Pan
   mainZoom: 1.0,
@@ -40,7 +37,6 @@ export const appState = {
   roiY: 0.5,
 
   // UI Windows Visibility & Active Screen ('live' | 'gallery' | 'settings' | 'reticle' | 'controller')
-  optionsOpen: false,
   hudOpen: false,
   currentScreen: 'live',
   galleryDrawerOpen: false,
@@ -80,6 +76,9 @@ export const appState = {
 
   // Localized Micro-Change Heatmap (ignores global camera shake)
   heatmapEnabled: false,
+  heatmapSetupOpen: false, // Transient live-screen calibration popover & visual feedback
+  liveMaskDrawActive: false, // Transient mask drawing mode on live viewport
+  liveMasksVisible: false, // Transient mask visibility on live viewport (auto-shown in setup)
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
   heatmapMaxAreaPct: 5,   // Max simultaneous changed area (% of screen, default 5% = 1/20th)
@@ -94,11 +93,14 @@ export const appState = {
   voiceRate: 0.80,        // Voice speech rate (0.6..1.0)
   voiceAlertKeyword: 'Detection', // Customizable alert keyword (e.g. Contact, Target, Alert)
   voiceUnitKeyword: 'clicks',     // Customizable distance unit (e.g. clicks, mils, marks, units)
+  detectionCalloutMode: 'poi',    // 'poi' (where hit landed) | 'poa' (dial adjustment to center)
 
   // Configurable In-Memory Rolling Recording Buffer
   bufferEnabled: true,
   bufferMaxSeconds: 20, // Adjustable: 5s to 60s
   bufferTargetFps: 15,  // Adjustable: 5 FPS to 30 FPS
+  bufferFastQuality: true, // true: 720p / 0.75q fast encode for non-RTSP streams; false: native res / 0.84q
+  bufferMicEnabled: false, // Opt-in microphone peak sampling (avoids launch-time mic prompt)
   bufferedSeconds: 0,
   bufferBytes: 0,
 

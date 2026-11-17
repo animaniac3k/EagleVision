@@ -123,6 +123,7 @@
 
 #pipZoomBadge {
   pointer-events: auto;
+  cursor: pointer;
   font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 700;
@@ -231,4 +232,83 @@
 
 .pip-resize-handle:hover {
   opacity: 1;
+}
+
+/* Transient Heatmap Setup Feedback Canvas & Live Ignore Masks */
+#heatmapSetupCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.live-ignore-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.live-ignore-layer.mask-draw-active {
+  z-index: 28;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.live-ignore-box {
+  position: absolute;
+  border: 1.5px dashed rgba(245, 158, 11, 0.92);
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(245, 158, 11, 0.16),
+    rgba(245, 158, 11, 0.16) 6px,
+    rgba(245, 158, 11, 0.04) 6px,
+    rgba(245, 158, 11, 0.04) 12px
+  );
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.live-ignore-layer.mask-edit-active .live-ignore-box {
+  pointer-events: none;
+}
+
+.live-ignore-box-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(11, 15, 23, 0.92);
+  color: #fda4af;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.live-ignore-box-remove:hover {
+  background: var(--radar-danger);
+  color: #ffffff;
+}
+
+.live-ignore-layer:not(.mask-edit-active) .live-ignore-box-remove {
+  display: none;
+}
+
+.live-draw-preview {
+  position: absolute;
+  z-index: 29;
+  border: 2px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 4px;
+  pointer-events: none;
 }

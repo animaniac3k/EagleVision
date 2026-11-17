@@ -100,14 +100,30 @@ function scheduleAlertChime(ctx, startTime) {
   } catch (_) {}
 }
 
+const KNOWN_UNITS = [
+  'click', 'clicks', 'mil', 'mils', 'mark', 'marks',
+  'unit', 'units', 'degree', 'degrees', 'meter', 'meters', 'yard', 'yards'
+];
+
+function pushCountTokens(tokens, countNum) {
+  if (countNum === null || Number.isNaN(countNum)) return;
+  if (countNum >= 1 && countNum <= 100) {
+    tokens.push(String(countNum));
+  } else if (countNum > 100 && countNum < 200) {
+    tokens.push('100');
+    const rem = countNum - 100;
+    if (rem > 0 && rem <= 100) {
+      tokens.push(String(rem));
+    }
+  } else if (countNum >= 200) {
+    tokens.push('100');
+  }
+}
+
 /**
- * Parses detection announcements and callout phrases into sprite tokens
- * Examples:
- * - "Detection! 11 o'clock, 3 clicks"
- * - "Contact! 1 o'clock, 1 click"
- * - "Target! Center"
- * - "Detection! Voice callouts active"
- * - "Warning! 6 o'clock, 42 clicks"
+ * Parses detection announcements and callout phrases into sprite tokens.
+ * Supports Style A Cartesian callouts ("Detection! 3 clicks right, 2 clicks up"),
+ * single-axis callouts ("Detection! 1 click left"), "Detection! Center", and status phrases.
  */
 export function parsePhraseToTokens(phrase) {
   if (!phrase || typeof phrase !== 'string') return [];
@@ -117,7 +133,6 @@ export function parsePhraseToTokens(phrase) {
 
   // Check for status messages
   if (lower.includes('callouts active') || lower.includes('voice callouts active')) {
-    // Extract prefix if present
     const prefixMatch = raw.match(/^([A-Za-z0-9_-]+)[!:,]/);
     if (prefixMatch) {
       const p = prefixMatch[1].toLowerCase();
@@ -133,73 +148,50 @@ export function parsePhraseToTokens(phrase) {
   }
 
   // 1. Extract Alert Prefix (e.g. "Detection!", "Contact:", "Target")
-  let alertToken = null;
   const prefixMatch = raw.match(/^([A-Za-z0-9_-]+)[!:,]?/);
   if (prefixMatch) {
     const candidate = prefixMatch[1].toLowerCase();
-    if (VOICE_MANIFEST[candidate]) {
-      alertToken = candidate;
-    } else {
-      // Custom keyword flag
-      alertToken = '__custom_chime__';
-    }
+    tokens.push(VOICE_MANIFEST[candidate] ? candidate : '__custom_chime__');
   }
 
-  if (alertToken) {
-    tokens.push(alertToken);
-  }
-
-  // 2. Check for Center vs Clock Direction
-  if (lower.includes('center')) {
+  // 2. Center callout
+  if (/\bcenter\b/i.test(lower)) {
     tokens.push('center');
-  } else {
-    // Match clock direction e.g. "11 o'clock", "3 o'clock"
-    const clockMatch = lower.match(/\b([1-9]|1[0-2])\s*o'?clock\b/);
-    if (clockMatch) {
-      tokens.push(`${clockMatch[1]}_oclock`);
-    }
+    return tokens;
   }
 
-  // 3. Extract Number Count (1 to 100+)
-  let countNum = null;
-  // Match number following o'clock
-  const oclockCount = lower.match(/o'?clock\s*[, ]+\s*(\d+)/i);
-  if (oclockCount) {
-    countNum = parseInt(oclockCount[1], 10);
-  } else {
-    // Match number before a unit word
-    const unitCount = lower.match(/\b(\d+)\s*(?:click|mil|mark|unit|degree|meter|yard)/i);
-    if (unitCount) {
-      countNum = parseInt(unitCount[1], 10);
-    } else {
-      // Match number after a comma
-      const commaCount = lower.match(/,\s*(\d+)/);
-      if (commaCount) {
-        countNum = parseInt(commaCount[1], 10);
-      }
+  // 3. Cartesian Left / Right / Up / Down clauses (Style A: "3 clicks right, 2 clicks up")
+  const axisRegex = /(\d+)\s+(?:([a-z]+)\s+)?(left|right|up|down)\b/gi;
+  let axisMatch;
+  let foundAxisClause = false;
+  while ((axisMatch = axisRegex.exec(lower)) !== null) {
+    foundAxisClause = true;
+    const countNum = parseInt(axisMatch[1], 10);
+    const maybeUnit = axisMatch[2] || '';
+    const dir = axisMatch[3].toLowerCase();
+    pushCountTokens(tokens, countNum);
+    if (maybeUnit && KNOWN_UNITS.includes(maybeUnit)) {
+      tokens.push(maybeUnit);
+    }
+    if (VOICE_MANIFEST[dir]) {
+      tokens.push(dir);
     }
   }
-
-  if (countNum !== null && !isNaN(countNum)) {
-    if (countNum >= 1 && countNum <= 100) {
-      tokens.push(String(countNum));
-    } else if (countNum > 100 && countNum < 200) {
-      // Compound 101-199
-      tokens.push('100');
-      const rem = countNum - 100;
-      if (rem > 0 && rem <= 100) {
-        tokens.push(String(rem));
-      }
-    } else if (countNum >= 200) {
-      tokens.push('100');
-    }
+  if (foundAxisClause) {
+    return tokens;
   }
 
-  // 4. Extract Unit Word
-  const knownUnits = ['click', 'clicks', 'mil', 'mils', 'mark', 'marks', 'unit', 'units', 'degree', 'degrees', 'meter', 'meters', 'yard', 'yards'];
-  for (const u of knownUnits) {
-    const regex = new RegExp(`\\b${u}\\b`, 'i');
-    if (regex.test(lower)) {
+  // 4. Legacy clock fallback if an external caller passes o'clock phrasing
+  const clockMatch = lower.match(/\b([1-9]|1[0-2])\s*o'?clock\b/);
+  if (clockMatch) {
+    tokens.push(`${clockMatch[1]}_oclock`);
+  }
+  const countMatch = lower.match(/,\s*(\d+)/) || lower.match(/\b(\d+)\b/);
+  if (countMatch) {
+    pushCountTokens(tokens, parseInt(countMatch[1], 10));
+  }
+  for (const u of KNOWN_UNITS) {
+    if (new RegExp(`\\b${u}\\b`, 'i').test(lower)) {
       tokens.push(u);
       break;
     }

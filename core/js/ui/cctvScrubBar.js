@@ -100,6 +100,7 @@ export function renderCctvTrack({
   const clusterTimestamps = clusteredEvents.map((c) => c.start);
 
   return {
+    hasEvents: clusterTimestamps.length > 0,
     getPrevEvent: (currentTimeSec) => {
       if (!clusterTimestamps.length) return null;
       const prev = [...clusterTimestamps].reverse().find((t) => t < currentTimeSec - 0.25);

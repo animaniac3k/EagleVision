@@ -1849,7 +1849,7 @@ export function executeMappedAction(actionId) {
       break;
 
     case 'toggle_hud':
-      document.getElementById('btnToggleHud')?.click();
+      updateState({ hudOpen: !appState.hudOpen });
       break;
 
     case 'zoom_in':
@@ -1861,7 +1861,7 @@ export function executeMappedAction(actionId) {
       break;
 
     case 'zoom_reset':
-      document.getElementById('mainZoomReset')?.click();
+      document.getElementById('mainZoomBadge')?.click();
       break;
 
     case 'instant_replay':
@@ -2101,7 +2101,7 @@ export const QUICK_TOOLS = [
     id: 'hud',
     name: 'TELEMETRY HUD',
     check: (s) => s.hudOpen,
-    toggle: () => document.getElementById('btnToggleHud')?.click()
+    toggle: () => updateState({ hudOpen: !appState.hudOpen })
   }
 ];
 

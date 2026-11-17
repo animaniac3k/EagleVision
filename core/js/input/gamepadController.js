@@ -53,7 +53,6 @@ let reticleStickRightXTime = 0;
 let reticleStickRightYTime = 0;
 
 // Stick Tuning: Power curve provides 50-70% reduction at low end for fine-tick adjustments
-const DEADZONE = 0.16;
 const BASE_ROI_SPEED = 0.012;
 const BASE_PAN_SPEED = 0.014;
 

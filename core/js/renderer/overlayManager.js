@@ -37,28 +37,6 @@ export function getClickDistanceInPixels(viewportW, viewportH, overlayScalePerce
 }
 
 /**
- * Returns the on-screen pixel distance from reticle center to the edge of the center gap.
- */
-export function getCenterGapDistanceInPixels(viewportW, viewportH, overlayScalePercent = 100) {
-  const cfg = appState.reticleConfig || {};
-  const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
-  const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
-  const rawStep = Number(cfg.clickSpacing);
-  const step = Number.isFinite(rawStep) && rawStep >= 4 ? rawStep : defaultFittingStep;
-  const rawGapHalf = Math.max(0, (Number(cfg.centerGap) ?? 64) / 2);
-  const gapHalfSvgUnits = Math.min(rawGapHalf, 360);
-
-  const baseScale = Math.min(
-    Math.max(1, viewportW) / RETICLE_VIEWBOX_W,
-    Math.max(1, viewportH) / RETICLE_VIEWBOX_H
-  );
-
-  const ffpFactor = appState.reticleFfpMode ? Math.max(1.0, Number(appState.mainZoom) || 1.0) : 1.0;
-  const scaleMultiplier = Math.max(0.1, (Number(overlayScalePercent) || 100) / 100) * ffpFactor;
-  return gapHalfSvgUnits * baseScale * scaleMultiplier;
-}
-
-/**
  * Builds the complete SVG markup for the customizable graduated reticle.
  * Can be rendered on the main feed (#svgOverlay), Playback, Hits, or Reticle Customizer preview stage.
  */

@@ -10,12 +10,16 @@ export function loadSavedSettings() {
     if (!parsed) return null;
     parsed.playbackReticleEnabled = Boolean(parsed.playbackReticleEnabled);
     parsed.hitsReticleEnabled = parsed.hitsReticleEnabled !== false;
-    parsed.heatmapMaxAreaPct = Number.isFinite(Number(parsed.heatmapMaxAreaPct))
-      ? Math.max(1, Math.min(20, Number(parsed.heatmapMaxAreaPct)))
-      : 5;
+    parsed.detectionCalloutMode = parsed.detectionCalloutMode === 'poa' ? 'poa' : 'poi';
+    parsed.bufferFastQuality = parsed.bufferFastQuality !== false;
+    parsed.bufferMicEnabled = Boolean(parsed.bufferMicEnabled);
     parsed.heatmapMinCells = Number.isFinite(Number(parsed.heatmapMinCells))
       ? Math.max(1, Math.min(20, Number(parsed.heatmapMinCells)))
       : 2;
+    const minAreaPct = ((parsed.heatmapMinCells + 1) / 14400) * 100;
+    parsed.heatmapMaxAreaPct = Number.isFinite(Number(parsed.heatmapMaxAreaPct))
+      ? Math.max(minAreaPct, Math.min(20, Number(parsed.heatmapMaxAreaPct)))
+      : 5;
     if (parsed.reticleConfig) {
       parsed.reticleConfig = Object.assign(
         {
@@ -72,9 +76,12 @@ export function saveSettings(state) {
       voiceRate: state.voiceRate || 0.80,
       voiceAlertKeyword: state.voiceAlertKeyword || 'Detection',
       voiceUnitKeyword: state.voiceUnitKeyword || 'clicks',
+      detectionCalloutMode: state.detectionCalloutMode === 'poa' ? 'poa' : 'poi',
       bufferEnabled: state.bufferEnabled,
       bufferMaxSeconds: state.bufferMaxSeconds,
       bufferTargetFps: state.bufferTargetFps,
+      bufferFastQuality: state.bufferFastQuality !== false,
+      bufferMicEnabled: Boolean(state.bufferMicEnabled),
       themeColor: state.themeColor || '#f97316',
       uiOpacity: state.uiOpacity ?? 100,
       touchpadSensitivity: state.touchpadSensitivity ?? 50,

@@ -15,10 +15,20 @@ import {
   stopMemoryBuffer,
   updateMemoryBufferConfig,
   getAvailableMemoryBudgetMB,
-  getEstimatedBufferMB
+  getEstimatedBufferMB,
+  getBufferedTargetDimensions
 } from '../recorder/memoryRingBuffer.js';
 import { saveSettings } from '../storage/settingsStore.js';
-import { speakDetectionAnnouncement, stopVoiceAnnouncement, rezeroHeatmap, captureAnnotatedSnapshot } from '../renderer/compositor.js';
+import {
+  speakDetectionAnnouncement,
+  stopVoiceAnnouncement,
+  rezeroHeatmap,
+  captureAnnotatedSnapshot,
+  addHeatmapIgnoreZone,
+  clearHeatmapIgnoreZones,
+  subscribeHeatmapTelemetry,
+  getLiveViewportProjection
+} from '../renderer/compositor.js';
 import { snapLoupeToLatestHit } from '../renderer/zoomWindow.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
@@ -106,7 +116,6 @@ export function initSidebarAndTopControls(videoEl) {
   const btnTogglePip = document.getElementById('btnTogglePip');
   const btnToggleOverlayTop = document.getElementById('btnToggleOverlayTop');
   const btnToggleHeatmap = document.getElementById('btnToggleHeatmap');
-  const btnToggleHud = document.getElementById('btnToggleHud');
   const btnToggleBuffer = document.getElementById('btnToggleBuffer');
   const bufferDot = document.getElementById('bufferDot');
   const bufferText = document.getElementById('bufferText');
@@ -233,24 +242,85 @@ export function initSidebarAndTopControls(videoEl) {
     toggleQuickTool();
   });
 
-  // 3. Toggle Localized Micro-Change Heatmap (double-tap also re-zeros background)
+  // 3. Toggle Localized Micro-Change Heatmap (double-tap re-zeros; long-press / caret opens live setup)
   let lastHeatmapTapMs = 0;
   let rezeroFeedbackTimer = null;
+  let heatmapLongPressTimer = null;
+  let heatmapLongPressFired = false;
   const btnLiveRezero = document.getElementById('btnLiveRezero');
+  const btnHeatmapTune = document.getElementById('btnHeatmapTune');
+  const heatmapDockGroup = btnToggleHeatmap?.closest('.heatmap-dock-group');
+  const heatmapTunePopover = document.getElementById('heatmapTunePopover');
+  const btnPopoverRezero = document.getElementById('btnPopoverRezero');
+  const btnCloseHeatmapSetup = document.getElementById('btnCloseHeatmapSetup');
+  const btnOpenLiveHeatmapTune = document.getElementById('btnOpenLiveHeatmapTune');
+
   const triggerLiveRezero = () => {
     rezeroHeatmap();
-    if (btnLiveRezero) {
-      btnLiveRezero.classList.add('radar-btn-active');
-      clearTimeout(rezeroFeedbackTimer);
-      rezeroFeedbackTimer = setTimeout(() => {
-        btnLiveRezero.classList.remove('radar-btn-active');
-      }, 900);
-    }
+    [btnLiveRezero, btnPopoverRezero].forEach((b) => b?.classList.add('radar-btn-active'));
+    clearTimeout(rezeroFeedbackTimer);
+    rezeroFeedbackTimer = setTimeout(() => {
+      [btnLiveRezero, btnPopoverRezero].forEach((b) => b?.classList.remove('radar-btn-active'));
+    }, 900);
   };
 
+  function setHeatmapSetupOpen(open) {
+    const next = Boolean(open);
+    if (next) {
+      updateState({
+        currentScreen: 'live',
+        uiDecluttered: false,
+        heatmapEnabled: true,
+        heatmapSetupOpen: true,
+        liveMasksVisible: true
+      });
+      saveSettings(appState);
+      requestAnimationFrame(() => renderLiveIgnoreMasks());
+    } else {
+      updateState({
+        heatmapSetupOpen: false,
+        liveMaskDrawActive: false,
+        liveMasksVisible: false
+      });
+    }
+  }
+
   btnLiveRezero?.addEventListener('click', triggerLiveRezero);
+  btnPopoverRezero?.addEventListener('click', triggerLiveRezero);
+  btnCloseHeatmapSetup?.addEventListener('click', () => setHeatmapSetupOpen(false));
+  btnHeatmapTune?.addEventListener('click', () => setHeatmapSetupOpen(!appState.heatmapSetupOpen));
+  btnOpenLiveHeatmapTune?.addEventListener('click', () => setHeatmapSetupOpen(true));
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && appState.heatmapSetupOpen) {
+      setHeatmapSetupOpen(false);
+    }
+  });
+
+  btnToggleHeatmap.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    heatmapLongPressFired = false;
+    clearTimeout(heatmapLongPressTimer);
+    heatmapLongPressTimer = setTimeout(() => {
+      heatmapLongPressFired = true;
+      setHeatmapSetupOpen(!appState.heatmapSetupOpen);
+    }, 420);
+  });
+
+  const cancelHeatmapLongPress = () => clearTimeout(heatmapLongPressTimer);
+  btnToggleHeatmap.addEventListener('pointerup', cancelHeatmapLongPress);
+  btnToggleHeatmap.addEventListener('pointercancel', cancelHeatmapLongPress);
+  btnToggleHeatmap.addEventListener('pointerleave', cancelHeatmapLongPress);
+  btnToggleHeatmap.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    setHeatmapSetupOpen(!appState.heatmapSetupOpen);
+  });
 
   btnToggleHeatmap.addEventListener('click', () => {
+    if (heatmapLongPressFired) {
+      heatmapLongPressFired = false;
+      return;
+    }
     const now = performance.now();
     if (now - lastHeatmapTapMs < 350 && appState.heatmapEnabled) {
       lastHeatmapTapMs = 0;
@@ -258,7 +328,11 @@ export function initSidebarAndTopControls(videoEl) {
       return;
     }
     lastHeatmapTapMs = now;
-    updateState({ heatmapEnabled: !appState.heatmapEnabled });
+    const nextEnabled = !appState.heatmapEnabled;
+    updateState({
+      heatmapEnabled: nextEnabled,
+      ...(nextEnabled ? {} : { heatmapSetupOpen: false, liveMaskDrawActive: false, liveMasksVisible: false })
+    });
     saveSettings(appState);
   });
 
@@ -266,11 +340,6 @@ export function initSidebarAndTopControls(videoEl) {
   const btnLiveSnapshot = document.getElementById('btnLiveSnapshot');
   btnLiveSnapshot?.addEventListener('click', () => {
     captureAnnotatedSnapshot();
-  });
-
-  // 4. Show/Hide Stream Telemetry HUD
-  btnToggleHud.addEventListener('click', () => {
-    updateState({ hudOpen: !appState.hudOpen });
   });
 
   // 5. Enable/Disable Rolling In-Memory Buffer
@@ -321,6 +390,37 @@ export function initSidebarAndTopControls(videoEl) {
     valBufferFps.textContent = `${fps} FPS`;
     updateState({ bufferTargetFps: fps });
     saveSettings(appState);
+    updateMemoryBufferConfig();
+  });
+
+  const btnBufferQuality = document.getElementById('btnBufferQuality');
+  const btnBufferMic = document.getElementById('btnBufferMic');
+
+  function syncBufferOptionButtons() {
+    if (btnBufferQuality) {
+      const fast = appState.bufferFastQuality !== false;
+      btnBufferQuality.classList.toggle('radar-btn-active', fast);
+      btnBufferQuality.textContent = fast ? 'Capture: 720p Fast' : 'Capture: Native';
+    }
+    if (btnBufferMic) {
+      const micOn = Boolean(appState.bufferMicEnabled);
+      btnBufferMic.classList.toggle('radar-btn-active', micOn);
+      btnBufferMic.textContent = micOn ? 'Mic Peaks: ON' : 'Mic Peaks: OFF';
+    }
+  }
+  syncBufferOptionButtons();
+
+  btnBufferQuality?.addEventListener('click', () => {
+    updateState({ bufferFastQuality: !(appState.bufferFastQuality !== false) });
+    saveSettings(appState);
+    syncBufferOptionButtons();
+    updateMemoryBufferConfig();
+  });
+
+  btnBufferMic?.addEventListener('click', () => {
+    updateState({ bufferMicEnabled: !appState.bufferMicEnabled });
+    saveSettings(appState);
+    syncBufferOptionButtons();
     updateMemoryBufferConfig();
   });
 
@@ -669,7 +769,6 @@ export function initSidebarAndTopControls(videoEl) {
   // 8. Main Whole-Image Zoom Controls (Bottom Bar)
   const mainZoomMinus = document.getElementById('mainZoomMinus');
   const mainZoomPlus = document.getElementById('mainZoomPlus');
-  const mainZoomReset = document.getElementById('mainZoomReset');
   const mainZoomBadge = document.getElementById('mainZoomBadge');
 
   mainZoomMinus.addEventListener('click', () => {
@@ -687,10 +786,6 @@ export function initSidebarAndTopControls(videoEl) {
   });
 
   mainZoomBadge?.addEventListener('click', () => {
-    updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
-  });
-
-  mainZoomReset?.addEventListener('click', () => {
     updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
   });
 
@@ -723,53 +818,350 @@ export function initSidebarAndTopControls(videoEl) {
   const valVoiceRate = document.getElementById('valVoiceRate');
   const btnTestVoiceSettings = document.getElementById('btnTestVoiceSettings');
 
-  sliderHeatmapSens.value = String(appState.heatmapSensitivity || 60);
-  valHeatmapSens.textContent = `${appState.heatmapSensitivity || 60}%`;
-
+  const liveSliderHeatmapSens = document.getElementById('liveSliderHeatmapSens');
+  const liveValHeatmapSens = document.getElementById('liveValHeatmapSens');
+  const heatmapTuneSensChip = document.getElementById('heatmapTuneSensChip');
   const sliderHeatmapMaxArea = document.getElementById('sliderHeatmapMaxArea');
   const valHeatmapMaxArea = document.getElementById('valHeatmapMaxArea');
+  const liveSliderHeatmapMaxArea = document.getElementById('liveSliderHeatmapMaxArea');
+  const liveValHeatmapMaxArea = document.getElementById('liveValHeatmapMaxArea');
   const sliderHeatmapMinCells = document.getElementById('sliderHeatmapMinCells');
   const valHeatmapMinCells = document.getElementById('valHeatmapMinCells');
+  const liveSliderHeatmapMinCells = document.getElementById('liveSliderHeatmapMinCells');
+  const liveValHeatmapMinCells = document.getElementById('liveValHeatmapMinCells');
 
-  function syncMaxAreaUI(pct) {
-    const clamped = Math.max(1, Math.min(20, Number(pct) || 5));
-    if (sliderHeatmapMaxArea) sliderHeatmapMaxArea.value = String(clamped);
-    if (valHeatmapMaxArea) valHeatmapMaxArea.textContent = clamped === 5 ? '5% (1/20)' : `${clamped}%`;
-    document.querySelectorAll('.max-area-preset-btn').forEach((btn) => {
-      btn.classList.toggle('radar-btn-active', Number(btn.dataset.area) === clamped);
-    });
+  const heatmapLiveGatePill = document.getElementById('heatmapLiveGatePill');
+  const heatmapNoiseMeterFill = document.getElementById('heatmapNoiseMeterFill');
+  const heatmapNoisePeakTick = document.getElementById('heatmapNoisePeakTick');
+  const heatmapNoiseGateMarker = document.getElementById('heatmapNoiseGateMarker');
+  const heatmapNoiseTelemetryText = document.getElementById('heatmapNoiseTelemetryText');
+  const heatmapNoiseMarginText = document.getElementById('heatmapNoiseMarginText');
+
+  const DELTA_BAR_MAX = 85;
+  let lastNoiseDelta = 0;
+
+  function renderNoiseGateMarker(sens) {
+    const threshold = 82 - Math.max(10, Math.min(95, sens)) * 0.76;
+    if (heatmapNoiseGateMarker) {
+      const gatePct = Math.max(2, Math.min(98, (threshold / DELTA_BAR_MAX) * 100));
+      heatmapNoiseGateMarker.style.left = `${gatePct.toFixed(1)}%`;
+    }
+    if (heatmapNoiseMarginText) {
+      const margin = threshold - lastNoiseDelta;
+      heatmapNoiseMarginText.textContent = margin >= 0
+        ? `Headroom +${Math.round(margin)} Δ`
+        : `Noise +${Math.abs(Math.round(margin))} Δ over gate`;
+      heatmapNoiseMarginText.style.color = margin >= 4 ? '' : '#fda4af';
+    }
+  }
+
+  function syncSensitivityUI(sens) {
+    const clamped = Math.max(10, Math.min(95, Number(sens) || 60));
+    const threshold = Math.round(82 - clamped * 0.76);
+    if (sliderHeatmapSens) sliderHeatmapSens.value = String(clamped);
+    if (valHeatmapSens) valHeatmapSens.textContent = `${clamped}%`;
+    if (liveSliderHeatmapSens) liveSliderHeatmapSens.value = String(clamped);
+    if (liveValHeatmapSens) liveValHeatmapSens.textContent = `${clamped}% · Δ>${threshold}`;
+    if (heatmapTuneSensChip) heatmapTuneSensChip.textContent = `${clamped}%`;
+    renderNoiseGateMarker(clamped);
+  }
+
+  const HEAT_GRID_CELLS = 160 * 90;
+  const MAX_HIT_AREA_MAX_PCT = 20;
+  const MAX_HIT_AREA_CURVE = 2.5;
+
+  function getMinMaxAreaPct(minCells = appState.heatmapMinCells ?? 2) {
+    const safeMin = Math.max(1, Math.min(20, Number(minCells) || 2));
+    return ((safeMin + 1) / HEAT_GRID_CELLS) * 100;
+  }
+
+  function clampMaxAreaPct(pct, minCells = appState.heatmapMinCells ?? 2) {
+    const minPct = getMinMaxAreaPct(minCells);
+    const num = Number(pct);
+    const fallback = Number.isFinite(num) && num > 0 ? num : 5;
+    return Math.max(minPct, Math.min(MAX_HIT_AREA_MAX_PCT, fallback));
+  }
+
+  function sliderPosToMaxAreaPct(pos, minCells = appState.heatmapMinCells ?? 2) {
+    const t = Math.max(0, Math.min(1, (Number(pos) || 0) / 100));
+    const minPct = getMinMaxAreaPct(minCells);
+    const raw = minPct + (MAX_HIT_AREA_MAX_PCT - minPct) * Math.pow(t, MAX_HIT_AREA_CURVE);
+    return Number(raw.toFixed(4));
+  }
+
+  function maxAreaPctToSliderPos(pct, minCells = appState.heatmapMinCells ?? 2) {
+    const minPct = getMinMaxAreaPct(minCells);
+    const clamped = clampMaxAreaPct(pct, minCells);
+    const norm = Math.max(0, Math.min(1, (clamped - minPct) / Math.max(0.0001, MAX_HIT_AREA_MAX_PCT - minPct)));
+    return Math.round(Math.pow(norm, 1 / MAX_HIT_AREA_CURVE) * 100);
+  }
+
+  function formatMaxAreaPct(pct) {
+    if (pct < 1) return `${pct.toFixed(2)}%`;
+    if (pct < 10) return `${pct.toFixed(1)}%`;
+    return `${Math.round(pct)}%`;
+  }
+
+  function syncMaxAreaUI(pct, minCells = appState.heatmapMinCells ?? 2) {
+    const safeMin = Math.max(1, Math.min(20, Number(minCells) || 2));
+    const clamped = clampMaxAreaPct(pct, safeMin);
+    const pos = maxAreaPctToSliderPos(clamped, safeMin);
+    const cells = Math.max(safeMin + 1, Math.round((clamped / 100) * HEAT_GRID_CELLS));
+    const pctStr = formatMaxAreaPct(clamped);
+    if (sliderHeatmapMaxArea) sliderHeatmapMaxArea.value = String(pos);
+    if (valHeatmapMaxArea) valHeatmapMaxArea.textContent = `${cells} cells (${pctStr})`;
+    if (liveSliderHeatmapMaxArea) liveSliderHeatmapMaxArea.value = String(pos);
+    if (liveValHeatmapMaxArea) liveValHeatmapMaxArea.textContent = `${cells} cells`;
   }
 
   function syncMinCellsUI(cells) {
     const clamped = Math.max(1, Math.min(20, Number(cells) || 2));
+    const label = `${clamped} cell${clamped === 1 ? '' : 's'}`;
     if (sliderHeatmapMinCells) sliderHeatmapMinCells.value = String(clamped);
-    if (valHeatmapMinCells) valHeatmapMinCells.textContent = `${clamped} cell${clamped === 1 ? '' : 's'}`;
+    if (valHeatmapMinCells) valHeatmapMinCells.textContent = label;
+    if (liveSliderHeatmapMinCells) liveSliderHeatmapMinCells.value = String(clamped);
+    if (liveValHeatmapMinCells) liveValHeatmapMinCells.textContent = label;
   }
 
-  syncMaxAreaUI(appState.heatmapMaxAreaPct ?? 5);
-  syncMinCellsUI(appState.heatmapMinCells ?? 2);
-
-  sliderHeatmapMaxArea?.addEventListener('input', (e) => {
-    const val = Number(e.target.value) || 5;
-    syncMaxAreaUI(val);
-    updateState({ heatmapMaxAreaPct: val });
+  function applyHeatmapSensitivity(val) {
+    const sens = Math.max(10, Math.min(95, Number(val) || 60));
+    syncSensitivityUI(sens);
+    updateState({ heatmapSensitivity: sens });
     saveSettings(appState);
+  }
+
+  function applyHeatmapMaxAreaFromSlider(pos) {
+    const pct = sliderPosToMaxAreaPct(pos, appState.heatmapMinCells ?? 2);
+    syncMaxAreaUI(pct, appState.heatmapMinCells ?? 2);
+    updateState({ heatmapMaxAreaPct: pct });
+    saveSettings(appState);
+  }
+
+  function applyHeatmapMinCells(val) {
+    const cells = Math.max(1, Math.min(20, Number(val) || 2));
+    syncMinCellsUI(cells);
+    const nextMaxPct = clampMaxAreaPct(appState.heatmapMaxAreaPct ?? 5, cells);
+    syncMaxAreaUI(nextMaxPct, cells);
+    updateState({ heatmapMinCells: cells, heatmapMaxAreaPct: nextMaxPct });
+    saveSettings(appState);
+  }
+
+  syncSensitivityUI(appState.heatmapSensitivity ?? 60);
+  syncMinCellsUI(appState.heatmapMinCells ?? 2);
+  syncMaxAreaUI(appState.heatmapMaxAreaPct ?? 5, appState.heatmapMinCells ?? 2);
+
+  [sliderHeatmapMaxArea, liveSliderHeatmapMaxArea].forEach((el) => {
+    el?.addEventListener('input', (e) => applyHeatmapMaxAreaFromSlider(e.target.value));
   });
 
-  document.querySelectorAll('.max-area-preset-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const val = Number(btn.dataset.area) || 5;
-      syncMaxAreaUI(val);
-      updateState({ heatmapMaxAreaPct: val });
-      saveSettings(appState);
+  [sliderHeatmapMinCells, liveSliderHeatmapMinCells].forEach((el) => {
+    el?.addEventListener('input', (e) => applyHeatmapMinCells(e.target.value));
+  });
+
+  [sliderHeatmapSens, liveSliderHeatmapSens].forEach((el) => {
+    el?.addEventListener('input', (e) => applyHeatmapSensitivity(e.target.value));
+  });
+
+  // Live Noise-Floor & Gate Telemetry Subscription (active only when setup popover is open)
+  subscribeHeatmapTelemetry((snap) => {
+    if (!appState.heatmapSetupOpen) return;
+    lastNoiseDelta = snap.noiseDelta;
+    const noisePct = Math.max(0, Math.min(100, (snap.noiseDelta / DELTA_BAR_MAX) * 100));
+    const peakPct = Math.max(0, Math.min(100, (snap.peakDelta / DELTA_BAR_MAX) * 100));
+    if (heatmapNoiseMeterFill) {
+      heatmapNoiseMeterFill.style.width = `${noisePct.toFixed(1)}%`;
+      heatmapNoiseMeterFill.classList.toggle('level-warn', snap.noiseDelta >= snap.threshold * 0.72 && snap.noiseDelta < snap.threshold);
+      heatmapNoiseMeterFill.classList.toggle('level-hot', snap.noiseDelta >= snap.threshold);
+    }
+    if (heatmapNoisePeakTick) {
+      heatmapNoisePeakTick.style.left = `${peakPct.toFixed(1)}%`;
+    }
+    if (heatmapNoiseTelemetryText) {
+      heatmapNoiseTelemetryText.textContent = `Noise Δ${Math.round(snap.noiseDelta)} · Peak Δ${Math.round(snap.peakDelta)}`;
+    }
+    renderNoiseGateMarker(appState.heatmapSensitivity ?? 60);
+
+    if (heatmapLiveGatePill) {
+      const gateMap = {
+        idle: ['READY', 'gate-idle'],
+        building: ['DETECTING', 'gate-warn'],
+        below_min: [`< MIN (${snap.changedCells}/${appState.heatmapMinCells || 2})`, 'gate-warn'],
+        valid: [`HIT VALID (${snap.spikeCount}c)`, 'gate-valid'],
+        too_large: [`> MAX (${(snap.changedFraction * 100).toFixed(1)}%)`, 'gate-suppressed'],
+        global_shake: ['SHAKE GATE', 'gate-suppressed']
+      };
+      const [label, cls] = gateMap[snap.gateStatus] || gateMap.idle;
+      heatmapLiveGatePill.textContent = label;
+      heatmapLiveGatePill.className = `heatmap-gate-pill ${cls}`;
+    }
+  });
+
+  // Live Ignore Masks (Draw / Show / Delete / Clear right on Live Viewport)
+  const liveIgnoreLayer = document.getElementById('liveIgnoreLayer');
+  const liveDrawPreview = document.getElementById('liveDrawPreview');
+  const btnLiveMaskDraw = document.getElementById('btnLiveMaskDraw');
+  const btnLiveMasksVisible = document.getElementById('btnLiveMasksVisible');
+  const btnLiveClearMasks = document.getElementById('btnLiveClearMasks');
+  const liveMaskDrawHint = document.getElementById('liveMaskDrawHint');
+  let clearMasksArmTimer = null;
+  let clearMasksArmed = false;
+  let liveDrawStart = null;
+
+  function resetClearMasksArm() {
+    clearMasksArmed = false;
+    clearTimeout(clearMasksArmTimer);
+    if (btnLiveClearMasks) {
+      btnLiveClearMasks.textContent = 'Clear All';
+      btnLiveClearMasks.classList.remove('radar-btn-armed');
+    }
+  }
+
+  function renderLiveIgnoreMasks() {
+    if (!liveIgnoreLayer) return;
+    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+    const showMasks = Boolean(appState.heatmapSetupOpen && appState.liveMasksVisible);
+    const drawActive = Boolean(appState.heatmapSetupOpen && appState.liveMaskDrawActive);
+
+    if (btnLiveMasksVisible) {
+      btnLiveMasksVisible.disabled = masks.length === 0;
+      btnLiveMasksVisible.classList.toggle('radar-btn-active', showMasks && masks.length > 0);
+      btnLiveMasksVisible.textContent = showMasks ? `👁 Masks (${masks.length})` : `🙈 Hidden (${masks.length})`;
+    }
+    if (btnLiveMaskDraw) {
+      btnLiveMaskDraw.classList.toggle('radar-btn-active', drawActive);
+      btnLiveMaskDraw.textContent = drawActive ? '✓ Done Drawing' : '✎ Draw Mask';
+    }
+    if (btnLiveClearMasks) {
+      btnLiveClearMasks.classList.toggle('hidden', masks.length === 0);
+      if (masks.length === 0) resetClearMasksArm();
+    }
+    if (liveMaskDrawHint) {
+      liveMaskDrawHint.classList.toggle('hidden', !drawActive);
+    }
+
+    liveIgnoreLayer.classList.toggle('hidden', !showMasks && !drawActive);
+    liveIgnoreLayer.classList.toggle('mask-draw-active', drawActive);
+    liveIgnoreLayer.classList.toggle('mask-edit-active', showMasks);
+
+    liveIgnoreLayer.innerHTML = '';
+    if (!showMasks) return;
+
+    const proj = getLiveViewportProjection();
+    masks.forEach((m, idx) => {
+      const box = document.createElement('div');
+      box.className = 'live-ignore-box';
+      const leftPct = ((m.x * proj.vw - proj.sx) / proj.cropW) * 100;
+      const topPct = ((m.y * proj.vh - proj.sy) / proj.cropH) * 100;
+      const widthPct = ((m.w * proj.vw) / proj.cropW) * 100;
+      const heightPct = ((m.h * proj.vh) / proj.cropH) * 100;
+      box.style.left = `${leftPct.toFixed(2)}%`;
+      box.style.top = `${topPct.toFixed(2)}%`;
+      box.style.width = `${widthPct.toFixed(2)}%`;
+      box.style.height = `${heightPct.toFixed(2)}%`;
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'live-ignore-box-remove';
+      rm.title = 'Remove ignore zone';
+      rm.textContent = '×';
+      rm.addEventListener('pointerdown', (e) => e.stopPropagation());
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = masks.filter((_, i) => i !== idx);
+        updateState({ heatmapIgnoreMasks: next });
+        saveSettings(appState);
+      });
+      box.appendChild(rm);
+      liveIgnoreLayer.appendChild(box);
+    });
+  }
+
+  btnLiveMaskDraw?.addEventListener('click', () => {
+    const next = !appState.liveMaskDrawActive;
+    updateState({
+      liveMaskDrawActive: next,
+      ...(next ? { liveMasksVisible: true } : {})
     });
   });
 
-  sliderHeatmapMinCells?.addEventListener('input', (e) => {
-    const val = Number(e.target.value) || 2;
-    syncMinCellsUI(val);
-    updateState({ heatmapMinCells: val });
+  btnLiveMasksVisible?.addEventListener('click', () => {
+    updateState({ liveMasksVisible: !appState.liveMasksVisible });
+  });
+
+  btnLiveClearMasks?.addEventListener('click', () => {
+    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+    if (!masks.length) return;
+    if (!clearMasksArmed) {
+      clearMasksArmed = true;
+      btnLiveClearMasks.textContent = 'Confirm Clear?';
+      btnLiveClearMasks.classList.add('radar-btn-armed');
+      clearTimeout(clearMasksArmTimer);
+      clearMasksArmTimer = setTimeout(resetClearMasksArm, 2500);
+      return;
+    }
+    resetClearMasksArm();
+    updateState({ liveMaskDrawActive: false });
+    clearHeatmapIgnoreZones();
     saveSettings(appState);
+  });
+
+  liveIgnoreLayer?.addEventListener('pointerdown', (e) => {
+    if (!appState.liveMaskDrawActive || e.target.closest('.live-ignore-box-remove')) return;
+    const rect = liveIgnoreLayer.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const vx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const vy = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    liveDrawStart = { vx, vy, pointerId: e.pointerId };
+    liveIgnoreLayer.setPointerCapture(e.pointerId);
+    if (liveDrawPreview) {
+      liveDrawPreview.classList.remove('hidden');
+      liveDrawPreview.style.left = `${(vx * 100).toFixed(2)}%`;
+      liveDrawPreview.style.top = `${(vy * 100).toFixed(2)}%`;
+      liveDrawPreview.style.width = '0%';
+      liveDrawPreview.style.height = '0%';
+    }
+  });
+
+  liveIgnoreLayer?.addEventListener('pointermove', (e) => {
+    if (!liveDrawStart || !liveDrawPreview) return;
+    const rect = liveIgnoreLayer.getBoundingClientRect();
+    const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    liveDrawPreview.style.left = `${(Math.min(liveDrawStart.vx, curX) * 100).toFixed(2)}%`;
+    liveDrawPreview.style.top = `${(Math.min(liveDrawStart.vy, curY) * 100).toFixed(2)}%`;
+    liveDrawPreview.style.width = `${(Math.abs(curX - liveDrawStart.vx) * 100).toFixed(2)}%`;
+    liveDrawPreview.style.height = `${(Math.abs(curY - liveDrawStart.vy) * 100).toFixed(2)}%`;
+  });
+
+  const finishLiveMaskDraw = (e) => {
+    if (!liveDrawStart) return;
+    const rect = liveIgnoreLayer.getBoundingClientRect();
+    const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    const vx0 = Math.min(liveDrawStart.vx, curX);
+    const vy0 = Math.min(liveDrawStart.vy, curY);
+    const vwFrac = Math.abs(curX - liveDrawStart.vx);
+    const vhFrac = Math.abs(curY - liveDrawStart.vy);
+    liveDrawStart = null;
+    liveDrawPreview?.classList.add('hidden');
+
+    if (vwFrac >= 0.025 && vhFrac >= 0.025) {
+      const proj = getLiveViewportProjection();
+      const srcX = (proj.sx + vx0 * proj.cropW) / proj.vw;
+      const srcY = (proj.sy + vy0 * proj.cropH) / proj.vh;
+      const srcW = (vwFrac * proj.cropW) / proj.vw;
+      const srcH = (vhFrac * proj.cropH) / proj.vh;
+      addHeatmapIgnoreZone({ x: srcX, y: srcY, w: srcW, h: srcH });
+      saveSettings(appState);
+    }
+  };
+  liveIgnoreLayer?.addEventListener('pointerup', finishLiveMaskDraw);
+  liveIgnoreLayer?.addEventListener('pointercancel', () => {
+    liveDrawStart = null;
+    liveDrawPreview?.classList.add('hidden');
+  });
+  window.addEventListener('resize', () => {
+    if (appState.heatmapSetupOpen) renderLiveIgnoreMasks();
   });
 
   function setHeatmapDuration(dur) {
@@ -826,51 +1218,75 @@ export function initSidebarAndTopControls(videoEl) {
     }
   });
 
-  function syncVoiceToggleUI(isEnabled) {
+  const btnToggleVoiceAnnounce = document.getElementById('btnToggleVoiceAnnounce');
+  const voiceModeLabel = document.getElementById('voiceModeLabel');
+
+  function syncVoiceToggleUI(isEnabled, mode = appState.detectionCalloutMode) {
     const isVoiceOn = Boolean(isEnabled);
+    const isPoa = mode === 'poa';
     if (btnToggleVoiceAnnounce) {
       btnToggleVoiceAnnounce.classList.toggle('radar-btn-active', isVoiceOn);
       btnToggleVoiceAnnounce.classList.toggle('radar-btn-muted', !isVoiceOn);
-      btnToggleVoiceAnnounce.title = isVoiceOn
-        ? 'Voice Announcements: ON (Click to Mute)'
-        : 'Voice Announcements: MUTED (Click to Enable)';
+      btnToggleVoiceAnnounce.classList.toggle('voice-mode-poi', isVoiceOn && !isPoa);
+      btnToggleVoiceAnnounce.classList.toggle('voice-mode-poa', isVoiceOn && isPoa);
+      btnToggleVoiceAnnounce.title = !isVoiceOn
+        ? 'Voice Callouts: OFF — Tap to cycle OFF → POI → POA'
+        : isPoa
+          ? 'Voice Callouts: POA (Turret adjust clicks) — Tap to Mute'
+          : 'Voice Callouts: POI (Impact location) — Tap for POA';
+      if (voiceModeLabel) {
+        voiceModeLabel.textContent = !isVoiceOn ? 'OFF' : (isPoa ? 'POA' : 'POI');
+      }
       const iconVoiceOn = document.getElementById('iconVoiceOn');
       const iconVoiceMuted = document.getElementById('iconVoiceMuted');
       if (iconVoiceOn) iconVoiceOn.classList.toggle('hidden', !isVoiceOn);
       if (iconVoiceMuted) iconVoiceMuted.classList.toggle('hidden', isVoiceOn);
     }
     if (btnToggleHeatmapSpeech) {
-      btnToggleHeatmapSpeech.textContent = isVoiceOn ? 'VOICE: ON' : 'VOICE: OFF';
+      btnToggleHeatmapSpeech.textContent = !isVoiceOn ? 'VOICE: OFF' : (isPoa ? 'VOICE: POA' : 'VOICE: POI');
       btnToggleHeatmapSpeech.classList.toggle('radar-btn-active', isVoiceOn);
     }
   }
 
-  function toggleVoiceSpeech(e) {
+  function cycleVoiceMode(e) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    const next = !appState.heatmapSpeechEnabled;
-    updateState({ heatmapSpeechEnabled: next });
-    saveSettings(appState);
-    syncVoiceToggleUI(next);
-    if (next) {
-      speakDetectionAnnouncement('Voice callouts active');
+    const wasOn = Boolean(appState.heatmapSpeechEnabled);
+    const wasPoa = appState.detectionCalloutMode === 'poa';
+    let nextSpeech = true;
+    let nextMode = 'poi';
+
+    if (!wasOn) {
+      nextSpeech = true;
+      nextMode = 'poi';
+    } else if (!wasPoa) {
+      nextSpeech = true;
+      nextMode = 'poa';
     } else {
+      nextSpeech = false;
+      nextMode = 'poi';
+    }
+
+    updateState({ heatmapSpeechEnabled: nextSpeech, detectionCalloutMode: nextMode });
+    saveSettings(appState);
+    syncVoiceToggleUI(nextSpeech, nextMode);
+    if (nextSpeech && !wasOn) {
+      speakDetectionAnnouncement('Voice callouts active');
+    } else if (!nextSpeech) {
       stopVoiceAnnouncement();
     }
   }
 
   if (btnToggleHeatmapSpeech) {
-    btnToggleHeatmapSpeech.addEventListener('click', toggleVoiceSpeech);
+    btnToggleHeatmapSpeech.addEventListener('click', cycleVoiceMode);
   }
 
-  // Top-Left Floating Strip Voice Toggle Button
-  const btnToggleVoiceAnnounce = document.getElementById('btnToggleVoiceAnnounce');
   if (btnToggleVoiceAnnounce) {
-    btnToggleVoiceAnnounce.addEventListener('click', toggleVoiceSpeech);
+    btnToggleVoiceAnnounce.addEventListener('click', cycleVoiceMode);
   }
-  syncVoiceToggleUI(Boolean(appState.heatmapSpeechEnabled));
+  syncVoiceToggleUI(Boolean(appState.heatmapSpeechEnabled), appState.detectionCalloutMode);
 
   // Voice Customization (Pitch & Speed)
   if (sliderVoicePitch && valVoicePitch) {
@@ -897,16 +1313,50 @@ export function initSidebarAndTopControls(videoEl) {
     });
   }
 
-  // Voice Keyword Customization
+  // Voice Keyword & POI/POA Mode Customization
   const inputVoiceAlertKeyword = document.getElementById('inputVoiceAlertKeyword');
   const inputVoiceUnitKeyword = document.getElementById('inputVoiceUnitKeyword');
+  const btnCalloutModePoi = document.getElementById('btnCalloutModePoi');
+  const btnCalloutModePoa = document.getElementById('btnCalloutModePoa');
+  const calloutModeDesc = document.getElementById('calloutModeDesc');
+
+  function getAuditionPhrase(prefixOverride, unitOverride) {
+    const prefix = (prefixOverride ?? appState.voiceAlertKeyword ?? 'Detection').trim();
+    const unit = (unitOverride ?? appState.voiceUnitKeyword ?? 'clicks').trim();
+    const isPoa = appState.detectionCalloutMode === 'poa';
+    return isPoa
+      ? `${prefix}! 3 ${unit} left, 2 ${unit} down`
+      : `${prefix}! 3 ${unit} right, 2 ${unit} up`;
+  }
 
   function updateAuditionButtonText() {
     if (!btnTestVoiceSettings) return;
-    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
-    const unit = (appState.voiceUnitKeyword || 'clicks').trim();
-    btnTestVoiceSettings.textContent = `AUDITION: "${prefix}! 11 o'clock, 3 ${unit}"`;
+    btnTestVoiceSettings.textContent = `AUDITION: "${getAuditionPhrase()}"`;
   }
+
+  function syncCalloutModeUI(mode) {
+    const isPoa = mode === 'poa';
+    btnCalloutModePoi?.classList.toggle('radar-btn-active', !isPoa);
+    btnCalloutModePoa?.classList.toggle('radar-btn-active', isPoa);
+    if (calloutModeDesc) {
+      calloutModeDesc.textContent = isPoa
+        ? 'POA: turret clicks to dial hit back to center'
+        : 'POI: where hit landed relative to reticle';
+    }
+    syncVoiceToggleUI(Boolean(appState.heatmapSpeechEnabled), mode);
+    updateAuditionButtonText();
+  }
+
+  function setCalloutMode(nextMode) {
+    const normalized = nextMode === 'poa' ? 'poa' : 'poi';
+    updateState({ detectionCalloutMode: normalized });
+    saveSettings(appState);
+    syncCalloutModeUI(normalized);
+  }
+
+  btnCalloutModePoi?.addEventListener('click', () => setCalloutMode('poi'));
+  btnCalloutModePoa?.addEventListener('click', () => setCalloutMode('poa'));
+  syncCalloutModeUI(appState.detectionCalloutMode);
 
   if (inputVoiceAlertKeyword) {
     inputVoiceAlertKeyword.value = appState.voiceAlertKeyword || 'Detection';
@@ -939,23 +1389,14 @@ export function initSidebarAndTopControls(videoEl) {
       updateState({ voiceAlertKeyword: prefix, voiceUnitKeyword: unit });
       saveSettings(appState);
       updateAuditionButtonText();
-      speakDetectionAnnouncement(`${prefix}! 11 o'clock, 3 ${unit}`);
+      speakDetectionAnnouncement(getAuditionPhrase(prefix, unit));
     });
   });
 
   updateAuditionButtonText();
 
   btnTestVoiceSettings?.addEventListener('click', () => {
-    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
-    const unit = (appState.voiceUnitKeyword || 'clicks').trim();
-    speakDetectionAnnouncement(`${prefix}! 11 o'clock, 3 ${unit}`);
-  });
-
-  sliderHeatmapSens.addEventListener('input', (e) => {
-    const sens = Number(e.target.value) || 60;
-    valHeatmapSens.textContent = `${sens}%`;
-    updateState({ heatmapSensitivity: sens });
-    saveSettings(appState);
+    speakDetectionAnnouncement(getAuditionPhrase());
   });
 
   // 11. Image Manipulation Sliders & Toggles
@@ -1109,6 +1550,33 @@ export function initSidebarAndTopControls(videoEl) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+    heatmapDockGroup?.classList.toggle('is-heatmap-on', Boolean(state.heatmapEnabled));
+    const setupOpen = Boolean(state.heatmapSetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
+    if (state.heatmapSetupOpen && !setupOpen) {
+      queueMicrotask(() => setHeatmapSetupOpen(false));
+    }
+    heatmapTunePopover?.classList.toggle('hidden', !setupOpen);
+    if (btnHeatmapTune) {
+      btnHeatmapTune.classList.toggle('radar-btn-active', setupOpen);
+      btnHeatmapTune.setAttribute('aria-expanded', setupOpen ? 'true' : 'false');
+    }
+    if (
+      patch.heatmapSetupOpen !== undefined ||
+      patch.heatmapIgnoreMasks !== undefined ||
+      patch.liveMasksVisible !== undefined ||
+      patch.liveMaskDrawActive !== undefined ||
+      patch.mainZoom !== undefined ||
+      patch.mainPanX !== undefined ||
+      patch.mainPanY !== undefined ||
+      patch.currentScreen !== undefined
+    ) {
+      renderLiveIgnoreMasks();
+    }
+    if (patch.heatmapSensitivity !== undefined) syncSensitivityUI(state.heatmapSensitivity);
+    if (patch.heatmapMinCells !== undefined) syncMinCellsUI(state.heatmapMinCells);
+    if (patch.heatmapMaxAreaPct !== undefined || patch.heatmapMinCells !== undefined) {
+      syncMaxAreaUI(state.heatmapMaxAreaPct, state.heatmapMinCells);
+    }
     const detectorActive = Boolean(state.heatmapEnabled || state.heatmapSpeechEnabled);
     if (btnLiveRezero) {
       btnLiveRezero.disabled = !detectorActive;
@@ -1119,9 +1587,11 @@ export function initSidebarAndTopControls(videoEl) {
       btnLiveAimLoupe.disabled = !hasHits;
       btnLiveAimLoupe.classList.toggle('dock-btn-dimmed', !hasHits);
     }
-    syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled));
+    syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled), state.detectionCalloutMode);
+    if (patch.detectionCalloutMode !== undefined) {
+      syncCalloutModeUI(state.detectionCalloutMode);
+    }
     syncAutoSaveUI(Boolean(state.heatmapAutoSave));
-    btnToggleHud.classList.toggle('radar-btn-active', state.hudOpen);
 
     btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
     bufferDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
@@ -1130,7 +1600,8 @@ export function initSidebarAndTopControls(videoEl) {
       : 'RAM OFF';
 
     // Update Memory Availability Meter in Settings
-    valBufferResolution.textContent = `${state.streamWidth}×${state.streamHeight}`;
+    const bufDims = getBufferedTargetDimensions(state.streamWidth, state.streamHeight);
+    valBufferResolution.textContent = `${bufDims.width}×${bufDims.height}`;
     const usedMB = (state.bufferBytes / (1024 * 1024)).toFixed(1);
     const estMB = getEstimatedBufferMB();
     const maxBudgetMB = getAvailableMemoryBudgetMB();
@@ -1143,9 +1614,7 @@ export function initSidebarAndTopControls(videoEl) {
     memBarUsedFill.style.width = `${usedPct}%`;
 
     mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
-    const atDefaultZoom = state.mainZoom <= 1.01;
-    mainZoomReset.disabled = atDefaultZoom;
-    mainZoomReset.classList.toggle('dock-btn-dimmed', atDefaultZoom);
+    mainZoomBadge.classList.toggle('zoom-can-reset', state.mainZoom > 1.01);
 
     btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
     btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);

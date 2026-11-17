@@ -6,11 +6,11 @@
  * For RTSP streams, ingests incoming JPEG frames directly with zero canvas
  * readback or double-JPEG re-encoding.
  */
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { subscribeRtspJpegFrames } from '../camera/streamManager.js';
-import { getSoundPeak, initSoundSampler } from '../audio/soundSampler.js';
+import { getSoundPeak, initSoundSampler, stopSoundSampler } from '../audio/soundSampler.js';
 
-let frameRing = []; // Array of { timestampMs, jpegBuffer, width, height, soundPeak }
+let frameRing = []; // Array of { timestampMs, perfMs, jpegBuffer, width, height, soundPeak }
 let ringEvents = []; // Array of { timestampMs, type }
 let totalBytes = 0;
 let captureInterval = null;
@@ -21,6 +21,33 @@ let encodingInProgress = false;
 let currentVideoEl = null;
 let lastBufferStateUpdateTime = 0;
 let lastRtspCaptureMs = 0;
+let pausedAtMs = appState.currentScreen !== 'live' ? performance.now() : null;
+
+function rebasePausedTimeline(nowMs = performance.now()) {
+  if (pausedAtMs === null) return;
+  const deltaMs = Math.max(0, nowMs - pausedAtMs);
+  pausedAtMs = null;
+  if (deltaMs > 0) {
+    for (const f of frameRing) {
+      f.timestampMs += deltaMs;
+    }
+    for (const e of ringEvents) {
+      e.timestampMs += deltaMs;
+    }
+  }
+  lastBufferStateUpdateTime = 0;
+  lastRtspCaptureMs = 0;
+}
+
+subscribeState((state) => {
+  if (state.currentScreen !== 'live') {
+    if (pausedAtMs === null) {
+      pausedAtMs = performance.now();
+    }
+  } else if (pausedAtMs !== null) {
+    rebasePausedTimeline(performance.now());
+  }
+});
 
 /**
  * Records an external detection event (e.g. Micro-Change Heatmap target hit)
@@ -52,9 +79,22 @@ export function getAvailableMemoryBudgetMB() {
   return Math.round(Math.min(768, Math.max(150, deviceGB * 90)));
 }
 
+export function getBufferedTargetDimensions(nativeW, nativeH) {
+  const nw = nativeW || appState.streamWidth || 1920;
+  const nh = nativeH || appState.streamHeight || 1080;
+  if (appState.bufferFastQuality !== false && !appState.isRtspStream && nh > 720) {
+    const scale = 720 / nh;
+    return {
+      width: Math.max(2, Math.round((nw * scale) / 2) * 2),
+      height: 720
+    };
+  }
+  return { width: nw, height: nh };
+}
+
 /**
  * Estimates how many MB of RAM the configured (bufferMaxSeconds × bufferTargetFps)
- * will consume at the current stream resolution.
+ * will consume at the current capture resolution.
  */
 export function getEstimatedBufferMB() {
   const totalTargetFrames = appState.bufferMaxSeconds * appState.bufferTargetFps;
@@ -62,15 +102,19 @@ export function getEstimatedBufferMB() {
     const avgBytes = totalBytes / frameRing.length;
     return Number(((avgBytes * totalTargetFrames) / (1024 * 1024)).toFixed(1));
   }
-  // Fallback estimate based on pixel count (~0.055 bytes per pixel for JPEG q=0.84)
-  const pixels = (appState.streamWidth || 1920) * (appState.streamHeight || 1080);
-  const estFrameBytes = pixels * 0.055;
+  const { width, height } = getBufferedTargetDimensions();
+  const bytesPerPixel = appState.bufferFastQuality !== false && !appState.isRtspStream ? 0.045 : 0.055;
+  const estFrameBytes = width * height * bytesPerPixel;
   return Number(((estFrameBytes * totalTargetFrames) / (1024 * 1024)).toFixed(1));
 }
 
 function appendFrameToRing(jpegBuffer, width, height, capturedAt, soundPeak, targetFps) {
+  if (pausedAtMs !== null) {
+    rebasePausedTimeline(capturedAt);
+  }
   frameRing.push({
     timestampMs: capturedAt,
+    perfMs: capturedAt,
     jpegBuffer,
     width,
     height,
@@ -85,8 +129,8 @@ function appendFrameToRing(jpegBuffer, width, height, capturedAt, soundPeak, tar
 
   while (
     frameRing.length > maxFrames ||
-    (frameRing.length > 2 && frameRing[0].timestampMs < cutoff) ||
-    (frameRing.length > 2 && totalBytes > maxBudgetBytes)
+    (frameRing.length > 1 && frameRing[0].timestampMs < cutoff) ||
+    (frameRing.length > 1 && totalBytes > maxBudgetBytes)
   ) {
     const old = frameRing.shift();
     totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
@@ -125,12 +169,17 @@ export function startMemoryBuffer(videoEl) {
   }
   if (!appState.bufferEnabled || !currentVideoEl) return;
 
-  // Initialize sound sampler if mic available
-  initSoundSampler().catch(() => {});
+  // Opt-in microphone sound sampler (avoids launch-time mic prompts in the field)
+  if (appState.bufferMicEnabled) {
+    initSoundSampler().catch(() => {});
+  } else {
+    stopSoundSampler();
+  }
 
   const targetFps = Math.max(5, Math.min(30, appState.bufferTargetFps || 15));
   const intervalMs = Math.round(1000 / targetFps);
   const minRtspIntervalMs = (1000 / targetFps) * 0.92;
+  const jpegQuality = appState.bufferFastQuality !== false ? 0.75 : 0.84;
 
   // Direct zero-reencode RTSP JPEG ingestion
   rtspUnsubscribe = subscribeRtspJpegFrames((jpegBytes, w, h, nowMs) => {
@@ -148,7 +197,7 @@ export function startMemoryBuffer(videoEl) {
       w || appState.streamWidth || 1920,
       h || appState.streamHeight || 1080,
       nowMs,
-      getSoundPeak(),
+      appState.bufferMicEnabled ? getSoundPeak() : 0,
       targetFps
     );
   });
@@ -167,30 +216,31 @@ export function startMemoryBuffer(videoEl) {
 
     const nativeW = source.videoWidth || source.width || appState.streamWidth || 1920;
     const nativeH = source.videoHeight || source.height || appState.streamHeight || 1080;
+    const { width: capW, height: capH } = getBufferedTargetDimensions(nativeW, nativeH);
 
-    if (captureCanvas.width !== nativeW || captureCanvas.height !== nativeH) {
-      captureCanvas.width = nativeW;
-      captureCanvas.height = nativeH;
+    if (captureCanvas.width !== capW || captureCanvas.height !== capH) {
+      captureCanvas.width = capW;
+      captureCanvas.height = capH;
     }
 
     encodingInProgress = true;
     const capturedAt = performance.now();
-    const currentPeak = getSoundPeak();
+    const currentPeak = appState.bufferMicEnabled ? getSoundPeak() : 0;
 
     try {
-      captureCtx.drawImage(source, 0, 0, nativeW, nativeH);
+      captureCtx.drawImage(source, 0, 0, capW, capH);
       captureCanvas.toBlob(
         async (blob) => {
           try {
             if (!blob || !appState.bufferEnabled || appState.currentScreen !== 'live') return;
             const jpegBuffer = await blob.arrayBuffer();
-            appendFrameToRing(jpegBuffer, nativeW, nativeH, capturedAt, currentPeak, targetFps);
+            appendFrameToRing(jpegBuffer, capW, capH, capturedAt, currentPeak, targetFps);
           } finally {
             encodingInProgress = false;
           }
         },
         'image/jpeg',
-        0.84
+        jpegQuality
       );
     } catch {
       encodingInProgress = false;
@@ -223,7 +273,35 @@ export function stopMemoryBuffer() {
   encodingInProgress = false;
   lastBufferStateUpdateTime = 0;
   lastRtspCaptureMs = 0;
+  pausedAtMs = appState.currentScreen !== 'live' ? performance.now() : null;
+  stopSoundSampler();
   updateState({ bufferedSeconds: 0, bufferBytes: 0 });
+}
+
+function mapHitPerfToTimelineMs(hitPerfMs, firstTs, lastTs) {
+  if (!frameRing.length || typeof hitPerfMs !== 'number' || !Number.isFinite(hitPerfMs)) {
+    return null;
+  }
+  const firstPerf = frameRing[0].perfMs ?? firstTs;
+  const lastPerf = frameRing[frameRing.length - 1].perfMs ?? lastTs;
+  if (hitPerfMs < firstPerf - 350 || hitPerfMs > lastPerf + 150) {
+    return null;
+  }
+  if (hitPerfMs <= firstPerf) return firstTs;
+  if (hitPerfMs >= lastPerf) return lastTs;
+
+  let lo = 0;
+  let hi = frameRing.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const midPerf = frameRing[mid].perfMs ?? frameRing[mid].timestampMs;
+    if (midPerf < hitPerfMs) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return frameRing[lo].timestampMs;
 }
 
 export async function snapshotMemoryBuffer() {
@@ -231,7 +309,8 @@ export async function snapshotMemoryBuffer() {
 
   const maxSec = appState.bufferMaxSeconds || 20;
   const now = performance.now();
-  const cutoff = now - maxSec * 1000;
+  const effectivePauseMs = pausedAtMs !== null ? Math.max(0, now - pausedAtMs) : 0;
+  const cutoff = now - effectivePauseMs - maxSec * 1000;
   while (frameRing.length > 1 && frameRing[0].timestampMs < cutoff) {
     const old = frameRing.shift();
     totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
@@ -240,7 +319,8 @@ export async function snapshotMemoryBuffer() {
 
   const firstTs = frameRing[0].timestampMs;
   const lastTs = frameRing[frameRing.length - 1].timestampMs;
-  const durationSec = Math.max(0.5, Math.min(maxSec, (lastTs - firstTs) / 1000));
+  const rawSpanSec = Math.max(0.05, (lastTs - firstTs) / 1000);
+  const durationSec = Math.max(0.5, Math.min(maxSec, rawSpanSec));
   const lastFrame = frameRing[frameRing.length - 1];
 
   // Zero-copy snapshot: frameRing never mutates individual ArrayBuffer contents
@@ -248,7 +328,7 @@ export async function snapshotMemoryBuffer() {
   const frameTimestamps = frameRing.map((f) => Number(((f.timestampMs - firstTs) / 1000).toFixed(3)));
   const effectiveFps =
     frameRing.length > 1
-      ? Math.max(1, Math.min(60, Math.round((frameRing.length - 1) / durationSec)))
+      ? Math.max(1, Math.min(60, Math.round((frameRing.length - 1) / rawSpanSec)))
       : appState.bufferTargetFps || 15;
 
   // Downsample sound peaks to up to 80 bins across duration
@@ -268,16 +348,16 @@ export async function snapshotMemoryBuffer() {
 
   // Calculate events relative to the start of the recording in seconds
   // Group events occurring within the same second into a single event timestamp
-  const spanSec = Math.max(0.5, (lastTs - firstTs) / 1000);
-  const tailCutoffTs = Math.max(lastTs, performance.now()) + 150;
-  const hitPerfTimestamps = Array.isArray(appState.detectionHits)
+  const spanSec = Math.max(0.5, rawSpanSec);
+  const tailCutoffTs = Math.max(lastTs, now - effectivePauseMs) + 150;
+  const hitTimelineTimestamps = Array.isArray(appState.detectionHits)
     ? appState.detectionHits
-      .map((h) => h?.perfMs)
+      .map((h) => mapHitPerfToTimelineMs(h?.perfMs, firstTs, lastTs))
       .filter((t) => typeof t === 'number' && Number.isFinite(t))
     : [];
   const allEventTimestamps = [
     ...ringEvents.map((e) => e.timestampMs),
-    ...hitPerfTimestamps
+    ...hitTimelineTimestamps
   ];
   const rawEvents = allEventTimestamps
     .filter((ts) => ts >= firstTs - 350 && ts <= tailCutoffTs)

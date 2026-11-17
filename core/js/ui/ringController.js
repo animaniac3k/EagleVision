@@ -22,9 +22,9 @@ import { appState, updateState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
-export const ZOOM_CYCLE_STOPS = [1.0, 1.5, 2.0, 2.5, 3.0];
+const ZOOM_CYCLE_STOPS = [1.0, 1.5, 2.0, 2.5, 3.0];
 
-export const DEFAULT_KEY_MAP = {
+const DEFAULT_KEY_MAP = {
   UP: ['ArrowUp', 'PageUp', 'KeyW'],
   DOWN: ['ArrowDown', 'PageDown', 'KeyS'],
   LEFT: ['ArrowLeft', 'MediaTrackPrevious', 'KeyA'],
@@ -34,18 +34,17 @@ export const DEFAULT_KEY_MAP = {
   BTN2: ['AudioVolumeDown', 'KeyM', 'KeyT', 'Tab', 'KeyB']
 };
 
-export const RING_SWIPE_MAX_MS = 420;
+const RING_SWIPE_MAX_MS = 420;
 const RING_SWIPE_MIN_DIST_PX = 12;
 const SUPPRESS_CLICK_MS = 450;
 
 let learningAction = null;
-let hudFadeTimer = null;
 let lastWheelMs = 0;
 let lastKeyDownMs = 0;
 let suppressNextClickUntil = 0;
 let suppressNextAuxUntil = 0;
 
-export function hasMappedSwipeSignals() {
+function hasMappedSwipeSignals() {
   const map = appState.ringKeyMap || {};
   return Object.values(map).some((v) => typeof v === 'string' && v.includes('Swipe'));
 }
@@ -93,9 +92,6 @@ export function setLearningAction(act) {
 }
 
 export function initRingController() {
-  const ringHudPill = document.getElementById('ringHudPill');
-  const ringModeBadge = document.getElementById('ringModeBadge');
-  const ringActionText = document.getElementById('ringActionText');
   const ringLastSignalEl = document.getElementById('ringLastSignal');
   const ringRawSignalLogEl = document.getElementById('ringRawSignalLog');
   let lastPrimaryRawMs = 0;
@@ -111,23 +107,6 @@ export function initRingController() {
 
   function getCustomRingMap() {
     return appState.ringKeyMap && typeof appState.ringKeyMap === 'object' ? appState.ringKeyMap : {};
-  }
-
-  function flashRingHud(actionSummary) {
-    const modeName = getActiveRemoteMode();
-    if (ringModeBadge) {
-      ringModeBadge.textContent = `REMOTE: ${modeName}`;
-    }
-    if (ringActionText && actionSummary) {
-      ringActionText.textContent = actionSummary;
-    }
-    if (ringHudPill) {
-      ringHudPill.classList.add('ring-hud-active');
-      if (hudFadeTimer) clearTimeout(hudFadeTimer);
-      hudFadeTimer = setTimeout(() => {
-        ringHudPill.classList.remove('ring-hud-active');
-      }, 2600);
-    }
   }
 
   function parseTouchTapCoords(code) {
@@ -201,30 +180,27 @@ export function initRingController() {
   // ACTION EXECUTION (One-Finger Ergonomics)
   // -------------------------------------------------------------------------
 
-  function toggleInstantReplay(label) {
+  function toggleInstantReplay() {
     if (appState.currentScreen === 'gallery') {
       document.getElementById('btnBackToLive')?.click();
-      flashRingHud(`${label}: RETURN TO LIVE FEED`);
       return;
     }
 
     document.getElementById('btnReplay20s')?.click();
-    flashRingHud(`${label}: INSTANT REPLAY`);
   }
 
   function executeBtn1() {
-    toggleInstantReplay('BTN 1');
+    toggleInstantReplay();
   }
 
   function executeBtn2() {
-    toggleInstantReplay('BTN 2');
+    toggleInstantReplay();
   }
 
   function executeCenter() {
     // In Gallery
     if (appState.currentScreen === 'gallery') {
       document.getElementById('btnGalleryPlayPause')?.click();
-      flashRingHud('● PLAY / PAUSE');
       return;
     }
 
@@ -233,7 +209,6 @@ export function initRingController() {
     const nextZoom = ZOOM_CYCLE_STOPS.find((z) => z > curZoom + 0.05) ?? 1.0;
     if (nextZoom <= 1.01) {
       updateState({ mainZoom: 1.0, mainPanX: 0, mainPanY: 0 });
-      flashRingHud('● ZOOM 1.0x (RESET)');
       return;
     }
 
@@ -241,7 +216,6 @@ export function initRingController() {
     const nx = Math.max(-maxPan, Math.min(maxPan, appState.mainPanX || 0));
     const ny = Math.max(-maxPan, Math.min(maxPan, appState.mainPanY || 0));
     updateState({ mainZoom: nextZoom, mainPanX: nx, mainPanY: ny });
-    flashRingHud(`● ZOOM ${nextZoom.toFixed(1)}x`);
   }
 
   function executeDirectionalAction(act) {
@@ -250,16 +224,12 @@ export function initRingController() {
       if (act === 'LEFT') {
         const scrubber = document.getElementById('galleryScrubber');
         scrubRangeElement(scrubber, -1);
-        flashRingHud('◀ REWIND');
       } else if (act === 'RIGHT') {
         document.getElementById('btnGalleryStep')?.click();
-        flashRingHud('▶ STEP +1 FRAME');
       } else if (act === 'UP') {
         document.getElementById('btnGallerySlowMo')?.click();
-        flashRingHud('▲ TOGGLE 0.5x SLOW-MO');
       } else if (act === 'DOWN') {
         document.getElementById('btnToggleGalleryDrawer')?.click();
-        flashRingHud('▼ TOGGLE CLIPS LIST');
       }
       return;
     }
@@ -274,7 +244,6 @@ export function initRingController() {
       if (act === 'LEFT') rx = Math.max(0.03, rx - aimStep);
       if (act === 'RIGHT') rx = Math.min(0.97, rx + aimStep);
       updateState({ roiX: rx, roiY: ry, pipEnabled: true, roiTargetVisible: true });
-      flashRingHud(`LOUPE (${Math.round(rx * 100)}%, ${Math.round(ry * 100)}%)`);
       return;
     }
 
@@ -296,7 +265,6 @@ export function initRingController() {
     if (act === 'RIGHT') nx = Math.min(maxPan, nx + panStep);
 
     updateState({ mainPanX: nx, mainPanY: ny });
-    flashRingHud(`PAN (${Math.round(nx * 100)}, ${Math.round(ny * 100)}) [${zoom.toFixed(1)}x]`);
   }
 
   function handleRingSignal(signalCode) {

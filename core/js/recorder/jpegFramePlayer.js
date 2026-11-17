@@ -7,7 +7,9 @@
  * canvas rendering without redundant clears.
  */
 
-const MAX_CACHED_BITMAPS = 5;
+const MAX_CACHED_BITMAPS = 8;
+const PREFETCH_AHEAD = 3;
+const MAX_INFLIGHT_PREFETCH = 4;
 
 export function createJpegFramePlayer(canvasEl, getViewportTransform) {
   const ctx =
@@ -101,33 +103,57 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
     ctx.drawImage(currentBitmap, sx, sy, cropW, cropH, 0, 0, cw, ch);
   }
 
-  function prefetchNext(fromIdx, gen) {
-    if (gen !== generation || frames.length <= 1 || inflight.size >= 2) return;
-    const nextIdx = (fromIdx + 1) % frames.length;
-    if (bitmapCache.has(nextIdx) || inflight.has(nextIdx)) return;
-    decodeFrame(nextIdx, gen).then((bmp) => {
-      if (bmp && gen === generation && targetIdx === nextIdx && currentIdx !== nextIdx) {
-        currentBitmap = bmp;
-        currentIdx = nextIdx;
-        draw();
-      }
-    });
+  function shouldApplyDecodedFrame(reqIdx) {
+    if (currentBitmap === null || currentIdx < 0) return true;
+    if (reqIdx === targetIdx) return true;
+    if (reqIdx > currentIdx && reqIdx <= targetIdx) return true;
+    // Allow forward/target updates after loop wrap or backward scrub
+    if (targetIdx < currentIdx && reqIdx <= targetIdx) return true;
+    return false;
+  }
+
+  function applyBitmap(idx, bmp) {
+    bitmapCache.delete(idx);
+    bitmapCache.set(idx, bmp);
+    currentBitmap = bmp;
+    currentIdx = idx;
+    draw();
+  }
+
+  function prefetchAhead(fromIdx, gen) {
+    if (gen !== generation || frames.length <= 1 || fromIdx < 0) return;
+    for (let offset = 1; offset <= PREFETCH_AHEAD; offset++) {
+      if (inflight.size >= MAX_INFLIGHT_PREFETCH) break;
+      const nextIdx = (fromIdx + offset) % frames.length;
+      if (nextIdx === fromIdx) break;
+      if (bitmapCache.has(nextIdx) || inflight.has(nextIdx)) continue;
+      decodeFrame(nextIdx, gen).then((bmp) => {
+        if (bmp && gen === generation && shouldApplyDecodedFrame(nextIdx) && currentIdx !== nextIdx) {
+          applyBitmap(nextIdx, bmp);
+        }
+      });
+    }
   }
 
   function pumpDecode() {
-    if (decodingTarget || targetIdx < 0 || targetIdx >= frames.length) return;
-    if (targetIdx === currentIdx && currentBitmap) return;
+    if (targetIdx < 0 || targetIdx >= frames.length) return;
+    if (targetIdx === currentIdx && currentBitmap) {
+      prefetchAhead(targetIdx, generation);
+      return;
+    }
 
     const cached = bitmapCache.get(targetIdx);
     if (cached) {
-      bitmapCache.delete(targetIdx);
-      bitmapCache.set(targetIdx, cached);
-      currentBitmap = cached;
-      currentIdx = targetIdx;
-      draw();
-      prefetchNext(targetIdx, generation);
+      applyBitmap(targetIdx, cached);
+      prefetchAhead(targetIdx, generation);
       return;
     }
+
+    // Keep off-thread lookahead decoding pipelined ahead of targetIdx even while
+    // a current target frame is still decoding.
+    prefetchAhead(targetIdx, generation);
+
+    if (decodingTarget) return;
 
     const reqIdx = targetIdx;
     const gen = generation;
@@ -137,17 +163,14 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
       decodingTarget = false;
       if (gen !== generation) return;
 
-      if (bmp && (reqIdx === targetIdx || currentBitmap === null)) {
-        bitmapCache.delete(reqIdx);
-        bitmapCache.set(reqIdx, bmp);
-        currentBitmap = bmp;
-        currentIdx = reqIdx;
-        draw();
-        prefetchNext(reqIdx, gen);
+      if (bmp && shouldApplyDecodedFrame(reqIdx)) {
+        applyBitmap(reqIdx, bmp);
       }
 
       if (targetIdx !== currentIdx && targetIdx >= 0 && targetIdx < frames.length) {
         pumpDecode();
+      } else {
+        prefetchAhead(targetIdx, gen);
       }
     });
   }
