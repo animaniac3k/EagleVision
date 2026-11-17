@@ -11,7 +11,12 @@ import {
   clearDetectionHits,
   exportAnnotatedCanvasPng
 } from '../renderer/compositor.js';
-import { renderReticleOverlayLayer } from '../renderer/overlayManager.js';
+import {
+  renderReticleOverlayLayer,
+  computeFfpMatchScale,
+  computeReticleBaseScale,
+  getLiveViewportDimensions
+} from '../renderer/overlayManager.js';
 import { saveSettings } from '../storage/settingsStore.js';
 
 let initialized = false;
@@ -116,6 +121,9 @@ export function initDetectionsScreen(subscribeState) {
     hitsTransformLayer.style.setProperty('--hits-inv-scale', invPinScale.toFixed(3));
     hitsTransformLayer.style.transform = `translate3d(${hitsPanPxX.toFixed(1)}px, ${hitsPanPxY.toFixed(1)}px, 0) scale(${hitsZoom.toFixed(3)})`;
     hitsMapViewport.style.cursor = hitsPanning ? 'grabbing' : (hitsZoom > 1.01 ? 'grab' : 'default');
+    if (isHitsActive) {
+      syncHitsReticleOverlay();
+    }
   }
 
   function fitHitsViewportBox() {
@@ -195,12 +203,47 @@ export function initDetectionsScreen(subscribeState) {
     const layerEl = document.getElementById('hitsReticleLayer');
     const svgEl = document.getElementById('hitsReticleSvg');
     const customImg = document.getElementById('hitsReticleCustomImg');
+    if (customImg && !customImg._ffpLoadWired) {
+      customImg._ffpLoadWired = true;
+      customImg.addEventListener('load', () => syncHitsReticleOverlay());
+    }
     const enabled = appState.hitsReticleEnabled !== false;
     if (btnToggleHitsReticle) {
       btnToggleHitsReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
       btnToggleHitsReticle.classList.toggle('radar-btn-active', enabled);
     }
-    renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, 1.0);
+
+    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+    const activeHit = getSelectedHit(hits);
+    const fw = activeHit?.frameW || appState.streamWidth || 1920;
+    const fh = activeHit?.frameH || appState.streamHeight || 1080;
+    const stageW = hitsLayerW || hitsTransformLayer?.clientWidth || fw;
+    const stageH = hitsLayerH || hitsTransformLayer?.clientHeight || fh;
+    const useCustom = appState.overlayType === 'custom' && customImg?.naturalWidth > 0 && customImg?.naturalHeight > 0;
+    const imgW = useCustom ? customImg.naturalWidth : 0;
+    const imgH = useCustom ? customImg.naturalHeight : 0;
+
+    // #hitsTransformLayer already applies CSS scale(hitsZoom) to #hitsReticleLayer:
+    // - In FFP mode, scale by ffpMatchScale so 1 click matches Live's source-pixel distance at all zooms.
+    // - In SFP mode, compensate for hitsLayer size and divide out hitsZoom so reticle stays fixed screen size.
+    const ffpMatchScale = computeFfpMatchScale({
+      stageWidth: stageW,
+      stageHeight: stageH,
+      frameWidth: fw,
+      frameHeight: fh,
+      fitMode: 'contain',
+      customImgWidth: imgW,
+      customImgHeight: imgH
+    });
+    const liveDims = getLiveViewportDimensions();
+    const liveBase = computeReticleBaseScale(liveDims.width, liveDims.height, imgW, imgH);
+    const hitsBase = computeReticleBaseScale(stageW, stageH, imgW, imgH);
+    const sfpMatchScale = (hitsBase > 0 ? liveBase / hitsBase : 1.0) / Math.max(1.0, hitsZoom);
+
+    renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, 1.0, {
+      ffpMatchScale,
+      sfpMatchScale
+    });
   }
 
   function syncHitsPinsVisibility() {
@@ -452,6 +495,7 @@ export function initDetectionsScreen(subscribeState) {
     await exportAnnotatedCanvasPng(tempCanvas, {
       includeReticle: appState.hitsReticleEnabled !== false,
       reticleZoom: 1.0,
+      matchLiveFfp: true,
       prefix: 'SPOTR_Hits',
       drawExtra: async (ctx, w, h) => {
         ctx.save();
@@ -492,6 +536,7 @@ export function initDetectionsScreen(subscribeState) {
       patch.overlayType !== undefined ||
       patch.overlayOpacity !== undefined ||
       patch.overlayScale !== undefined ||
+      patch.reticleFfpMode !== undefined ||
       patch.customOverlayUrl !== undefined ||
       patch.reticleConfig !== undefined ||
       patch.themeColor !== undefined

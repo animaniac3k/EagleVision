@@ -12,7 +12,13 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
 import { getRtspCanvas, getRtspFrameSeq } from '../camera/streamManager.js';
-import { getClickDistanceInPixels, buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from './overlayManager.js';
+import {
+  getClickDistanceInPixels,
+  buildGraduatedCrosshairSvg,
+  computeFfpMatchScale,
+  RETICLE_VIEWBOX_W,
+  RETICLE_VIEWBOX_H
+} from './overlayManager.js';
 import { aimLoupeAtHit } from './zoomWindow.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
@@ -168,7 +174,7 @@ export function clearHeatmapIgnoreZones() {
  */
 export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
   if (!baseCanvas || !baseCanvas.width || !baseCanvas.height) return false;
-  const { includeReticle = true, reticleZoom = null, prefix = 'SPOTR', drawExtra = null } = options;
+  const { includeReticle = true, reticleZoom = null, matchLiveFfp = false, prefix = 'SPOTR', drawExtra = null } = options;
 
   const outCanvas = document.createElement('canvas');
   outCanvas.width = baseCanvas.width;
@@ -186,13 +192,25 @@ export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
     try {
       const zoomVal = reticleZoom !== null ? Math.max(1.0, Number(reticleZoom) || 1.0) : Math.max(1.0, Number(appState.mainZoom) || 1.0);
       const ffpFactor = appState.reticleFfpMode ? zoomVal : 1.0;
-      const scaleVal = ((appState.overlayScale ?? 100) / 100) * ffpFactor;
+      const baseScaleMult = (appState.overlayScale ?? 100) / 100;
       const alpha = Math.max(0.1, Math.min(1, (appState.overlayOpacity ?? 85) / 100));
 
       if (appState.overlayType === 'custom' && appState.customOverlayUrl) {
         await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
+            const matchScale = (matchLiveFfp && appState.reticleFfpMode)
+              ? computeFfpMatchScale({
+                  stageWidth: outCanvas.width,
+                  stageHeight: outCanvas.height,
+                  frameWidth: outCanvas.width,
+                  frameHeight: outCanvas.height,
+                  fitMode: 'contain',
+                  customImgWidth: img.width,
+                  customImgHeight: img.height
+                })
+              : 1.0;
+            const scaleVal = baseScaleMult * ffpFactor * matchScale;
             ctx.save();
             ctx.globalAlpha = alpha;
             const fitScale = Math.min((outCanvas.width * 0.9) / Math.max(1, img.width), (outCanvas.height * 0.9) / Math.max(1, img.height)) * scaleVal;
@@ -206,6 +224,16 @@ export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
           img.src = appState.customOverlayUrl;
         });
       } else {
+        const matchScale = (matchLiveFfp && appState.reticleFfpMode)
+          ? computeFfpMatchScale({
+              stageWidth: outCanvas.width,
+              stageHeight: outCanvas.height,
+              frameWidth: outCanvas.width,
+              frameHeight: outCanvas.height,
+              fitMode: 'contain'
+            })
+          : 1.0;
+        const scaleVal = baseScaleMult * ffpFactor * matchScale;
         const accentColor = appState.themeColor || '#f97316';
         const svgInner = buildGraduatedCrosshairSvg(appState.reticleConfig)
           .replaceAll('var(--radar-accent)', accentColor);

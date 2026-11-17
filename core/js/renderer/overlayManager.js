@@ -14,6 +14,72 @@ export const RETICLE_VIEWBOX_H = 500;
 const reticleMarkupCache = new WeakMap();
 
 /**
+ * Returns the Live viewport dimensions in CSS pixels even when #screenLive is hidden.
+ */
+export function getLiveViewportDimensions() {
+  const vp = document.getElementById('viewportContainer');
+  if (vp && vp.clientWidth > 0 && vp.clientHeight > 0) {
+    return { width: vp.clientWidth, height: vp.clientHeight };
+  }
+  const appRoot = document.getElementById('appRoot');
+  if (appRoot && appRoot.clientWidth > 0 && appRoot.clientHeight > 0) {
+    return { width: appRoot.clientWidth, height: appRoot.clientHeight };
+  }
+  return {
+    width: Math.max(1, window.innerWidth || 1920),
+    height: Math.max(1, window.innerHeight || 1080)
+  };
+}
+
+/**
+ * Computes the base scale multiplier required on a target stage (e.g. Playback, Hits,
+ * or exported PNG) so 1 reticle click spans the exact same number of source camera
+ * pixels as on the Live cover-projected viewport.
+ */
+export function computeFfpMatchScale({
+  stageWidth,
+  stageHeight,
+  frameWidth,
+  frameHeight,
+  fitMode = 'contain',
+  customImgWidth = 0,
+  customImgHeight = 0
+} = {}) {
+  const liveDims = getLiveViewportDimensions();
+  const liveW = Math.max(1, liveDims.width);
+  const liveH = Math.max(1, liveDims.height);
+  const stW = Math.max(1, Number(stageWidth) || liveW);
+  const stH = Math.max(1, Number(stageHeight) || liveH);
+  const srcW = Math.max(1, Number(frameWidth) || appState.streamWidth || 1920);
+  const srcH = Math.max(1, Number(frameHeight) || appState.streamHeight || 1080);
+  const srcAspect = srcW / srcH;
+
+  // Full camera FOV width in CSS px on Live (cover) vs target stage at 1.0x zoom
+  const liveFovW = Math.max(liveW, liveH * srcAspect);
+  const stageFovW = fitMode === 'cover'
+    ? Math.max(stW, stH * srcAspect)
+    : Math.min(stW, stH * srcAspect);
+
+  const liveReticleBase = computeReticleBaseScale(liveW, liveH, customImgWidth, customImgHeight);
+  const stageReticleBase = computeReticleBaseScale(stW, stH, customImgWidth, customImgHeight);
+
+  if (liveFovW <= 0 || stageReticleBase <= 0) return 1.0;
+  return (stageFovW / liveFovW) * (liveReticleBase / stageReticleBase);
+}
+
+/**
+ * Returns the unscaled CSS-px-per-unit factor for either the SVG viewBox or a custom overlay image.
+ */
+export function computeReticleBaseScale(containerW, containerH, customImgWidth = 0, customImgHeight = 0) {
+  const w = Math.max(1, Number(containerW) || 1);
+  const h = Math.max(1, Number(containerH) || 1);
+  if (customImgWidth > 0 && customImgHeight > 0) {
+    return Math.min((w * 0.9) / customImgWidth, (h * 0.9) / customImgHeight);
+  }
+  return Math.min(w / RETICLE_VIEWBOX_W, h / RETICLE_VIEWBOX_H);
+}
+
+/**
  * Returns the exact on-screen pixel distance of 1 reticle click / indent,
  * dynamically taking into account viewport dimensions and Guide Scale (25%..200%).
  */
@@ -266,15 +332,30 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
 /**
  * Shared renderer for any reticle overlay container (Live, Playback, or Hits).
  */
-export function renderReticleOverlayLayer(layerEl, svgEl, customImgEl, state, enabled, zoomForFfp = 1.0) {
+export function renderReticleOverlayLayer(
+  layerEl,
+  svgEl,
+  customImgEl,
+  state,
+  enabled,
+  zoomForFfp = 1.0,
+  options = {}
+) {
   if (!layerEl || !svgEl) return;
   layerEl.classList.toggle('hidden', !enabled);
   if (!enabled) return;
 
   layerEl.style.opacity = String((state.overlayOpacity ?? 75) / 100);
 
-  const ffpFactor = state.reticleFfpMode ? Math.max(1.0, Number(zoomForFfp) || 1.0) : 1.0;
-  const scaleVal = ((state.overlayScale ?? 100) / 100) * ffpFactor;
+  const rawZoom = Math.max(1.0, Number(zoomForFfp) || 1.0);
+  const ffpMatch = Number.isFinite(Number(options.ffpMatchScale)) && Number(options.ffpMatchScale) > 0
+    ? Number(options.ffpMatchScale)
+    : 1.0;
+  const sfpMatch = Number.isFinite(Number(options.sfpMatchScale)) && Number(options.sfpMatchScale) > 0
+    ? Number(options.sfpMatchScale)
+    : 1.0;
+  const zoomFactor = state.reticleFfpMode ? rawZoom * ffpMatch : sfpMatch;
+  const scaleVal = ((state.overlayScale ?? 100) / 100) * zoomFactor;
   svgEl.style.transform = `scale(${scaleVal})`;
   if (customImgEl) customImgEl.style.transform = `scale(${scaleVal})`;
 

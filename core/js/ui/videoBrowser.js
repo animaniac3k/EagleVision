@@ -18,7 +18,7 @@ import {
 import { renderCctvTrack } from './cctvScrubBar.js';
 import { shouldHoldCanvasPan } from './ringController.js';
 import { exportAnnotatedCanvasPng } from '../renderer/compositor.js';
-import { renderReticleOverlayLayer } from '../renderer/overlayManager.js';
+import { renderReticleOverlayLayer, computeFfpMatchScale } from '../renderer/overlayManager.js';
 import { saveSettings } from '../storage/settingsStore.js';
 
 const LIVE_BUFFER_ID = '__live_buffer__';
@@ -42,6 +42,9 @@ let lastPlayBtnText = '';
 let setDrawerOpenFn = null;
 let openingLiveBuffer = false;
 
+let activeClipWidth = 0;
+let activeClipHeight = 0;
+
 function stopPlayerLoop() {
   if (rafId) {
     cancelAnimationFrame(rafId);
@@ -53,6 +56,11 @@ function syncPlaybackReticleOverlay() {
   const layerEl = document.getElementById('galleryReticleLayer');
   const svgEl = document.getElementById('galleryReticleSvg');
   const customImg = document.getElementById('galleryReticleCustomImg');
+  if (customImg && !customImg._ffpLoadWired) {
+    customImg._ffpLoadWired = true;
+    customImg.addEventListener('load', () => syncPlaybackReticleOverlay());
+  }
+  const stageEl = document.getElementById('galleryClipsStage');
   const btnReticle = document.getElementById('btnTogglePlaybackReticle');
   const enabled = Boolean(appState.playbackReticleEnabled);
 
@@ -60,7 +68,25 @@ function syncPlaybackReticleOverlay() {
     btnReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
     btnReticle.classList.toggle('radar-btn-active', enabled);
   }
-  renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, galleryZoom);
+
+  const stageW = stageEl?.clientWidth || window.innerWidth || 1920;
+  const stageH = stageEl?.clientHeight || window.innerHeight || 1080;
+  const frameW = activeClipWidth || appState.streamWidth || 1920;
+  const frameH = activeClipHeight || appState.streamHeight || 1080;
+  const useCustom = appState.overlayType === 'custom' && customImg?.naturalWidth > 0 && customImg?.naturalHeight > 0;
+  const ffpMatchScale = computeFfpMatchScale({
+    stageWidth: stageW,
+    stageHeight: stageH,
+    frameWidth: frameW,
+    frameHeight: frameH,
+    fitMode: 'contain',
+    customImgWidth: useCustom ? customImg.naturalWidth : 0,
+    customImgHeight: useCustom ? customImg.naturalHeight : 0
+  });
+
+  renderReticleOverlayLayer(layerEl, svgEl, customImg, appState, enabled, galleryZoom, {
+    ffpMatchScale
+  });
 }
 
 function disarmDeleteBtn(btn) {
@@ -329,8 +355,11 @@ async function selectClip(clip, autoPlay = true) {
   const canvasEl = document.getElementById('galleryPlayerCanvas');
   const scrubber = document.getElementById('galleryScrubber');
 
-  canvasEl.width = clip.width || 1920;
-  canvasEl.height = clip.height || 1080;
+  activeClipWidth = clip.width || 1920;
+  activeClipHeight = clip.height || 1080;
+  canvasEl.width = activeClipWidth;
+  canvasEl.height = activeClipHeight;
+  syncPlaybackReticleOverlay();
 
   clipDuration = Math.max(0.5, Number(clip.durationSec) || 0.5);
   playheadSec = 0;
@@ -706,6 +735,7 @@ export function initVideoBrowser() {
     await exportAnnotatedCanvasPng(canvasEl, {
       includeReticle: Boolean(appState.playbackReticleEnabled),
       reticleZoom: galleryZoom,
+      matchLiveFfp: true,
       prefix: 'SPOTR_Clip'
     });
   });
@@ -739,6 +769,12 @@ export function initVideoBrowser() {
       selectedClipId = null;
       await refreshGalleryClips(true);
     });
+  });
+
+  window.addEventListener('resize', () => {
+    if (appState.currentScreen === 'gallery' && appState.galleryArchiveTab !== 'hits') {
+      syncPlaybackReticleOverlay();
+    }
   });
 
   syncPlaybackReticleOverlay();
