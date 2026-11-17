@@ -318,6 +318,9 @@ export function initRingController() {
     );
 
     if (!action) return false;
+    if (appState.currentScreen !== 'live' && appState.currentScreen !== 'gallery') {
+      return false;
+    }
 
     if (action === 'BTN1') {
       executeBtn1();
@@ -448,12 +451,19 @@ export function initRingController() {
     (e) => {
       logRawSignal(`wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)}`);
       const targetEl = e.target instanceof Element ? e.target : null;
-      if (
-        !learningAction &&
-        targetEl &&
-        (targetEl.closest('#optionsPanel') || targetEl.closest('#galleryDrawer'))
-      ) {
-        return;
+      if (!learningAction) {
+        if (
+          appState.currentScreen !== 'live' &&
+          !(appState.currentScreen === 'gallery' && appState.galleryArchiveTab !== 'hits')
+        ) {
+          return;
+        }
+        if (
+          targetEl &&
+          targetEl.closest('#optionsPanel, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #heatmapTunePopover, #replayTunePopover')
+        ) {
+          return;
+        }
       }
       const now = performance.now();
       if (!learningAction && now - lastWheelMs < 140) return;

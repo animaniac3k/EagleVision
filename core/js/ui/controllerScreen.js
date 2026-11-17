@@ -594,11 +594,23 @@ export function getProfile(id) {
 }
 
 export function getActiveBindings() {
-  if (appState.controllerBindings && typeof appState.controllerBindings === 'object') {
-    return appState.controllerBindings;
+  const base = {};
+  for (const act of ACTION_DEFINITIONS) {
+    base[act.id] = { gamepad: act.defaultGamepad, key: act.defaultKey };
   }
-  const prof = getProfile(appState.activeControllerProfile);
-  return Object.assign({}, prof.bindings);
+  const source =
+    appState.controllerBindings && typeof appState.controllerBindings === 'object'
+      ? appState.controllerBindings
+      : getProfile(appState.activeControllerProfile).bindings || {};
+  for (const [actId, binding] of Object.entries(source)) {
+    if (binding && typeof binding === 'object') {
+      base[actId] = {
+        gamepad: binding.gamepad ?? base[actId]?.gamepad ?? 'none',
+        key: binding.key ?? base[actId]?.key ?? 'none'
+      };
+    }
+  }
+  return base;
 }
 
 let activeRebindActionId = null;
@@ -763,7 +775,8 @@ export function initControllerScreen() {
         optCustom.innerHTML = customKeys.map((k) => {
           const p = customMap[k];
           const isMod = (k === activeId && isProfileDirty);
-          return `<option value="${k}">${p.name || 'Untitled Profile'}${isMod ? ' *' : ''}</option>`;
+          const safeName = escapeHtmlStr(p.name || 'Untitled Profile');
+          return `<option value="${escapeHtmlStr(k)}">${safeName}${isMod ? ' *' : ''}</option>`;
         }).join('');
       }
     }
@@ -1049,6 +1062,7 @@ export function initControllerScreen() {
     updateState({
       activeControllerProfile: 'default',
       controllerBindings: defaultBindings,
+      microSlotActions: {},
       ringKeyMap: defaultRingMap,
       leftStickDeadzone: 16,
       rightStickDeadzone: 16,
@@ -1496,7 +1510,7 @@ export function initControllerScreen() {
         const keyList = boundKey.split(',').map((k) => k.trim()).filter(Boolean);
         keyPillsHtml = keyList.map((k, idx) => {
           const pillClass = isCustom ? 'custom' : (idx === 0 ? 'primary' : '');
-          return `<span class="remote-key-tag ${pillClass}">${k}</span>`;
+          return `<span class="remote-key-tag ${pillClass}">${escapeHtmlStr(k)}</span>`;
         }).join('');
       }
 
@@ -1539,9 +1553,9 @@ export function initControllerScreen() {
     });
   }
 
-  const microSlotActionMap = {};
   function getMicroSlotAction(slotId) {
-    if (microSlotActionMap[slotId]) return microSlotActionMap[slotId];
+    const saved = appState.microSlotActions;
+    if (saved && saved[slotId]) return saved[slotId];
     const def = MICRO_BUTTON_DEFS.find((d) => d.id === slotId);
     return def ? def.defaultAction : 'none';
   }
@@ -1589,10 +1603,10 @@ export function initControllerScreen() {
     microMappingTableBody.querySelectorAll('.micro-action-select').forEach((sel) => {
       sel.addEventListener('change', () => {
         const slotId = sel.dataset.microBtn;
-        microSlotActionMap[slotId] = sel.value;
+        const nextSlotMap = Object.assign({}, appState.microSlotActions || {}, { [slotId]: sel.value });
         const slot = MICRO_BUTTON_DEFS.find((d) => d.id === slotId);
         if (slot) {
-          const nextBindings = JSON.parse(JSON.stringify(getActiveBindings()));
+          const nextBindings = getActiveBindings();
           const targetAction = sel.value;
           const actDef = ACTION_DEFINITIONS.find((a) => a.id === targetAction);
           if (!nextBindings[targetAction]) {
@@ -1600,10 +1614,13 @@ export function initControllerScreen() {
           } else if (!nextBindings[targetAction].key || nextBindings[targetAction].key === 'none') {
             nextBindings[targetAction].key = slot.defaultKey;
           }
-          updateState({ controllerBindings: nextBindings });
+          updateState({ controllerBindings: nextBindings, microSlotActions: nextSlotMap });
           saveSettings(appState);
           markProfileDirty();
           renderMappingTable();
+        } else {
+          updateState({ microSlotActions: nextSlotMap });
+          saveSettings(appState);
         }
         renderMicroTable();
       });
@@ -1639,14 +1656,14 @@ export function initControllerScreen() {
   });
 
   btnApplyMicroPreset?.addEventListener('click', () => {
-    Object.keys(microSlotActionMap).forEach((k) => delete microSlotActionMap[k]);
+    updateState({ microSlotActions: {} });
     loadProfile('8bitdo_micro', true);
     renderMicroTable();
     syncMicroStateUI();
   });
 
   btnResetMicroPreset?.addEventListener('click', () => {
-    Object.keys(microSlotActionMap).forEach((k) => delete microSlotActionMap[k]);
+    updateState({ microSlotActions: {} });
     loadProfile('8bitdo_micro', true);
     renderMicroTable();
     syncMicroStateUI();
@@ -1743,6 +1760,14 @@ export function initControllerScreen() {
   refreshProfileDropdown();
   renderRemoteTable();
   syncRemoteStateUI();
+}
+
+function escapeHtmlStr(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function showToastBanner(msg) {

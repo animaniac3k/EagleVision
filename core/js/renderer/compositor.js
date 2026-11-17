@@ -1097,6 +1097,7 @@ export function initCompositor(videoEl) {
   // Panning the main image when zoomed in (>1.0x)
   let panning = false;
   let panCommitted = false;
+  let panPointerId = null;
   let panStartTime = 0;
   let panStartX = 0;
   let panStartY = 0;
@@ -1106,17 +1107,22 @@ export function initCompositor(videoEl) {
   mainCanvas.addEventListener('pointerdown', (e) => {
     if (appState.mainZoom <= 1.01 || appState.liveMaskDrawActive) return;
     panning = true;
+    panPointerId = e.pointerId;
     panStartTime = performance.now();
     panCommitted = !shouldHoldCanvasPan(panStartTime);
     panStartX = e.clientX;
     panStartY = e.clientY;
     startOffsetX = appState.mainPanX;
     startOffsetY = appState.mainPanY;
-    mainCanvas.setPointerCapture(e.pointerId);
+    try {
+      mainCanvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore synthetic pointer capture errors
+    }
   });
 
   mainCanvas.addEventListener('pointermove', (e) => {
-    if (!panning) return;
+    if (!panning || e.pointerId !== panPointerId) return;
     if (!panCommitted) {
       if (shouldHoldCanvasPan(panStartTime)) return;
       panCommitted = true;
@@ -1132,14 +1138,22 @@ export function initCompositor(videoEl) {
     });
   });
 
-  const stopPan = () => { panning = false; };
+  const stopPan = (e) => {
+    if (panPointerId !== null && e?.pointerId !== undefined && e.pointerId !== panPointerId) return;
+    panning = false;
+    panCommitted = false;
+    panPointerId = null;
+  };
   mainCanvas.addEventListener('pointerup', stopPan);
   mainCanvas.addEventListener('pointercancel', stopPan);
+  mainCanvas.addEventListener('lostpointercapture', stopPan);
 
   let lastRenderKey = '';
 
   function renderLoop() {
-    if (appState.currentScreen === 'live') {
+    if (appState.currentScreen !== 'live') {
+      lastRenderKey = '';
+    } else {
       const isRtsp = Boolean(appState.isRtspStream);
       const rtspCanv = isRtsp ? getRtspCanvas() : null;
       const source = isRtsp ? rtspCanv : videoEl;
@@ -1218,16 +1232,27 @@ export function initCompositor(videoEl) {
 
         // 2. Render Magnified PiP Zoom Window
         if (appState.pipEnabled) {
+          const pipParent = pipCanvas.parentElement;
+          if (pipParent && pipParent.clientWidth > 0 && pipParent.clientHeight > 0) {
+            const targetPw = Math.max(160, Math.round(pipParent.clientWidth));
+            const targetPh = Math.max(100, Math.round(pipParent.clientHeight));
+            if (pipCanvas.width !== targetPw || pipCanvas.height !== targetPh) {
+              pipCanvas.width = targetPw;
+              pipCanvas.height = targetPh;
+            }
+          }
+          const drawPw = pipCanvas.width || 340;
+          const drawPh = pipCanvas.height || 210;
           const targetSourceX = sx + appState.roiX * cropW;
           const targetSourceY = sy + appState.roiY * cropH;
 
-          const pipCropW = (cropW * (pw / cw)) / appState.pipZoom;
-          const pipCropH = (cropH * (ph / ch)) / appState.pipZoom;
+          const pipCropW = (cropW * (drawPw / cw)) / appState.pipZoom;
+          const pipCropH = (cropH * (drawPh / ch)) / appState.pipZoom;
 
           const psx = Math.max(0, Math.min(vw - pipCropW, targetSourceX - pipCropW / 2));
           const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
 
-          pipCtx.drawImage(source, psx, psy, pipCropW, pipCropH, 0, 0, pw, ph);
+          pipCtx.drawImage(source, psx, psy, pipCropW, pipCropH, 0, 0, drawPw, drawPh);
           if (showHeatmapOverlay) {
             pipCtx.drawImage(
               heatOverlayCanvas,
@@ -1237,8 +1262,8 @@ export function initCompositor(videoEl) {
               (pipCropH / vh) * HEAT_H,
               0,
               0,
-              pw,
-              ph
+              drawPw,
+              drawPh
             );
           }
         }

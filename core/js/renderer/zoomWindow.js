@@ -352,8 +352,8 @@ export function initZoomWindow() {
     const ph = parent.clientHeight;
     if (pw <= 0 || ph <= 0) return;
 
-    const cw = crosshairEl.offsetWidth || 96;
-    const ch = crosshairEl.offsetHeight || 96;
+    const cw = crosshairEl.offsetWidth || 88;
+    const ch = crosshairEl.offsetHeight || 88;
     const targetLeft = Math.round(appState.roiX * pw - cw / 2);
     const targetTop = Math.round(appState.roiY * ph - ch / 2);
 

@@ -17,6 +17,7 @@ let lastGatewayPaused = false;
 let activeMjpegPauseUrl = '';
 let activeMjpegStopUrl = '';
 let uvcGatewaySupported = null;
+let streamSessionSeq = 0;
 const rtspJpegListeners = new Set();
 
 subscribeState((state) => {
@@ -195,6 +196,7 @@ export async function enumerateCameras() {
 
 export async function startCameraStream(videoEl, preferredDeviceId = 'auto', customLabel = null) {
   stopCurrentStream();
+  const sessionSeq = ++streamSessionSeq;
 
   // Route network / RTSP streams to the dedicated MJPEG canvas bridge
   if (typeof preferredDeviceId === 'string' && (preferredDeviceId.startsWith('rtsp:') || preferredDeviceId.startsWith('rtsp://'))) {
@@ -221,6 +223,7 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
 
   if (!navigator.mediaDevices?.getUserMedia) {
     const uvcCameras = await fetchAndroidUvcCameras();
+    if (sessionSeq !== streamSessionSeq) return null;
     if (uvcCameras.length > 0) {
       return startUvcStream(videoEl, uvcCameras[0].deviceId, uvcCameras[0].label);
     }
@@ -253,6 +256,7 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
     try {
       stream = await acquireStream(videoConstraints);
     } catch (primaryErr) {
+      if (sessionSeq !== streamSessionSeq) return null;
       // Retry with unconstrained video if ideal constraints caused OverconstrainedError on a device
       if (
         (!preferredDeviceId || preferredDeviceId === 'auto') &&
@@ -265,9 +269,15 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
       }
     }
 
+    if (sessionSeq !== streamSessionSeq) {
+      stream?.getTracks?.().forEach((t) => t.stop());
+      return null;
+    }
+
     activeMediaStream = stream;
     videoEl.srcObject = stream;
     await videoEl.play();
+    if (sessionSeq !== streamSessionSeq) return null;
 
     const track = stream.getVideoTracks()[0];
     const settings = track ? track.getSettings() : {};
@@ -287,9 +297,11 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
 
     return stream;
   } catch (err) {
+    if (sessionSeq !== streamSessionSeq) return null;
     console.warn('Camera stream unavailable, checking USB UVC / test fallback:', err);
     if (!preferredDeviceId || preferredDeviceId === 'auto') {
       const uvcCameras = await fetchAndroidUvcCameras();
+      if (sessionSeq !== streamSessionSeq) return null;
       if (uvcCameras.length > 0) {
         notifyCameraListChanged();
         return startUvcStream(videoEl, uvcCameras[0].deviceId, uvcCameras[0].label);
@@ -532,6 +544,10 @@ async function startMjpegCanvasStream(videoEl, opts) {
 
   const renderMjpegDisconnect = async (errMsg = null) => {
     if (!rtspDrawLoopActive) return;
+    if (rtspStatusPollTimer) {
+      clearInterval(rtspStatusPollTimer);
+      rtspStatusPollTimer = null;
+    }
     let detailMsg = errMsg || defaultDisconnectDetail;
     try {
       const res = await fetch(statusUrl, { cache: 'no-store' });
@@ -621,7 +637,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
 
     const drawLoop = () => {
       if (!rtspDrawLoopActive || !rtspImg) return;
-      if (rtspImg.complete && rtspImg.naturalWidth > 0) {
+      if (appState.currentScreen === 'live' && rtspImg.complete && rtspImg.naturalWidth > 0) {
         syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
         ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
         rtspFrameSeq += 1;
@@ -722,7 +738,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
             headerBuf = new Uint8Array(0);
             if (match) {
               const expectedLen = parseInt(match[1], 10);
-              if (expectedLen > 0) {
+              if (expectedLen > 0 && expectedLen <= 32 * 1024 * 1024) {
                 frameBuf = new Uint8Array(expectedLen);
                 frameFill = 0;
               }
@@ -759,6 +775,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
 }
 
 export function stopCurrentStream() {
+  streamSessionSeq += 1;
   if (simTimer) {
     clearInterval(simTimer);
     simTimer = null;

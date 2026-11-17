@@ -845,6 +845,13 @@ export function initSidebarAndTopControls(videoEl) {
   if (inputBresserIp && appState.rtspCameraIp) {
     inputBresserIp.value = appState.rtspCameraIp;
   }
+  document.querySelectorAll('.btn-bresser-channel').forEach((btn) => {
+    btn.classList.toggle('radar-btn-active', (btn.dataset.channel || 'ch0') === selectedBresserChannel);
+  });
+  updateBresserRtspUrlField();
+  document.querySelectorAll('.btn-onvif-channel').forEach((btn) => {
+    btn.classList.toggle('radar-btn-active', (btn.dataset.path || '/onvif1') === selectedOnvifPath);
+  });
   if (inputCustomRtspUrl && appState.rtspCustomUrl) {
     inputCustomRtspUrl.value = appState.rtspCustomUrl;
   }
@@ -1303,6 +1310,12 @@ export function initSidebarAndTopControls(videoEl) {
     liveIgnoreLayer.classList.toggle('mask-draw-active', drawActive);
     liveIgnoreLayer.classList.toggle('mask-edit-active', showMasks);
 
+    if (!showMasks && !drawActive) {
+      activeMaskDrag = null;
+      liveDrawStart = null;
+      liveDrawPreview?.classList.add('hidden');
+    }
+
     if (activeMaskDrag) return;
 
     liveIgnoreLayer.innerHTML = '';
@@ -1377,7 +1390,11 @@ export function initSidebarAndTopControls(videoEl) {
     const vx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const vy = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
     liveDrawStart = { vx, vy, pointerId: e.pointerId };
-    liveIgnoreLayer.setPointerCapture(e.pointerId);
+    try {
+      liveIgnoreLayer.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore synthetic pointer capture errors
+    }
     if (liveDrawPreview) {
       liveDrawPreview.classList.remove('hidden');
       liveDrawPreview.style.left = `${(vx * 100).toFixed(2)}%`;
@@ -1388,7 +1405,7 @@ export function initSidebarAndTopControls(videoEl) {
   });
 
   liveIgnoreLayer?.addEventListener('pointermove', (e) => {
-    if (!liveDrawStart || !liveDrawPreview) return;
+    if (!liveDrawStart || e.pointerId !== liveDrawStart.pointerId || !liveDrawPreview) return;
     const rect = liveIgnoreLayer.getBoundingClientRect();
     const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
@@ -1399,7 +1416,7 @@ export function initSidebarAndTopControls(videoEl) {
   });
 
   const finishLiveMaskDraw = (e) => {
-    if (!liveDrawStart) return;
+    if (!liveDrawStart || (e?.pointerId !== undefined && e.pointerId !== liveDrawStart.pointerId)) return;
     const rect = liveIgnoreLayer.getBoundingClientRect();
     const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));

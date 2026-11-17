@@ -114,6 +114,23 @@ export function initGamepadController() {
   startFrameLoop();
   autoReconnectWebHID();
 
+  if ('hid' in navigator) {
+    navigator.hid.addEventListener('disconnect', (event) => {
+      if (event.device === activeHIDDevice) {
+        console.log('[WebHID] Device disconnected');
+        activeHIDDevice = null;
+        webHIDConnected = false;
+        hasSentInit = false;
+        updateState({
+          gamepadConnected: false,
+          gamepadName: '',
+          lastGamepadAction: 'DISCONNECTED'
+        });
+        updateGamepadUI(false, 'DISCONNECTED (PRESS ANY BUTTON)');
+      }
+    });
+  }
+
   window.addEventListener('gamepadconnected', (e) => {
     const pad = e.gamepad;
     console.log(`[Gamepad API] Connected: "${pad.id}" (index: ${pad.index})`);
@@ -311,21 +328,6 @@ async function setupWebHIDDevice(device) {
     // Send output report to unlock extended report 0x11 mode
     await sendDualShock4BluetoothInit(device);
     device.receiveFeatureReport(0x02).catch(() => {});
-
-    navigator.hid.addEventListener('disconnect', (event) => {
-      if (event.device === activeHIDDevice) {
-        console.log('[WebHID] Device disconnected');
-        activeHIDDevice = null;
-        webHIDConnected = false;
-        hasSentInit = false;
-        updateState({
-          gamepadConnected: false,
-          gamepadName: '',
-          lastGamepadAction: 'DISCONNECTED'
-        });
-        updateGamepadUI(false, 'DISCONNECTED (PRESS ANY BUTTON)');
-      }
-    });
   } catch (err) {
     console.error('[WebHID Setup Error]', err);
     updateGamepadUI(false, 'DEVICE BUSY (CLOSE JOY.CPL & RETRY)');
@@ -368,9 +370,6 @@ function handleWebHIDInputReport(event) {
   const rx = applyDeadzone((rawRx - 128) / 128, true);
   const ry = applyDeadzone((rawRy - 128) / 128, true);
   latestAxes = { lx, ly, rx, ry };
-
-  // Dispatch continuous analog stick movement immediately on each report
-  applyStickMotion(lx, ly, rx, ry);
 
   // 2. Buttons Byte 1: D-pad (bits 0-3) + Shape Buttons (bits 4-7)
   const b1 = data.getUint8(offset + 4);
@@ -691,17 +690,18 @@ function endVirtualDrag(x, y) {
       button: 0,
       buttons: 0
     }));
-    el.dispatchEvent(new MouseEvent('click', {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      button: 0
-    }));
 
     const interactive = el.closest('button, a, .radar-btn, .gp-badge, .ov-btn');
     if (interactive && typeof interactive.click === 'function') {
       interactive.click();
+    } else {
+      el.dispatchEvent(new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 0
+      }));
     }
 
     // If dragged/clicked on main video canvas in live screen, aim the ROI target crosshair right there!
@@ -740,13 +740,14 @@ function triggerVirtualClick(x, y) {
   interactive.dispatchEvent(new PointerEvent('pointerup', {
     bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: 0, pointerId: 101, isPrimary: true
   }));
-  interactive.dispatchEvent(new MouseEvent('click', {
-    bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0
-  }));
 
   if (typeof interactive.focus === 'function') interactive.focus();
-  if (typeof interactive.click === 'function' && interactive !== el) {
+  if (typeof interactive.click === 'function') {
     interactive.click();
+  } else {
+    interactive.dispatchEvent(new MouseEvent('click', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0
+    }));
   }
 
   // If clicked on main video canvas in live screen, move the ROI target crosshair right there!
@@ -1065,6 +1066,7 @@ function dispatchControllerInputs(actionState) {
     if (anyPressed) {
       dismissSplashScreen('gamepad');
     }
+    prevButtonStates = Object.assign({}, actionState);
     return;
   }
 
@@ -1157,7 +1159,7 @@ function dispatchControllerInputs(actionState) {
     } else {
       const act = getBoundAction('cross') || 'quick_tool_toggle';
       executeMappedAction(act);
-      updateState({ lastGamepadAction: 'BUTTON: CROSS (QUICK TOOL TOGGLE)' });
+      updateState({ lastGamepadAction: `BUTTON: CROSS (${act.toUpperCase()})` });
     }
   }
 
@@ -1506,13 +1508,12 @@ function getGamepadApiActionDown(pad, role) {
 
 function getGamepadApiRightStick(pad) {
   const isDInput = isDirectInputDS4(pad);
-  const rx = applyDeadzone(pad.axes[2] || 0);
-  let ryVal = 0;
+  const rx = pad.axes[2] || 0;
+  let ry = 0;
   if (isDInput && pad.axes.length >= 6) {
-    ryVal = pad.axes[5];
+    ry = pad.axes[5] || 0;
   } else if (pad.axes.length >= 4) {
-    ryVal = pad.axes[3];
+    ry = pad.axes[3] || 0;
   }
-  const ry = applyDeadzone(ryVal || 0);
   return { rx, ry };
 }

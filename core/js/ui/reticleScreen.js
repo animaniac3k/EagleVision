@@ -472,6 +472,7 @@ export function initReticleScreen() {
     });
     saveSettings(appState);
     renderPreview();
+    e.target.value = '';
   });
 
   // Color Theme Swatches on Reticle Screen
@@ -541,7 +542,7 @@ export function initReticleScreen() {
   });
 
   btnRings?.addEventListener('click', () => {
-    updateReticleConfig({ concentricRings: !appState.reticleConfig.concentricRings });
+    updateReticleConfig({ concentricRings: !appState.reticleConfig?.concentricRings });
   });
 
   sliderStroke?.addEventListener('input', (e) => {
@@ -553,18 +554,19 @@ export function initReticleScreen() {
     if (e.target.closest('.reticle-stage-controls, .reticle-gamepad-legend')) return;
     if (!previewSvg || !appState.overlayEnabled) return;
     const stageRect = previewStage.getBoundingClientRect();
-    const svgRect = previewSvg.getBoundingClientRect();
+    const useSvg = !previewSvg.classList.contains('hidden');
+    const targetRect = useSvg ? previewSvg.getBoundingClientRect() : stageRect;
 
-    // The center of the reticle (400, 250 in 800x500 viewBox) corresponds to center of svgRect
-    const centerX = svgRect.left + svgRect.width / 2;
-    const centerY = svgRect.top + svgRect.height / 2;
+    // The center of the reticle (400, 250 in 800x500 viewBox) corresponds to center of targetRect
+    const centerX = targetRect.left + targetRect.width / 2;
+    const centerY = targetRect.top + targetRect.height / 2;
 
     const dx = e.clientX - centerX;
     const dy = e.clientY - centerY;
 
     // Compute click distance on the preview stage (scaled to 800x500 viewBox)
-    const baseScale = Math.min(svgRect.width / RETICLE_VIEWBOX_W, svgRect.height / RETICLE_VIEWBOX_H);
-    const clickSpacingPx = Math.max(8, Number(appState.reticleConfig?.clickSpacing) || 32) * baseScale;
+    const baseScale = Math.min(targetRect.width / RETICLE_VIEWBOX_W, targetRect.height / RETICLE_VIEWBOX_H);
+    const clickSpacingPx = Math.max(4, Number(appState.reticleConfig?.clickSpacing) || 32) * baseScale;
 
     const offset = computeClickCalloutOffset(dx, dy, clickSpacingPx, appState.detectionCalloutMode);
     const phrase = buildDetectionCalloutPhrase(offset);

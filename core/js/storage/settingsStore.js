@@ -11,6 +11,9 @@ export function loadSavedSettings() {
     parsed.playbackReticleEnabled = Boolean(parsed.playbackReticleEnabled);
     parsed.hitsReticleEnabled = parsed.hitsReticleEnabled !== false;
     parsed.autoAimLoupe = Boolean(parsed.autoAimLoupe);
+    if (parsed.overlayType === 'custom' && !parsed.customOverlayUrl) {
+      parsed.overlayType = 'crosshair';
+    }
     parsed.detectionCalloutMode = parsed.detectionCalloutMode === 'poa' ? 'poa' : 'poi';
     parsed.bufferFastQuality = parsed.bufferFastQuality !== false;
     parsed.bufferMicEnabled = Boolean(parsed.bufferMicEnabled);
@@ -103,12 +106,14 @@ export function saveSettings(state) {
       activeControllerProfile: state.activeControllerProfile || 'default',
       customControllerProfiles: state.customControllerProfiles || {},
       controllerBindings: state.controllerBindings || null,
+      microSlotActions: state.microSlotActions || {},
       ringKeyMap: state.ringKeyMap || {},
       rtspSourceMode: state.rtspSourceMode || 'usb',
       rtspPreset: state.rtspPreset || 'bresser',
       rtspCameraIp: state.rtspCameraIp || '192.168.0.1',
       rtspChannel: state.rtspChannel || 'ch0',
       rtspGatewayHost: state.rtspGatewayHost || '',
+      rtspOnvifIp: state.rtspOnvifIp || '192.168.1.100',
       rtspOnvifPort: state.rtspOnvifPort || 554,
       rtspOnvifPath: state.rtspOnvifPath || '/onvif1',
       rtspOnvifUser: state.rtspOnvifUser || '',

@@ -69,11 +69,13 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
   const rawStep = Number(cfg.clickSpacing);
   const step = Number.isFinite(rawStep) && rawStep >= 4 ? rawStep : defaultFittingStep;
-  const rawGapHalf = Math.max(0, (Number(cfg.centerGap) ?? 64) / 2);
+  const rawGap = Number(cfg.centerGap);
+  const rawGapHalf = Math.max(0, (Number.isFinite(rawGap) ? rawGap : 64) / 2);
   const gapHalf = Math.min(rawGapHalf, 360);
   const sw = Number(cfg.strokeWidth) || 1.8;
   const strokeColor = cfg.reticleColor ? cfg.reticleColor : 'var(--radar-accent)';
-  const majorInt = Math.max(0, Number(cfg.majorInterval) || 5);
+  const rawMajor = Number(cfg.majorInterval);
+  const majorInt = Number.isFinite(rawMajor) ? Math.max(0, rawMajor) : 5;
   const minorLen = Math.min(Math.max(3, Number(cfg.minorTickLen) || 10), Math.max(5, step * 0.9));
   const majorLen = Math.min(Math.max(6, Number(cfg.majorTickLen) || 18), Math.max(8, step * 1.6));
   const showLabels = Boolean(cfg.showLabels);

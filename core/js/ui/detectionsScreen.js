@@ -253,7 +253,7 @@ export function initDetectionsScreen(subscribeState) {
       }
     }
 
-    [btnHitPrev, btnHitNext].forEach((btn) => {
+    [btnHitPrev, btnHitNext, btnHitSnapshot].forEach((btn) => {
       if (btn) btn.disabled = !hasHits;
     });
 
@@ -348,7 +348,11 @@ export function initDetectionsScreen(subscribeState) {
       hitsStartOffX = hitsPanPxX;
       hitsStartOffY = hitsPanPxY;
       hitsMapViewport.style.cursor = 'grabbing';
-      hitsMapViewport.setPointerCapture(e.pointerId);
+      try {
+        hitsMapViewport.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic pointer capture errors
+      }
     }
   });
 
@@ -367,10 +371,8 @@ export function initDetectionsScreen(subscribeState) {
     }
   };
   hitsMapViewport?.addEventListener('pointerup', finishPointer);
-  hitsMapViewport?.addEventListener('pointercancel', () => {
-    hitsPanning = false;
-    applyHitsTransform();
-  });
+  hitsMapViewport?.addEventListener('pointercancel', finishPointer);
+  hitsMapViewport?.addEventListener('lostpointercapture', finishPointer);
 
   btnOpenHitsTab?.addEventListener('click', () => {
     updateState({ currentScreen: 'gallery', galleryArchiveTab: 'hits' });

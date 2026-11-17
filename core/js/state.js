@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.1.12';
+export const APP_VERSION = 'v0.1.13';
 
 const listeners = new Set();
 
@@ -18,6 +18,7 @@ export const appState = {
   rtspPreset: 'bresser',       // 'bresser' | 'onvif' | 'custom'
   rtspCameraIp: '192.168.0.1', // Default Bresser Eyepiece HD IP
   rtspChannel: 'ch0',          // Default highest res channel (1080p Full HD)
+  rtspOnvifIp: '192.168.1.100',
   rtspOnvifPort: 554,
   rtspOnvifPath: '/onvif1',
   rtspOnvifUser: '',
@@ -124,6 +125,7 @@ export const appState = {
   activeControllerProfile: 'default', // 'default' | 'simplified' | 'flight' | custom profile ID
   customControllerProfiles: {},       // User custom profiles: Record<id, ProfileObject>
   controllerBindings: null,           // User-configured active controller & key mappings
+  microSlotActions: {},               // Persisted 8BitDo Micro slot -> action overrides
   ringKeyMap: {},                     // User-configured active Bluetooth Ring / Remote mappings
   gamepadConnected: false,
   gamepadName: '',

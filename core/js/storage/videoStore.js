@@ -181,6 +181,8 @@ export async function deleteVideoClip(id) {
  * Exports a stored clip to a standard .webm video file on disk.
  */
 export async function exportClipToDisk(clip) {
+  const frames = clip?.jpegFrames || [];
+  if (!frames.length) return;
   const filename = clip.name.toLowerCase();
   const canvas = document.createElement('canvas');
   canvas.width = clip.width || 1920;
@@ -204,37 +206,42 @@ export async function exportClipToDisk(clip) {
 
   recorder.start();
 
-  const frames = clip.jpegFrames || [];
   const timestamps = Array.isArray(clip.frameTimestamps) && clip.frameTimestamps.length === frames.length
     ? clip.frameTimestamps
     : null;
   const frameIntervalMs = 1000 / exportFps;
   const startMs = performance.now();
 
-  let nextBitmapPromise = frames.length > 0
-    ? createImageBitmap(new Blob([frames[0]], { type: 'image/jpeg' }))
-    : null;
+  let nextBitmapPromise = createImageBitmap(new Blob([frames[0]], { type: 'image/jpeg' })).catch(() => null);
 
-  for (let i = 0; i < frames.length; i++) {
-    const bmp = await nextBitmapPromise;
-    nextBitmapPromise = i + 1 < frames.length
-      ? createImageBitmap(new Blob([frames[i + 1]], { type: 'image/jpeg' }))
-      : null;
+  try {
+    for (let i = 0; i < frames.length; i++) {
+      const bmp = await nextBitmapPromise;
+      nextBitmapPromise = i + 1 < frames.length
+        ? createImageBitmap(new Blob([frames[i + 1]], { type: 'image/jpeg' })).catch(() => null)
+        : null;
 
-    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    if (bmp.close) bmp.close();
+      if (bmp) {
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        if (bmp.close) bmp.close();
+      }
 
-    const targetElapsedMs = timestamps
-      ? (i + 1 < frames.length ? timestamps[i + 1] * 1000 : (clip.durationSec || 0) * 1000)
-      : (i + 1) * frameIntervalMs;
-    const waitMs = startMs + targetElapsedMs - performance.now();
-    if (waitMs > 2) {
-      await new Promise((r) => setTimeout(r, waitMs));
+      const targetElapsedMs = timestamps
+        ? (i + 1 < frames.length ? timestamps[i + 1] * 1000 : (clip.durationSec || 0) * 1000)
+        : (i + 1) * frameIntervalMs;
+      const waitMs = startMs + targetElapsedMs - performance.now();
+      if (waitMs > 2) {
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+    }
+  } finally {
+    if (recorder.state !== 'inactive') {
+      recorder.stop();
     }
   }
-  recorder.stop();
   const webmBlob = await blobPromise;
 
+  let savedViaPicker = false;
   if ('showSaveFilePicker' in window) {
     try {
       const handle = await window.showSaveFilePicker({
@@ -244,20 +251,22 @@ export async function exportClipToDisk(clip) {
       const writable = await handle.createWritable();
       await writable.write(webmBlob);
       await writable.close();
-      return;
+      savedViaPicker = true;
     } catch (err) {
       if (err.name === 'AbortError') return;
     }
   }
 
-  const url = URL.createObjectURL(webmBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  if (!savedViaPicker) {
+    const url = URL.createObjectURL(webmBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
 
   // Export companion sidecar metadata JSON if timeline data exists
   if (clip.timeline && (clip.timeline.soundPeaks?.length || clip.timeline.events?.length)) {

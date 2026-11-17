@@ -154,6 +154,10 @@ function renderGalleryFrame() {
       lastTimeLabel = '0.0s / 0.0s';
       timeReadout.textContent = lastTimeLabel;
     }
+    if (btnPlayPause && lastPlayBtnText !== '▶') {
+      lastPlayBtnText = '▶';
+      btnPlayPause.textContent = '▶';
+    }
     return;
   }
 
@@ -328,7 +332,7 @@ async function selectClip(clip, autoPlay = true) {
   canvasEl.width = clip.width || 1920;
   canvasEl.height = clip.height || 1080;
 
-  clipDuration = Math.max(0.5, clip.durationSec);
+  clipDuration = Math.max(0.5, Number(clip.durationSec) || 0.5);
   playheadSec = 0;
   isPlaying = autoPlay;
   lastTickMs = performance.now();
@@ -349,7 +353,7 @@ async function selectClip(clip, autoPlay = true) {
   syncSourceActionButtons();
 
   const fullClip = clip.isBuffer ? clip : await getVideoClip(clip.id);
-  if (!fullClip || !Array.isArray(fullClip.jpegFrames) || selectedClipId !== clip.id) {
+  if (!fullClip || !Array.isArray(fullClip.jpegFrames) || selectedClipId !== clip.id || appState.currentScreen !== 'gallery') {
     return;
   }
 
@@ -487,7 +491,11 @@ export function initVideoBrowser() {
     panStartY = e.clientY;
     startOffX = galleryPanX;
     startOffY = galleryPanY;
-    canvasEl.setPointerCapture(e.pointerId);
+    try {
+      canvasEl.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore synthetic pointer capture errors
+    }
   });
 
   canvasEl.addEventListener('pointermove', (e) => {
@@ -510,6 +518,7 @@ export function initVideoBrowser() {
   const stopPan = () => { panning = false; };
   canvasEl.addEventListener('pointerup', stopPan);
   canvasEl.addEventListener('pointercancel', stopPan);
+  canvasEl.addEventListener('lostpointercapture', stopPan);
 
   function setDrawerOpen(open) {
     const next = typeof open === 'boolean' ? open : !appState.galleryDrawerOpen;
@@ -702,18 +711,25 @@ export function initVideoBrowser() {
   });
 
   btnDownload.addEventListener('click', async () => {
-    if (!selectedClipId) return;
-    const clip = selectedClipId === LIVE_BUFFER_ID && activeBufferClip
-      ? {
-          ...activeBufferClip,
-          name: `LIVE_BUFFER_${Date.now()}.WEBM`
-        }
-      : await getVideoClip(selectedClipId);
-    if (!clip) return;
+    if (!selectedClipId || btnDownload.disabled) return;
     const orig = btnDownload.textContent;
+    btnDownload.disabled = true;
     btnDownload.textContent = 'EXPORTING...';
-    await exportClipToDisk(clip);
-    btnDownload.textContent = orig;
+    try {
+      const clip = selectedClipId === LIVE_BUFFER_ID && activeBufferClip
+        ? {
+            ...activeBufferClip,
+            name: `LIVE_BUFFER_${Date.now()}.WEBM`
+          }
+        : await getVideoClip(selectedClipId);
+      if (!clip) return;
+      await exportClipToDisk(clip);
+    } catch (err) {
+      console.warn('Export clip failed:', err);
+    } finally {
+      btnDownload.disabled = false;
+      btnDownload.textContent = orig;
+    }
   });
 
   btnDelete.addEventListener('click', () => {

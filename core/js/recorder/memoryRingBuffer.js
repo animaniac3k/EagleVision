@@ -234,6 +234,7 @@ export function startMemoryBuffer(videoEl) {
           try {
             if (!blob || !appState.bufferEnabled || appState.currentScreen !== 'live') return;
             const jpegBuffer = await blob.arrayBuffer();
+            if (!appState.bufferEnabled || appState.currentScreen !== 'live') return;
             appendFrameToRing(jpegBuffer, capW, capH, capturedAt, currentPeak, targetFps);
           } finally {
             encodingInProgress = false;
@@ -253,6 +254,30 @@ export function startMemoryBuffer(videoEl) {
  * without discarding already-buffered frames in RAM.
  */
 export function updateMemoryBufferConfig() {
+  if (frameRing.length > 0) {
+    const maxSec = Math.max(5, Math.min(60, appState.bufferMaxSeconds || 20));
+    const targetFps = Math.max(5, Math.min(30, appState.bufferTargetFps || 15));
+    const maxFrames = maxSec * targetFps;
+    const now = performance.now();
+    const effectivePauseMs = pausedAtMs !== null ? Math.max(0, now - pausedAtMs) : 0;
+    const cutoff = now - effectivePauseMs - maxSec * 1000;
+    while (
+      frameRing.length > maxFrames ||
+      (frameRing.length > 1 && frameRing[0].timestampMs < cutoff)
+    ) {
+      const old = frameRing.shift();
+      totalBytes = Math.max(0, totalBytes - old.jpegBuffer.byteLength);
+    }
+    ringEvents = ringEvents.filter((e) => e.timestampMs >= cutoff);
+    const spanSec =
+      frameRing.length > 1
+        ? Math.min(maxSec, (frameRing[frameRing.length - 1].timestampMs - frameRing[0].timestampMs) / 1000)
+        : Number((1 / targetFps).toFixed(1));
+    updateState({
+      bufferedSeconds: Number(spanSec.toFixed(1)),
+      bufferBytes: totalBytes
+    });
+  }
   if (appState.bufferEnabled && currentVideoEl) {
     startMemoryBuffer(currentVideoEl);
   }
