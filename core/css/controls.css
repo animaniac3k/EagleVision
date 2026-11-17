@@ -116,6 +116,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+.loupe-mode-lbl {
+  display: inline-block;
+  width: 5.8em;
+  text-align: center;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: nowrap;
+}
+
 #btnToggleVoiceAnnounce.voice-mode-poi {
   color: #fbbf24;
   border-color: rgba(251, 191, 36, 0.55) !important;
@@ -124,6 +133,15 @@
 #btnToggleVoiceAnnounce.voice-mode-poa {
   color: #22d3ee;
   border-color: rgba(34, 211, 238, 0.55) !important;
+}
+
+#btnTogglePip.loupe-mode-auto {
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.55) !important;
+}
+
+#btnTogglePip.radar-btn-muted {
+  color: #fda4af;
 }
 
 /* Control Pod Containers */
@@ -676,8 +694,10 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   pointer-events: none;
 }
 
-/* Integrated Heatmap Split Trigger & Anchored Live Setup Popover */
-.heatmap-dock-group {
+/* Integrated Reticle, Heatmap (Tri-Part) & Replay Split Triggers */
+.reticle-dock-group,
+.heatmap-dock-group,
+.replay-dock-group {
   display: inline-flex;
   align-items: center;
   border-radius: var(--radius-pill);
@@ -687,17 +707,52 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   flex-shrink: 0;
 }
 
+.reticle-dock-group.is-reticle-on,
 .heatmap-dock-group.is-heatmap-on {
   border-color: color-mix(in srgb, var(--radar-accent) 45%, transparent);
 }
 
-.heatmap-dock-group #btnToggleHeatmap {
+.replay-dock-group {
+  border-color: color-mix(in srgb, var(--radar-accent) 45%, transparent);
+}
+
+.replay-dock-group.is-buffer-off {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.replay-dock-group.is-buffer-off #btnReplay20s {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--radar-text-muted) !important;
+  box-shadow: none !important;
+}
+
+.replay-dock-group.is-buffer-off .replay-tune-caret {
+  color: var(--radar-text-muted);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.reticle-dock-group #btnToggleOverlayTop,
+.heatmap-dock-group #btnToggleHeatmap,
+.replay-dock-group #btnReplay20s {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.heatmap-dock-group .heatmap-tune-caret {
+.heatmap-dock-group #btnToggleHeatmap {
+  padding: 0 10px;
+}
+
+.heatmap-dock-group #btnLiveRezero {
+  border-radius: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 34px;
+  padding: 0 8px;
+}
+
+.reticle-dock-group .reticle-ffp-chip,
+.heatmap-dock-group .heatmap-tune-caret,
+.replay-dock-group .replay-tune-caret {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   padding: 0 9px;
@@ -709,12 +764,18 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   min-width: auto;
 }
 
-.heatmap-dock-group.is-heatmap-on .heatmap-tune-caret {
+.reticle-dock-group .reticle-ffp-chip {
+  min-width: 4.5ch;
+}
+
+.heatmap-dock-group.is-heatmap-on .heatmap-tune-caret,
+.replay-dock-group .replay-tune-caret {
   color: var(--radar-text);
   background-color: color-mix(in srgb, var(--radar-accent) 14%, rgba(255, 255, 255, 0.04));
 }
 
-.heatmap-tune-caret.radar-btn-active .heatmap-caret-glyph {
+.heatmap-tune-caret.radar-btn-active .heatmap-caret-glyph,
+.replay-tune-caret.radar-btn-active .heatmap-caret-glyph {
   transform: rotate(180deg);
 }
 
@@ -730,6 +791,8 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   left: 50%;
   transform: translateX(-50%);
   width: min(370px, calc(100vw - 24px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
   z-index: 45;
   background: rgba(10, 15, 22, 0.9);
   border: 1px solid color-mix(in srgb, var(--radar-accent) 55%, rgba(255, 255, 255, 0.18));
@@ -737,10 +800,10 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.68), 0 0 1px rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  padding: 12px 14px;
+  padding: 11px 13px;
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 9px;
   pointer-events: auto;
 }
 
@@ -751,6 +814,22 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   gap: 8px;
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.heatmap-pop-header.is-dragging {
+  cursor: grabbing;
+}
+
+.heatmap-pop-grip {
+  font-size: 12px;
+  letter-spacing: -1px;
+  color: var(--radar-text-muted);
+  opacity: 0.75;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .heatmap-pop-title-group {
@@ -896,6 +975,45 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   font-size: 11px;
   color: var(--radar-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.heatmap-pop-section .duration-preset-btn {
+  height: 28px;
+  min-width: 36px;
+  font-size: 11.5px;
+}
+
+.heatmap-pop-section .radar-num-input {
+  width: 56px;
+  height: 26px;
+  font-size: 12px;
+}
+
+.heatmap-pop-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.heatmap-pop-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.heatmap-pop-toggle-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--radar-text-secondary);
+}
+
+.heatmap-pop-toggle-sub {
+  font-size: 10.5px;
+  color: var(--radar-text-muted);
 }
 
 .heatmap-pop-masks-row {

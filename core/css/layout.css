@@ -95,6 +95,7 @@
 #screenLive.ui-decluttered #pipZoomWindow,
 #screenLive.ui-decluttered #zoomTargetCrosshair,
 #screenLive.ui-decluttered #heatmapTunePopover,
+#screenLive.ui-decluttered #replayTunePopover,
 #screenLive.ui-decluttered #heatmapSetupCanvas,
 #screenLive.ui-decluttered #liveIgnoreLayer {
   display: none !important;

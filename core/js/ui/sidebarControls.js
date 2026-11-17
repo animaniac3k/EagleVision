@@ -23,7 +23,6 @@ import {
   speakDetectionAnnouncement,
   stopVoiceAnnouncement,
   rezeroHeatmap,
-  captureAnnotatedSnapshot,
   addHeatmapIgnoreZone,
   clearHeatmapIgnoreZones,
   subscribeHeatmapTelemetry,
@@ -209,24 +208,71 @@ export function initSidebarAndTopControls(videoEl) {
     screenSettings?.classList.remove('hidden');
   }
 
-  // 2. Show/Hide Digital Zoom Window & Aim Loupe to Latest Hit
-  btnTogglePip.addEventListener('click', () => {
-    updateState({ pipEnabled: !appState.pipEnabled });
+  // 2. Consolidated Digital Loupe Mode Cycle (ON -> Auto Aim -> OFF)
+  const loupeModeLabel = document.getElementById('loupeModeLabel');
+  const iconLoupeOn = document.getElementById('iconLoupeOn');
+  const iconLoupeAuto = document.getElementById('iconLoupeAuto');
+  const iconLoupeOff = document.getElementById('iconLoupeOff');
+
+  function syncLoupeModeUI(pipEnabled, autoAimLoupe) {
+    const isOn = Boolean(pipEnabled);
+    const isAuto = isOn && Boolean(autoAimLoupe);
+    if (btnTogglePip) {
+      btnTogglePip.classList.toggle('radar-btn-active', isOn);
+      btnTogglePip.classList.toggle('radar-btn-muted', !isOn);
+      btnTogglePip.classList.toggle('loupe-mode-auto', isAuto);
+      btnTogglePip.title = !isOn
+        ? 'Digital Loupe: OFF — Tap to turn ON'
+        : isAuto
+          ? 'Digital Loupe: AUTO AIM — Snaps to new detections (Tap to turn OFF)'
+          : 'Digital Loupe: ON — Tap to switch to Auto Aim';
+    }
+    if (iconLoupeOn) iconLoupeOn.classList.toggle('hidden', !(isOn && !isAuto));
+    if (iconLoupeAuto) iconLoupeAuto.classList.toggle('hidden', !isAuto);
+    if (iconLoupeOff) iconLoupeOff.classList.toggle('hidden', isOn);
+    if (loupeModeLabel) {
+      loupeModeLabel.textContent = !isOn ? 'Loupe OFF' : (isAuto ? 'Loupe AA' : 'Loupe ON');
+    }
+  }
+  syncLoupeModeUI(appState.pipEnabled, appState.autoAimLoupe);
+
+  btnTogglePip?.addEventListener('click', () => {
+    const isOn = Boolean(appState.pipEnabled);
+    const isAuto = isOn && Boolean(appState.autoAimLoupe);
+    if (isOn && !isAuto) {
+      // ON -> AUTO AIM
+      updateState({ pipEnabled: true, autoAimLoupe: true, roiTargetVisible: true });
+      snapLoupeToLatestHit();
+    } else if (isAuto) {
+      // AUTO AIM -> OFF
+      updateState({ pipEnabled: false, autoAimLoupe: false });
+    } else {
+      // OFF -> ON
+      updateState({ pipEnabled: true, autoAimLoupe: false });
+    }
     saveSettings(appState);
   });
 
-  const btnLiveAimLoupe = document.getElementById('btnLiveAimLoupe');
-  let aimLoupeFeedbackTimer = null;
-  btnLiveAimLoupe?.addEventListener('click', () => {
-    if (!snapLoupeToLatestHit()) return;
-    btnLiveAimLoupe.classList.add('radar-btn-active');
-    clearTimeout(aimLoupeFeedbackTimer);
-    aimLoupeFeedbackTimer = setTimeout(() => {
-      btnLiveAimLoupe.classList.remove('radar-btn-active');
-    }, 650);
-  });
+  // 2b. Toggle Overlay Guide & FFP/SFP Focal Plane Mode on Live Dock
+  const reticleDockGroup = btnToggleOverlayTop?.closest('.reticle-dock-group');
+  const btnToggleReticleFfp = document.getElementById('btnToggleReticleFfp');
+  const reticleFfpLabel = document.getElementById('reticleFfpLabel');
 
-  // 2b. Toggle Overlay Guide from Top-Left Bar
+  function syncReticleFfpUI(ffpMode) {
+    const isFfp = ffpMode !== false;
+    if (btnToggleReticleFfp) {
+      btnToggleReticleFfp.classList.toggle('radar-btn-active', isFfp);
+      btnToggleReticleFfp.setAttribute('aria-pressed', String(isFfp));
+      btnToggleReticleFfp.title = isFfp
+        ? 'Focal Plane: FFP (Scales with zoom) — Tap for SFP'
+        : 'Focal Plane: SFP (Fixed screen size) — Tap for FFP';
+    }
+    if (reticleFfpLabel) {
+      reticleFfpLabel.textContent = isFfp ? 'FFP' : 'SFP';
+    }
+  }
+  syncReticleFfpUI(appState.reticleFfpMode);
+
   if (btnToggleOverlayTop) {
     btnToggleOverlayTop.addEventListener('click', () => {
       updateState({ overlayEnabled: !appState.overlayEnabled });
@@ -234,7 +280,11 @@ export function initSidebarAndTopControls(videoEl) {
     });
   }
 
-  // Note: btnToggleReticleFfp is managed exclusively in reticleScreen.js
+  btnToggleReticleFfp?.addEventListener('click', () => {
+    const nextFfp = appState.reticleFfpMode === false;
+    updateState({ reticleFfpMode: nextFfp });
+    saveSettings(appState);
+  });
 
   // 2d. Cyclic Quick Tool HUD Pill Tap-to-Toggle
   const quickToolPill = document.getElementById('quickToolPill');
@@ -251,9 +301,92 @@ export function initSidebarAndTopControls(videoEl) {
   const btnHeatmapTune = document.getElementById('btnHeatmapTune');
   const heatmapDockGroup = btnToggleHeatmap?.closest('.heatmap-dock-group');
   const heatmapTunePopover = document.getElementById('heatmapTunePopover');
+  const heatmapPopoverHeader = document.getElementById('heatmapPopoverHeader');
   const btnPopoverRezero = document.getElementById('btnPopoverRezero');
   const btnCloseHeatmapSetup = document.getElementById('btnCloseHeatmapSetup');
-  const btnOpenLiveHeatmapTune = document.getElementById('btnOpenLiveHeatmapTune');
+
+  const btnReplayTune = document.getElementById('btnReplayTune');
+  const replayDockGroup = btnReplayTune?.closest('.replay-dock-group');
+  const replayDockDot = document.getElementById('replayDockDot');
+  const replayTunePopover = document.getElementById('replayTunePopover');
+  const replayPopoverHeader = document.getElementById('replayPopoverHeader');
+  const btnCloseReplaySetup = document.getElementById('btnCloseReplaySetup');
+
+  function makePopoverDraggable(popoverEl, headerEl) {
+    let customPos = false;
+    let dragState = null;
+
+    function clampPosition() {
+      if (!popoverEl || !customPos || popoverEl.classList.contains('hidden')) return;
+      const parent = popoverEl.parentElement;
+      if (!parent || !parent.clientWidth || !parent.clientHeight) return;
+      const maxX = Math.max(8, parent.clientWidth - popoverEl.offsetWidth - 8);
+      const maxY = Math.max(8, parent.clientHeight - popoverEl.offsetHeight - 8);
+      const curLeft = parseFloat(popoverEl.style.left);
+      const curTop = parseFloat(popoverEl.style.top);
+      const clampedX = Math.max(8, Math.min(maxX, Number.isFinite(curLeft) ? curLeft : popoverEl.offsetLeft));
+      const clampedY = Math.max(8, Math.min(maxY, Number.isFinite(curTop) ? curTop : popoverEl.offsetTop));
+      popoverEl.style.left = `${clampedX}px`;
+      popoverEl.style.top = `${clampedY}px`;
+    }
+
+    headerEl?.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (e.target.closest('button') || !popoverEl?.parentElement) return;
+      const popRect = popoverEl.getBoundingClientRect();
+      const parentRect = popoverEl.parentElement.getBoundingClientRect();
+      const origLeft = popRect.left - parentRect.left;
+      const origTop = popRect.top - parentRect.top;
+      popoverEl.style.left = `${origLeft}px`;
+      popoverEl.style.top = `${origTop}px`;
+      popoverEl.style.bottom = 'auto';
+      popoverEl.style.transform = 'none';
+      customPos = true;
+      dragState = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft,
+        origTop
+      };
+      headerEl.classList.add('is-dragging');
+      try {
+        headerEl.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic capture failures
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    headerEl?.addEventListener('pointermove', (e) => {
+      if (!dragState || e.pointerId !== dragState.pointerId || !popoverEl?.parentElement) return;
+      const parent = popoverEl.parentElement;
+      const maxX = Math.max(8, parent.clientWidth - popoverEl.offsetWidth - 8);
+      const maxY = Math.max(8, parent.clientHeight - popoverEl.offsetHeight - 8);
+      const nx = Math.max(8, Math.min(maxX, dragState.origLeft + (e.clientX - dragState.startX)));
+      const ny = Math.max(8, Math.min(maxY, dragState.origTop + (e.clientY - dragState.startY)));
+      popoverEl.style.left = `${nx}px`;
+      popoverEl.style.top = `${ny}px`;
+      e.stopPropagation();
+    });
+
+    const endDrag = (e) => {
+      if (!dragState) return;
+      if (e?.pointerId !== undefined && e.pointerId !== dragState.pointerId) return;
+      dragState = null;
+      headerEl?.classList.remove('is-dragging');
+      e?.stopPropagation?.();
+    };
+    headerEl?.addEventListener('pointerup', endDrag);
+    headerEl?.addEventListener('pointercancel', endDrag);
+    headerEl?.addEventListener('lostpointercapture', endDrag);
+
+    return clampPosition;
+  }
+
+  const clampHeatmapPopoverPosition = makePopoverDraggable(heatmapTunePopover, heatmapPopoverHeader);
+  const clampReplayPopoverPosition = makePopoverDraggable(replayTunePopover, replayPopoverHeader);
 
   const triggerLiveRezero = () => {
     rezeroHeatmap();
@@ -272,10 +405,14 @@ export function initSidebarAndTopControls(videoEl) {
         uiDecluttered: false,
         heatmapEnabled: true,
         heatmapSetupOpen: true,
+        replaySetupOpen: false,
         liveMasksVisible: true
       });
       saveSettings(appState);
-      requestAnimationFrame(() => renderLiveIgnoreMasks());
+      requestAnimationFrame(() => {
+        clampHeatmapPopoverPosition();
+        renderLiveIgnoreMasks();
+      });
     } else {
       updateState({
         heatmapSetupOpen: false,
@@ -285,15 +422,35 @@ export function initSidebarAndTopControls(videoEl) {
     }
   }
 
+  function setReplaySetupOpen(open) {
+    const next = Boolean(open);
+    if (next) {
+      updateState({
+        currentScreen: 'live',
+        uiDecluttered: false,
+        replaySetupOpen: true,
+        heatmapSetupOpen: false,
+        liveMaskDrawActive: false,
+        liveMasksVisible: false
+      });
+      requestAnimationFrame(() => clampReplayPopoverPosition());
+    } else {
+      updateState({ replaySetupOpen: false });
+    }
+  }
+
   btnLiveRezero?.addEventListener('click', triggerLiveRezero);
   btnPopoverRezero?.addEventListener('click', triggerLiveRezero);
   btnCloseHeatmapSetup?.addEventListener('click', () => setHeatmapSetupOpen(false));
   btnHeatmapTune?.addEventListener('click', () => setHeatmapSetupOpen(!appState.heatmapSetupOpen));
-  btnOpenLiveHeatmapTune?.addEventListener('click', () => setHeatmapSetupOpen(true));
+
+  btnCloseReplaySetup?.addEventListener('click', () => setReplaySetupOpen(false));
+  btnReplayTune?.addEventListener('click', () => setReplaySetupOpen(!appState.replaySetupOpen));
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && appState.heatmapSetupOpen) {
-      setHeatmapSetupOpen(false);
+    if (e.key === 'Escape') {
+      if (appState.heatmapSetupOpen) setHeatmapSetupOpen(false);
+      if (appState.replaySetupOpen) setReplaySetupOpen(false);
     }
   });
 
@@ -336,12 +493,6 @@ export function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 3b. Save Annotated PNG Snapshot (Live Frame + Reticle)
-  const btnLiveSnapshot = document.getElementById('btnLiveSnapshot');
-  btnLiveSnapshot?.addEventListener('click', () => {
-    captureAnnotatedSnapshot();
-  });
-
   // 5. Enable/Disable Rolling In-Memory Buffer
   btnToggleBuffer.addEventListener('click', () => {
     const next = !appState.bufferEnabled;
@@ -371,10 +522,12 @@ export function initSidebarAndTopControls(videoEl) {
   valBufferFps.textContent = `${appState.bufferTargetFps || 15} FPS`;
 
   const replayBtnLabel = document.getElementById('replayBtnLabel');
-  const updateReplayBtnLabel = (sec) => {
-    if (replayBtnLabel) replayBtnLabel.textContent = `Replay · ${sec}s`;
+  const replayTuneDurChip = document.getElementById('replayTuneDurChip');
+  const updateReplayBtnLabel = (sec, enabled = appState.bufferEnabled) => {
+    if (replayBtnLabel) replayBtnLabel.textContent = 'Replay';
+    if (replayTuneDurChip) replayTuneDurChip.textContent = enabled ? `${sec}s` : 'OFF';
   };
-  updateReplayBtnLabel(appState.bufferMaxSeconds || 20);
+  updateReplayBtnLabel(appState.bufferMaxSeconds || 20, appState.bufferEnabled);
 
   sliderBufferDuration.addEventListener('input', (e) => {
     const sec = Number(e.target.value) || 20;
@@ -791,9 +944,7 @@ export function initSidebarAndTopControls(videoEl) {
 
   // Note: Overlay reticle master controls (btnToggleOverlay, opacity, scale, load img) are managed exclusively in reticleScreen.js
 
-  // 10. Heatmap Sensitivity, Display Duration (with Infinity support) & Voice Callouts
-  const sliderHeatmapSens = document.getElementById('sliderHeatmapSens');
-  const valHeatmapSens = document.getElementById('valHeatmapSens');
+  // 10. Heatmap Display Duration (with Infinity support), Live Calibration & Voice Callouts
   const sliderHeatmapDuration = document.getElementById('sliderHeatmapDuration');
   const valHeatmapDuration = document.getElementById('valHeatmapDuration');
   const inputHeatmapDuration = document.getElementById('inputHeatmapDuration');
@@ -821,14 +972,12 @@ export function initSidebarAndTopControls(videoEl) {
   const liveSliderHeatmapSens = document.getElementById('liveSliderHeatmapSens');
   const liveValHeatmapSens = document.getElementById('liveValHeatmapSens');
   const heatmapTuneSensChip = document.getElementById('heatmapTuneSensChip');
-  const sliderHeatmapMaxArea = document.getElementById('sliderHeatmapMaxArea');
-  const valHeatmapMaxArea = document.getElementById('valHeatmapMaxArea');
   const liveSliderHeatmapMaxArea = document.getElementById('liveSliderHeatmapMaxArea');
   const liveValHeatmapMaxArea = document.getElementById('liveValHeatmapMaxArea');
-  const sliderHeatmapMinCells = document.getElementById('sliderHeatmapMinCells');
-  const valHeatmapMinCells = document.getElementById('valHeatmapMinCells');
   const liveSliderHeatmapMinCells = document.getElementById('liveSliderHeatmapMinCells');
   const liveValHeatmapMinCells = document.getElementById('liveValHeatmapMinCells');
+  const liveSliderHeatmapShakeGate = document.getElementById('liveSliderHeatmapShakeGate');
+  const liveValHeatmapShakeGate = document.getElementById('liveValHeatmapShakeGate');
 
   const heatmapLiveGatePill = document.getElementById('heatmapLiveGatePill');
   const heatmapNoiseMeterFill = document.getElementById('heatmapNoiseMeterFill');
@@ -858,8 +1007,6 @@ export function initSidebarAndTopControls(videoEl) {
   function syncSensitivityUI(sens) {
     const clamped = Math.max(10, Math.min(95, Number(sens) || 60));
     const threshold = Math.round(82 - clamped * 0.76);
-    if (sliderHeatmapSens) sliderHeatmapSens.value = String(clamped);
-    if (valHeatmapSens) valHeatmapSens.textContent = `${clamped}%`;
     if (liveSliderHeatmapSens) liveSliderHeatmapSens.value = String(clamped);
     if (liveValHeatmapSens) liveValHeatmapSens.textContent = `${clamped}% · Δ>${threshold}`;
     if (heatmapTuneSensChip) heatmapTuneSensChip.textContent = `${clamped}%`;
@@ -896,20 +1043,11 @@ export function initSidebarAndTopControls(videoEl) {
     return Math.round(Math.pow(norm, 1 / MAX_HIT_AREA_CURVE) * 100);
   }
 
-  function formatMaxAreaPct(pct) {
-    if (pct < 1) return `${pct.toFixed(2)}%`;
-    if (pct < 10) return `${pct.toFixed(1)}%`;
-    return `${Math.round(pct)}%`;
-  }
-
   function syncMaxAreaUI(pct, minCells = appState.heatmapMinCells ?? 2) {
     const safeMin = Math.max(1, Math.min(20, Number(minCells) || 2));
     const clamped = clampMaxAreaPct(pct, safeMin);
     const pos = maxAreaPctToSliderPos(clamped, safeMin);
     const cells = Math.max(safeMin + 1, Math.round((clamped / 100) * HEAT_GRID_CELLS));
-    const pctStr = formatMaxAreaPct(clamped);
-    if (sliderHeatmapMaxArea) sliderHeatmapMaxArea.value = String(pos);
-    if (valHeatmapMaxArea) valHeatmapMaxArea.textContent = `${cells} cells (${pctStr})`;
     if (liveSliderHeatmapMaxArea) liveSliderHeatmapMaxArea.value = String(pos);
     if (liveValHeatmapMaxArea) liveValHeatmapMaxArea.textContent = `${cells} cells`;
   }
@@ -917,10 +1055,22 @@ export function initSidebarAndTopControls(videoEl) {
   function syncMinCellsUI(cells) {
     const clamped = Math.max(1, Math.min(20, Number(cells) || 2));
     const label = `${clamped} cell${clamped === 1 ? '' : 's'}`;
-    if (sliderHeatmapMinCells) sliderHeatmapMinCells.value = String(clamped);
-    if (valHeatmapMinCells) valHeatmapMinCells.textContent = label;
     if (liveSliderHeatmapMinCells) liveSliderHeatmapMinCells.value = String(clamped);
     if (liveValHeatmapMinCells) liveValHeatmapMinCells.textContent = label;
+  }
+
+  function clampShakeGatePct(pct, maxAreaPct = appState.heatmapMaxAreaPct ?? 5) {
+    const minShake = Math.max(5, Math.ceil(Number(maxAreaPct) || 5));
+    const raw = Number(pct);
+    const val = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 18;
+    return Math.max(minShake, Math.min(50, val));
+  }
+
+  function syncShakeGateUI(pct, maxAreaPct = appState.heatmapMaxAreaPct ?? 5) {
+    const clamped = clampShakeGatePct(pct, maxAreaPct);
+    const cells = Math.round((clamped / 100) * HEAT_GRID_CELLS);
+    if (liveSliderHeatmapShakeGate) liveSliderHeatmapShakeGate.value = String(clamped);
+    if (liveValHeatmapShakeGate) liveValHeatmapShakeGate.textContent = `${clamped}% (${cells}c)`;
   }
 
   function applyHeatmapSensitivity(val) {
@@ -933,7 +1083,9 @@ export function initSidebarAndTopControls(videoEl) {
   function applyHeatmapMaxAreaFromSlider(pos) {
     const pct = sliderPosToMaxAreaPct(pos, appState.heatmapMinCells ?? 2);
     syncMaxAreaUI(pct, appState.heatmapMinCells ?? 2);
-    updateState({ heatmapMaxAreaPct: pct });
+    const nextShake = clampShakeGatePct(appState.heatmapShakeGatePct ?? 18, pct);
+    syncShakeGateUI(nextShake, pct);
+    updateState({ heatmapMaxAreaPct: pct, heatmapShakeGatePct: nextShake });
     saveSettings(appState);
   }
 
@@ -942,25 +1094,28 @@ export function initSidebarAndTopControls(videoEl) {
     syncMinCellsUI(cells);
     const nextMaxPct = clampMaxAreaPct(appState.heatmapMaxAreaPct ?? 5, cells);
     syncMaxAreaUI(nextMaxPct, cells);
-    updateState({ heatmapMinCells: cells, heatmapMaxAreaPct: nextMaxPct });
+    const nextShake = clampShakeGatePct(appState.heatmapShakeGatePct ?? 18, nextMaxPct);
+    syncShakeGateUI(nextShake, nextMaxPct);
+    updateState({ heatmapMinCells: cells, heatmapMaxAreaPct: nextMaxPct, heatmapShakeGatePct: nextShake });
+    saveSettings(appState);
+  }
+
+  function applyHeatmapShakeGate(val) {
+    const pct = clampShakeGatePct(val, appState.heatmapMaxAreaPct ?? 5);
+    syncShakeGateUI(pct, appState.heatmapMaxAreaPct ?? 5);
+    updateState({ heatmapShakeGatePct: pct });
     saveSettings(appState);
   }
 
   syncSensitivityUI(appState.heatmapSensitivity ?? 60);
   syncMinCellsUI(appState.heatmapMinCells ?? 2);
   syncMaxAreaUI(appState.heatmapMaxAreaPct ?? 5, appState.heatmapMinCells ?? 2);
+  syncShakeGateUI(appState.heatmapShakeGatePct ?? 18, appState.heatmapMaxAreaPct ?? 5);
 
-  [sliderHeatmapMaxArea, liveSliderHeatmapMaxArea].forEach((el) => {
-    el?.addEventListener('input', (e) => applyHeatmapMaxAreaFromSlider(e.target.value));
-  });
-
-  [sliderHeatmapMinCells, liveSliderHeatmapMinCells].forEach((el) => {
-    el?.addEventListener('input', (e) => applyHeatmapMinCells(e.target.value));
-  });
-
-  [sliderHeatmapSens, liveSliderHeatmapSens].forEach((el) => {
-    el?.addEventListener('input', (e) => applyHeatmapSensitivity(e.target.value));
-  });
+  liveSliderHeatmapMaxArea?.addEventListener('input', (e) => applyHeatmapMaxAreaFromSlider(e.target.value));
+  liveSliderHeatmapMinCells?.addEventListener('input', (e) => applyHeatmapMinCells(e.target.value));
+  liveSliderHeatmapShakeGate?.addEventListener('input', (e) => applyHeatmapShakeGate(e.target.value));
+  liveSliderHeatmapSens?.addEventListener('input', (e) => applyHeatmapSensitivity(e.target.value));
 
   // Live Noise-Floor & Gate Telemetry Subscription (active only when setup popover is open)
   subscribeHeatmapTelemetry((snap) => {
@@ -996,16 +1151,18 @@ export function initSidebarAndTopControls(videoEl) {
     }
   });
 
-  // Live Ignore Masks (Draw / Show / Delete / Clear right on Live Viewport)
+  // Live Ignore Masks (Draw / Move / Resize / Show / Delete / Clear right on Live Viewport)
   const liveIgnoreLayer = document.getElementById('liveIgnoreLayer');
   const liveDrawPreview = document.getElementById('liveDrawPreview');
   const btnLiveMaskDraw = document.getElementById('btnLiveMaskDraw');
   const btnLiveMasksVisible = document.getElementById('btnLiveMasksVisible');
   const btnLiveClearMasks = document.getElementById('btnLiveClearMasks');
   const liveMaskDrawHint = document.getElementById('liveMaskDrawHint');
+  const MIN_MASK_SIZE = 0.02;
   let clearMasksArmTimer = null;
   let clearMasksArmed = false;
   let liveDrawStart = null;
+  let activeMaskDrag = null;
 
   function resetClearMasksArm() {
     clearMasksArmed = false;
@@ -1014,6 +1171,109 @@ export function initSidebarAndTopControls(videoEl) {
       btnLiveClearMasks.textContent = 'Clear All';
       btnLiveClearMasks.classList.remove('radar-btn-armed');
     }
+  }
+
+  function applyMaskBoxGeometry(box, mask, proj) {
+    const leftPct = ((mask.x * proj.vw - proj.sx) / proj.cropW) * 100;
+    const topPct = ((mask.y * proj.vh - proj.sy) / proj.cropH) * 100;
+    const widthPct = ((mask.w * proj.vw) / proj.cropW) * 100;
+    const heightPct = ((mask.h * proj.vh) / proj.cropH) * 100;
+    box.style.left = `${leftPct.toFixed(2)}%`;
+    box.style.top = `${topPct.toFixed(2)}%`;
+    box.style.width = `${widthPct.toFixed(2)}%`;
+    box.style.height = `${heightPct.toFixed(2)}%`;
+  }
+
+  function attachMaskDragHandlers(targetEl, box, idx, mask, handleMode) {
+    targetEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (handleMode === 'move' && (e.target.closest('.live-ignore-handle') || e.target.closest('.live-ignore-box-remove'))) {
+        return;
+      }
+      const layerRect = liveIgnoreLayer?.getBoundingClientRect();
+      if (!layerRect || !layerRect.width || !layerRect.height) return;
+      const proj = getLiveViewportProjection();
+      const orig = {
+        x: Number(mask.x) || 0,
+        y: Number(mask.y) || 0,
+        w: Number(mask.w) || MIN_MASK_SIZE,
+        h: Number(mask.h) || MIN_MASK_SIZE
+      };
+      activeMaskDrag = {
+        idx,
+        handleMode,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        layerRect,
+        proj,
+        orig,
+        box
+      };
+      box.classList.add('is-editing');
+      try {
+        targetEl.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore synthetic capture errors
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    targetEl.addEventListener('pointermove', (e) => {
+      if (!activeMaskDrag || activeMaskDrag.pointerId !== e.pointerId || activeMaskDrag.idx !== idx) return;
+      const { startX, startY, layerRect, proj, orig, handleMode: mode } = activeMaskDrag;
+      const dvx = (e.clientX - startX) / layerRect.width;
+      const dvy = (e.clientY - startY) / layerRect.height;
+      const dsx = (dvx * proj.cropW) / proj.vw;
+      const dsy = (dvy * proj.cropH) / proj.vh;
+
+      let nx = orig.x;
+      let ny = orig.y;
+      let nw = orig.w;
+      let nh = orig.h;
+
+      if (mode === 'move') {
+        nx = Math.max(0, Math.min(1 - orig.w, orig.x + dsx));
+        ny = Math.max(0, Math.min(1 - orig.h, orig.y + dsy));
+      } else {
+        let left = orig.x;
+        let top = orig.y;
+        let right = orig.x + orig.w;
+        let bottom = orig.y + orig.h;
+        if (mode.includes('w')) left = Math.max(0, Math.min(right - MIN_MASK_SIZE, orig.x + dsx));
+        if (mode.includes('e')) right = Math.min(1, Math.max(left + MIN_MASK_SIZE, orig.x + orig.w + dsx));
+        if (mode.includes('n')) top = Math.max(0, Math.min(bottom - MIN_MASK_SIZE, orig.y + dsy));
+        if (mode.includes('s')) bottom = Math.min(1, Math.max(top + MIN_MASK_SIZE, orig.y + orig.h + dsy));
+        nx = left;
+        ny = top;
+        nw = right - left;
+        nh = bottom - top;
+      }
+
+      const updated = { x: nx, y: ny, w: nw, h: nh };
+      applyMaskBoxGeometry(box, updated, proj);
+
+      const curMasks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
+      if (idx >= 0 && idx < curMasks.length) {
+        const nextMasks = curMasks.map((item, i) => (i === idx ? updated : item));
+        updateState({ heatmapIgnoreMasks: nextMasks });
+      }
+      e.stopPropagation();
+    });
+
+    const finishMaskEdit = (e) => {
+      if (!activeMaskDrag || activeMaskDrag.idx !== idx) return;
+      if (e?.pointerId !== undefined && e.pointerId !== activeMaskDrag.pointerId) return;
+      e?.stopPropagation?.();
+      box.classList.remove('is-editing');
+      activeMaskDrag = null;
+      saveSettings(appState);
+      renderLiveIgnoreMasks();
+    };
+    targetEl.addEventListener('pointerup', finishMaskEdit);
+    targetEl.addEventListener('pointercancel', finishMaskEdit);
+    targetEl.addEventListener('lostpointercapture', finishMaskEdit);
   }
 
   function renderLiveIgnoreMasks() {
@@ -1043,6 +1303,8 @@ export function initSidebarAndTopControls(videoEl) {
     liveIgnoreLayer.classList.toggle('mask-draw-active', drawActive);
     liveIgnoreLayer.classList.toggle('mask-edit-active', showMasks);
 
+    if (activeMaskDrag) return;
+
     liveIgnoreLayer.innerHTML = '';
     if (!showMasks) return;
 
@@ -1050,14 +1312,17 @@ export function initSidebarAndTopControls(videoEl) {
     masks.forEach((m, idx) => {
       const box = document.createElement('div');
       box.className = 'live-ignore-box';
-      const leftPct = ((m.x * proj.vw - proj.sx) / proj.cropW) * 100;
-      const topPct = ((m.y * proj.vh - proj.sy) / proj.cropH) * 100;
-      const widthPct = ((m.w * proj.vw) / proj.cropW) * 100;
-      const heightPct = ((m.h * proj.vh) / proj.cropH) * 100;
-      box.style.left = `${leftPct.toFixed(2)}%`;
-      box.style.top = `${topPct.toFixed(2)}%`;
-      box.style.width = `${widthPct.toFixed(2)}%`;
-      box.style.height = `${heightPct.toFixed(2)}%`;
+      box.title = 'Drag to move mask, or drag corners to resize';
+      applyMaskBoxGeometry(box, m, proj);
+      attachMaskDragHandlers(box, box, idx, m, 'move');
+
+      ['nw', 'ne', 'sw', 'se'].forEach((corner) => {
+        const handle = document.createElement('div');
+        handle.className = `live-ignore-handle handle-${corner}`;
+        handle.title = 'Drag corner to resize mask';
+        attachMaskDragHandlers(handle, box, idx, m, corner);
+        box.appendChild(handle);
+      });
 
       const rm = document.createElement('button');
       rm.type = 'button';
@@ -1106,7 +1371,7 @@ export function initSidebarAndTopControls(videoEl) {
   });
 
   liveIgnoreLayer?.addEventListener('pointerdown', (e) => {
-    if (!appState.liveMaskDrawActive || e.target.closest('.live-ignore-box-remove')) return;
+    if (!appState.liveMaskDrawActive || e.target.closest('.live-ignore-box') || e.target.closest('.live-ignore-box-remove')) return;
     const rect = liveIgnoreLayer.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     const vx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -1161,7 +1426,13 @@ export function initSidebarAndTopControls(videoEl) {
     liveDrawPreview?.classList.add('hidden');
   });
   window.addEventListener('resize', () => {
-    if (appState.heatmapSetupOpen) renderLiveIgnoreMasks();
+    if (appState.heatmapSetupOpen) {
+      clampHeatmapPopoverPosition();
+      renderLiveIgnoreMasks();
+    }
+    if (appState.replaySetupOpen) {
+      clampReplayPopoverPosition();
+    }
   });
 
   function setHeatmapDuration(dur) {
@@ -1545,10 +1816,12 @@ export function initSidebarAndTopControls(videoEl) {
       if (screenController) screenController.classList.toggle('hidden', !isController);
       btnToggleOptions?.classList.toggle('radar-btn-active', isSettings);
     }
-    btnTogglePip.classList.toggle('radar-btn-active', state.pipEnabled);
+    syncLoupeModeUI(state.pipEnabled, state.autoAimLoupe);
     if (btnToggleOverlayTop) {
       btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
     }
+    reticleDockGroup?.classList.toggle('is-reticle-on', Boolean(state.overlayEnabled));
+    syncReticleFfpUI(state.reticleFfpMode);
     btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
     heatmapDockGroup?.classList.toggle('is-heatmap-on', Boolean(state.heatmapEnabled));
     const setupOpen = Boolean(state.heatmapSetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
@@ -1559,6 +1832,15 @@ export function initSidebarAndTopControls(videoEl) {
     if (btnHeatmapTune) {
       btnHeatmapTune.classList.toggle('radar-btn-active', setupOpen);
       btnHeatmapTune.setAttribute('aria-expanded', setupOpen ? 'true' : 'false');
+    }
+    const replayOpen = Boolean(state.replaySetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
+    if (state.replaySetupOpen && !replayOpen) {
+      queueMicrotask(() => setReplaySetupOpen(false));
+    }
+    replayTunePopover?.classList.toggle('hidden', !replayOpen);
+    if (btnReplayTune) {
+      btnReplayTune.classList.toggle('radar-btn-active', replayOpen);
+      btnReplayTune.setAttribute('aria-expanded', replayOpen ? 'true' : 'false');
     }
     if (
       patch.heatmapSetupOpen !== undefined ||
@@ -1577,15 +1859,13 @@ export function initSidebarAndTopControls(videoEl) {
     if (patch.heatmapMaxAreaPct !== undefined || patch.heatmapMinCells !== undefined) {
       syncMaxAreaUI(state.heatmapMaxAreaPct, state.heatmapMinCells);
     }
+    if (patch.heatmapShakeGatePct !== undefined || patch.heatmapMaxAreaPct !== undefined) {
+      syncShakeGateUI(state.heatmapShakeGatePct, state.heatmapMaxAreaPct);
+    }
     const detectorActive = Boolean(state.heatmapEnabled || state.heatmapSpeechEnabled);
     if (btnLiveRezero) {
       btnLiveRezero.disabled = !detectorActive;
       btnLiveRezero.classList.toggle('dock-btn-dimmed', !detectorActive);
-    }
-    if (btnLiveAimLoupe) {
-      const hasHits = Array.isArray(state.detectionHits) && state.detectionHits.length > 0;
-      btnLiveAimLoupe.disabled = !hasHits;
-      btnLiveAimLoupe.classList.toggle('dock-btn-dimmed', !hasHits);
     }
     syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled), state.detectionCalloutMode);
     if (patch.detectionCalloutMode !== undefined) {
@@ -1598,6 +1878,11 @@ export function initSidebarAndTopControls(videoEl) {
     bufferText.textContent = state.bufferEnabled
       ? `${Math.round(state.bufferedSeconds)}/${state.bufferMaxSeconds}s`
       : 'RAM OFF';
+    replayDockGroup?.classList.toggle('is-buffer-off', !state.bufferEnabled);
+    if (replayDockDot) {
+      replayDockDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
+    }
+    updateReplayBtnLabel(state.bufferMaxSeconds || 20, state.bufferEnabled);
 
     // Update Memory Availability Meter in Settings
     const bufDims = getBufferedTargetDimensions(state.streamWidth, state.streamHeight);

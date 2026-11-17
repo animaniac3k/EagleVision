@@ -32,6 +32,7 @@ export const appState = {
   // Digital Zoom Window (PiP) & ROI Target Crosshair
   pipEnabled: true,
   pipZoom: 3.0,
+  autoAimLoupe: false,
   roiTargetVisible: true,
   roiX: 0.5,
   roiY: 0.5,
@@ -61,8 +62,10 @@ export const appState = {
     minorTickLen: 10,      // Minor tick length (4..16)
     majorTickLen: 18,      // Major tick length (8..26)
     showLabels: true,      // Click numbers on arms (1, 2, 3... or 5, 10)
+    labelSize: 10,         // Click number font size in SVG units (6..24)
     concentricRings: false,// Concentric range circles
     ringInterval: 5,       // Circle every N clicks
+    svdRangefinder: false, // SVD-style stadiametric rangefinder in bottom-right quadrant
     strokeWidth: 1.8,      // Reticle stroke thickness (0.5..5.0)
     reticleColor: ''       // Empty string = dynamic radar theme color
   },
@@ -77,11 +80,13 @@ export const appState = {
   // Localized Micro-Change Heatmap (ignores global camera shake)
   heatmapEnabled: false,
   heatmapSetupOpen: false, // Transient live-screen calibration popover & visual feedback
+  replaySetupOpen: false,  // Transient live-screen replay buffer settings popover
   liveMaskDrawActive: false, // Transient mask drawing mode on live viewport
   liveMasksVisible: false, // Transient mask visibility on live viewport (auto-shown in setup)
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
   heatmapMaxAreaPct: 5,   // Max simultaneous changed area (% of screen, default 5% = 1/20th)
+  heatmapShakeGatePct: 18,// Global camera shake rejection threshold (% of unmasked frame)
   heatmapMinCells: 2,     // Minimum changed spike cells (160x90 grid) to register a hit
   heatmapSpeechEnabled: false, // Voice callouts ("Detection! 11 o'clock, 3 clicks")
   heatmapAutoSave: false, // Auto-snapshot rolling RAM buffer on localized hit (rate-limited)

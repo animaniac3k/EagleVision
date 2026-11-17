@@ -13,7 +13,7 @@ import { shouldHoldCanvasPan } from '../ui/ringController.js';
 /**
  * Aims the digital Loupe crosshair onto a normalized source frame coordinate on the Live screen.
  */
-export function aimLoupeAtHit(hit) {
+export function aimLoupeAtHit(hit, { switchToLive = true, ensurePipVisible = true } = {}) {
   if (!hit) return false;
   const nx = Math.max(0.02, Math.min(0.98, Number(hit.normX) || 0.5));
   const ny = Math.max(0.02, Math.min(0.98, Number(hit.normY) || 0.5));
@@ -68,15 +68,20 @@ export function aimLoupeAtHit(hit) {
   const roiX = Math.max(0.04, Math.min(0.96, (targetSourceX - sx) / Math.max(1, cropW)));
   const roiY = Math.max(0.04, Math.min(0.96, (targetSourceY - sy) / Math.max(1, cropH)));
 
-  updateState({
+  const patch = {
     mainPanX: nextPanX,
     mainPanY: nextPanY,
     roiX,
     roiY,
-    pipEnabled: true,
-    roiTargetVisible: true,
-    currentScreen: 'live'
-  });
+    roiTargetVisible: true
+  };
+  if (ensurePipVisible) {
+    patch.pipEnabled = true;
+  }
+  if (switchToLive) {
+    patch.currentScreen = 'live';
+  }
+  updateState(patch);
   return true;
 }
 

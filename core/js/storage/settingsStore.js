@@ -10,6 +10,7 @@ export function loadSavedSettings() {
     if (!parsed) return null;
     parsed.playbackReticleEnabled = Boolean(parsed.playbackReticleEnabled);
     parsed.hitsReticleEnabled = parsed.hitsReticleEnabled !== false;
+    parsed.autoAimLoupe = Boolean(parsed.autoAimLoupe);
     parsed.detectionCalloutMode = parsed.detectionCalloutMode === 'poa' ? 'poa' : 'poi';
     parsed.bufferFastQuality = parsed.bufferFastQuality !== false;
     parsed.bufferMicEnabled = Boolean(parsed.bufferMicEnabled);
@@ -20,6 +21,9 @@ export function loadSavedSettings() {
     parsed.heatmapMaxAreaPct = Number.isFinite(Number(parsed.heatmapMaxAreaPct))
       ? Math.max(minAreaPct, Math.min(20, Number(parsed.heatmapMaxAreaPct)))
       : 5;
+    parsed.heatmapShakeGatePct = Number.isFinite(Number(parsed.heatmapShakeGatePct))
+      ? Math.max(5, Math.min(50, Math.round(Number(parsed.heatmapShakeGatePct))))
+      : 18;
     if (parsed.reticleConfig) {
       parsed.reticleConfig = Object.assign(
         {
@@ -31,8 +35,10 @@ export function loadSavedSettings() {
           minorTickLen: 10,
           majorTickLen: 18,
           showLabels: true,
+          labelSize: 10,
           concentricRings: false,
           ringInterval: 5,
+          svdRangefinder: false,
           strokeWidth: 1.8,
           reticleColor: ''
         },
@@ -50,6 +56,7 @@ export function saveSettings(state) {
     const subset = {
       pipEnabled: state.pipEnabled,
       pipZoom: state.pipZoom,
+      autoAimLoupe: Boolean(state.autoAimLoupe),
       overlayEnabled: state.overlayEnabled,
       playbackReticleEnabled: Boolean(state.playbackReticleEnabled),
       hitsReticleEnabled: state.hitsReticleEnabled !== false,
@@ -68,6 +75,7 @@ export function saveSettings(state) {
       heatmapSensitivity: state.heatmapSensitivity,
       heatmapDuration: state.heatmapDuration || 30.0,
       heatmapMaxAreaPct: state.heatmapMaxAreaPct ?? 5,
+      heatmapShakeGatePct: state.heatmapShakeGatePct ?? 18,
       heatmapMinCells: state.heatmapMinCells ?? 2,
       heatmapSpeechEnabled: Boolean(state.heatmapSpeechEnabled),
       heatmapAutoSave: Boolean(state.heatmapAutoSave),

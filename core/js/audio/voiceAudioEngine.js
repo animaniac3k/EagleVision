@@ -100,6 +100,9 @@ function scheduleAlertChime(ctx, startTime) {
   } catch (_) {}
 }
 
+const AXIS_PAUSE_TOKEN = '__axis_pause__';
+const AXIS_PAUSE_SEC = 0.18;
+
 const KNOWN_UNITS = [
   'click', 'clicks', 'mil', 'mils', 'mark', 'marks',
   'unit', 'units', 'degree', 'degrees', 'meter', 'meters', 'yard', 'yards'
@@ -118,6 +121,31 @@ function pushCountTokens(tokens, countNum) {
   } else if (countNum >= 200) {
     tokens.push('100');
   }
+}
+
+function appendAxisMatches(tokens, lower, regex, dirFirst) {
+  let match;
+  let found = false;
+  while ((match = regex.exec(lower)) !== null) {
+    if (found) {
+      tokens.push(AXIS_PAUSE_TOKEN);
+    }
+    found = true;
+    const countNum = parseInt(dirFirst ? match[2] : match[1], 10);
+    const maybeUnit = (dirFirst ? match[3] : match[2]) || '';
+    const dir = (dirFirst ? match[1] : match[3]).toLowerCase();
+    if (dirFirst && VOICE_MANIFEST[dir]) {
+      tokens.push(dir);
+    }
+    pushCountTokens(tokens, countNum);
+    if (maybeUnit && KNOWN_UNITS.includes(maybeUnit)) {
+      tokens.push(maybeUnit);
+    }
+    if (!dirFirst && VOICE_MANIFEST[dir]) {
+      tokens.push(dir);
+    }
+  }
+  return found;
 }
 
 /**
@@ -160,24 +188,12 @@ export function parsePhraseToTokens(phrase) {
     return tokens;
   }
 
-  // 3. Cartesian Left / Right / Up / Down clauses (Style A: "3 clicks right, 2 clicks up")
-  const axisRegex = /(\d+)\s+(?:([a-z]+)\s+)?(left|right|up|down)\b/gi;
-  let axisMatch;
-  let foundAxisClause = false;
-  while ((axisMatch = axisRegex.exec(lower)) !== null) {
-    foundAxisClause = true;
-    const countNum = parseInt(axisMatch[1], 10);
-    const maybeUnit = axisMatch[2] || '';
-    const dir = axisMatch[3].toLowerCase();
-    pushCountTokens(tokens, countNum);
-    if (maybeUnit && KNOWN_UNITS.includes(maybeUnit)) {
-      tokens.push(maybeUnit);
-    }
-    if (VOICE_MANIFEST[dir]) {
-      tokens.push(dir);
-    }
-  }
-  if (foundAxisClause) {
+  // 3. Cartesian Left / Right / Up / Down clauses (Style A: "3 clicks right, 2 clicks up",
+  //    or direction-first fallback: "Left, 3 clicks. Down, 3 clicks")
+  if (
+    appendAxisMatches(tokens, lower, /(\d+)\s+(?:([a-z]+)\s+)?(left|right|up|down)\b/gi, false) ||
+    appendAxisMatches(tokens, lower, /\b(left|right|up|down)\s*,?\s*(\d+)(?:\s+([a-z]+))?\b/gi, true)
+  ) {
     return tokens;
   }
 
@@ -219,7 +235,7 @@ export async function speakDetectionAnnouncement(phrase) {
     // Fallback: if sprite failed to fetch, try native speech if available
     if ('speechSynthesis' in window) {
       try {
-        const u = new SpeechSynthesisUtterance(phrase);
+        const u = new SpeechSynthesisUtterance(phrase.replace(/,\s+/g, '. '));
         u.pitch = Number(appState.voicePitch) || 1.25;
         u.rate = Number(appState.voiceRate) || 0.80;
         window.speechSynthesis.speak(u);
@@ -247,6 +263,11 @@ export async function speakDetectionAnnouncement(phrase) {
     if (token === '__custom_chime__') {
       scheduleAlertChime(ctx, scheduledTime);
       scheduledTime += 0.12 / rate;
+      continue;
+    }
+
+    if (token === AXIS_PAUSE_TOKEN) {
+      scheduledTime += AXIS_PAUSE_SEC / rate;
       continue;
     }
 

@@ -13,7 +13,7 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from '../renderer/overlayManager.js';
-import { speakDetectionAnnouncement } from '../renderer/compositor.js';
+import { speakDetectionAnnouncement, computeClickCalloutOffset, buildDetectionCalloutPhrase } from '../renderer/compositor.js';
 import { applyThemeColor } from './sidebarControls.js';
 
 export function initReticleScreen() {
@@ -34,7 +34,6 @@ export function initReticleScreen() {
 
   // Card 1: Overlay Master & Optics inputs
   const btnToggleOverlay = document.getElementById('btnToggleOverlay');
-  const btnToggleReticleFfp = document.getElementById('btnToggleReticleFfp');
   const sliderOvOpacity = document.getElementById('sliderOvOpacity');
   const valOvOpacity = document.getElementById('valOvOpacity');
   const sliderOvScale = document.getElementById('sliderOvScale');
@@ -52,6 +51,9 @@ export function initReticleScreen() {
 
   // Card 3: Markings
   const btnLabels = document.getElementById('btnToggleReticleLabels');
+  const btnSvd = document.getElementById('btnToggleReticleSvd');
+  const sliderLabelSize = document.getElementById('sliderReticleLabelSize');
+  const valLabelSize = document.getElementById('valReticleLabelSize');
   const sliderMajor = document.getElementById('sliderReticleMajor');
   const valMajor = document.getElementById('valReticleMajor');
   const btnRings = document.getElementById('btnToggleReticleRings');
@@ -98,11 +100,6 @@ export function initReticleScreen() {
       btnToggleOverlay.textContent = appState.overlayEnabled ? 'ON' : 'OFF';
       btnToggleOverlay.classList.toggle('radar-btn-active', Boolean(appState.overlayEnabled));
     }
-    if (btnToggleReticleFfp) {
-      const ffp = appState.reticleFfpMode !== false;
-      btnToggleReticleFfp.textContent = ffp ? 'FFP: ON' : 'FFP: OFF';
-      btnToggleReticleFfp.classList.toggle('radar-btn-active', ffp);
-    }
     if (sliderOvOpacity && valOvOpacity) {
       sliderOvOpacity.value = String(appState.overlayOpacity ?? 75);
       valOvOpacity.textContent = `${appState.overlayOpacity ?? 75}%`;
@@ -120,9 +117,9 @@ export function initReticleScreen() {
     });
 
     const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
-    const maxFittingStep = Math.max(8, Math.floor(240 / clicks));
+    const defaultFittingStep = Math.max(8, Math.floor(240 / clicks));
     const rawStep = Number(cfg.clickSpacing);
-    const effStep = (!rawStep || rawStep > maxFittingStep) ? maxFittingStep : Math.max(6, rawStep);
+    const effStep = (Number.isFinite(rawStep) && rawStep >= 4) ? Math.min(100, rawStep) : defaultFittingStep;
 
     // Sync input values
     if (sliderClicks && valClicks) {
@@ -131,7 +128,7 @@ export function initReticleScreen() {
     }
     if (sliderSpacing && valSpacing) {
       sliderSpacing.value = String(effStep);
-      valSpacing.textContent = `${effStep} px`;
+      valSpacing.textContent = `${Number(effStep.toFixed(1))} px`;
     }
     const gapVal = Math.max(0, Math.min(280, Number(cfg.centerGap ?? 64)));
     if (sliderGap) {
@@ -158,6 +155,16 @@ export function initReticleScreen() {
       btnLabels.textContent = showLabels ? 'Labels: ON' : 'Labels: OFF';
       btnLabels.classList.toggle('radar-btn-active', showLabels);
     }
+    if (btnSvd) {
+      const svdOn = Boolean(cfg.svdRangefinder);
+      btnSvd.textContent = svdOn ? 'SVD Rangefinder: ON' : 'SVD Rangefinder: OFF';
+      btnSvd.classList.toggle('radar-btn-active', svdOn);
+    }
+    if (sliderLabelSize && valLabelSize) {
+      const lSize = Math.max(6, Math.min(24, Number(cfg.labelSize) || 10));
+      sliderLabelSize.value = String(lSize);
+      valLabelSize.textContent = `${lSize} px`;
+    }
     if (sliderMajor && valMajor) {
       sliderMajor.value = String(cfg.majorInterval ?? 5);
       valMajor.textContent = cfg.majorInterval === 0 ? 'NONE' : `EVERY ${cfg.majorInterval}`;
@@ -182,7 +189,6 @@ export function initReticleScreen() {
   // Exported Gamepad Control Definitions for Reticle Customizer
   const RETICLE_CONTROLS = [
     { key: 'overlayEnabled', label: 'Overlay Guide', isToggle: true, isRoot: true, elementId: 'btnToggleOverlay' },
-    { key: 'reticleFfpMode', label: 'FFP Zoom Lock', isToggle: true, isRoot: true, elementId: 'btnToggleReticleFfp' },
     { key: 'overlayOpacity', label: 'Overlay Opacity', min: 10, max: 100, step: 5, isRoot: true, elementId: 'sliderOvOpacity' },
     { key: 'overlayScale', label: 'Reticle Scale', min: 25, max: 200, step: 5, isRoot: true, elementId: 'sliderOvScale' },
     { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 30, step: 1, elementId: 'sliderReticleClicks' },
@@ -190,6 +196,8 @@ export function initReticleScreen() {
     { key: 'centerGap', label: 'Center Gap', min: 0, max: 280, step: 2, elementId: 'sliderReticleGap' },
     { key: 'centerStyle', label: 'Center Point', isOption: true, options: ['empty', 'dot', 'cross', 'chevron'], elementId: 'valReticleCenter' },
     { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
+    { key: 'svdRangefinder', label: 'SVD Rangefinder', isToggle: true, elementId: 'btnToggleReticleSvd' },
+    { key: 'labelSize', label: 'Mark Number Size', min: 6, max: 24, step: 1, elementId: 'sliderReticleLabelSize' },
     { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
     { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
     { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, isFloat: true, elementId: 'sliderReticleStroke' }
@@ -309,9 +317,13 @@ export function initReticleScreen() {
         return window.reticleGamepadAPI.adjust(1);
       } else {
         const testClicks = Math.min(3, appState.reticleConfig?.clickCount || 10);
-        const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
-        const unit = (appState.voiceUnitKeyword || (testClicks === 1 ? 'click' : 'clicks')).trim();
-        const phrase = `${prefix}! 11 o'clock, ${testClicks} ${unit}`;
+        const isPoa = appState.detectionCalloutMode === 'poa';
+        const phrase = buildDetectionCalloutPhrase({
+          xClicks: testClicks,
+          xDir: isPoa ? 'left' : 'right',
+          yClicks: Math.min(2, testClicks),
+          yDir: isPoa ? 'down' : 'up'
+        });
         speakDetectionAnnouncement(phrase);
         return `TEST CALLOUT: "${phrase}"`;
       }
@@ -319,9 +331,7 @@ export function initReticleScreen() {
     quickAdjustClicks: (delta) => {
       const cfg = appState.reticleConfig || {};
       const next = Math.max(2, Math.min(30, (cfg.clickCount || 10) + delta));
-      const maxFittingStep = Math.max(8, Math.floor(240 / next));
-      const nextStep = Math.min(cfg.clickSpacing || maxFittingStep, maxFittingStep);
-      updateReticleConfig({ clickCount: next, clickSpacing: nextStep });
+      updateReticleConfig({ clickCount: next });
       return `CLICKS PER ARM: ${next}`;
     },
     quickAdjustSpacing: (delta) => {
@@ -402,8 +412,10 @@ export function initReticleScreen() {
       minorTickLen: 10,
       majorTickLen: 18,
       showLabels: true,
+      labelSize: 10,
       concentricRings: false,
       ringInterval: 5,
+      svdRangefinder: false,
       strokeWidth: 1.8,
       reticleColor: ''
     });
@@ -412,13 +424,6 @@ export function initReticleScreen() {
   // Card 1: Direct Event Listeners (Guarantees instant, 100% reliable clicks)
   btnToggleOverlay?.addEventListener('click', () => {
     updateState({ overlayEnabled: !appState.overlayEnabled });
-    saveSettings(appState);
-    renderPreview();
-  });
-
-  btnToggleReticleFfp?.addEventListener('click', () => {
-    const nextFfp = appState.reticleFfpMode === false;
-    updateState({ reticleFfpMode: nextFfp });
     saveSettings(appState);
     renderPreview();
   });
@@ -498,9 +503,7 @@ export function initReticleScreen() {
   // Slider & Toggle Event Listeners
   sliderClicks?.addEventListener('input', (e) => {
     const nextClicks = Number(e.target.value) || 10;
-    const maxFittingStep = Math.max(8, Math.floor(240 / nextClicks));
-    const nextStep = Math.min(appState.reticleConfig?.clickSpacing || maxFittingStep, maxFittingStep);
-    updateReticleConfig({ clickCount: nextClicks, clickSpacing: nextStep });
+    updateReticleConfig({ clickCount: nextClicks });
   });
 
   sliderSpacing?.addEventListener('input', (e) => {
@@ -522,6 +525,15 @@ export function initReticleScreen() {
   btnLabels?.addEventListener('click', () => {
     const cur = appState.reticleConfig?.showLabels !== false;
     updateReticleConfig({ showLabels: !cur });
+  });
+
+  btnSvd?.addEventListener('click', () => {
+    updateReticleConfig({ svdRangefinder: !appState.reticleConfig?.svdRangefinder });
+  });
+
+  sliderLabelSize?.addEventListener('input', (e) => {
+    const nextSize = Math.max(6, Math.min(24, Number(e.target.value) || 10));
+    updateReticleConfig({ labelSize: nextSize });
   });
 
   sliderMajor?.addEventListener('input', (e) => {
@@ -549,28 +561,13 @@ export function initReticleScreen() {
 
     const dx = e.clientX - centerX;
     const dy = e.clientY - centerY;
-    const distPx = Math.hypot(dx, dy);
 
     // Compute click distance on the preview stage (scaled to 800x500 viewBox)
     const baseScale = Math.min(svgRect.width / RETICLE_VIEWBOX_W, svgRect.height / RETICLE_VIEWBOX_H);
     const clickSpacingPx = Math.max(8, Number(appState.reticleConfig?.clickSpacing) || 32) * baseScale;
 
-    // Clicks are calculated strictly from optical dead-center
-    let clicks = 0;
-    if (distPx >= clickSpacingPx * 0.4) {
-      clicks = Math.max(1, Math.round(distPx / Math.max(1, clickSpacingPx)));
-    }
-
-    const angleDeg = ((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360;
-    let clockHour = Math.round(angleDeg / 30);
-    if (clockHour === 0) clockHour = 12;
-
-    const prefix = (appState.voiceAlertKeyword || 'Detection').trim();
-    let rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
-    let unitWord = rawUnit;
-    if (clicks === 1 && rawUnit.toLowerCase() === 'clicks') unitWord = 'click';
-
-    const phrase = clicks === 0 ? `${prefix}! Center` : `${prefix}! ${clockHour} o'clock, ${clicks} ${unitWord}`;
+    const offset = computeClickCalloutOffset(dx, dy, clickSpacingPx, appState.detectionCalloutMode);
+    const phrase = buildDetectionCalloutPhrase(offset);
 
     speakDetectionAnnouncement(phrase);
 

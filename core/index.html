@@ -119,7 +119,7 @@
 
       <!-- TOP-LEFT: Quiet Setup + Clean View Pills -->
       <nav class="floating-strip strip-top-left">
-        <button id="btnToggleOptions" class="radar-btn radar-btn-pill" title="Open Unified Setup (Camera, Detection, Reticle, Controllers)">
+        <button id="btnToggleOptions" class="radar-btn radar-btn-pill" title="Open Unified Setup (Camera, Voice, Display, Reticle, Controllers)">
           <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
             <circle cx="12" cy="12" r="3"/>
@@ -136,13 +136,8 @@
         </button>
       </nav>
 
-      <!-- TOP-RIGHT: Compact Buffer Status + Saved Clips -->
+      <!-- TOP-RIGHT: Saved Clips & Spatial Hits -->
       <nav class="floating-strip strip-top-right">
-        <button id="btnToggleBuffer" class="radar-btn radar-btn-pill radar-btn-active" title="Toggle Rolling RAM Video Buffer">
-          <span id="bufferDot" class="status-dot"></span>
-          <span id="bufferText">20s</span>
-        </button>
-
         <div class="archive-split-pill">
           <button id="btnSwitchScreen" class="radar-btn radar-btn-pill archive-pill-half" title="Open Saved Video Clips">
             <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -172,10 +167,11 @@
         <div class="hud-row"><span class="hud-key">BUFFER</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
       </aside>
 
-      <!-- ANCHORED LIVE HEATMAP CALIBRATION POPOVER (Hidden until Setup opened) -->
+      <!-- MOVABLE LIVE HEATMAP CALIBRATION WINDOW (Hidden until Setup opened) -->
       <aside id="heatmapTunePopover" class="heatmap-tune-popover hidden" role="dialog" aria-label="Heatmap Calibration">
-        <div class="heatmap-pop-header">
+        <div id="heatmapPopoverHeader" class="heatmap-pop-header" title="Drag to move window">
           <div class="heatmap-pop-title-group">
+            <span class="heatmap-pop-grip" aria-hidden="true">⋮⋮</span>
             <span class="heatmap-pop-dot"></span>
             <span class="heatmap-pop-title">Heatmap Setup</span>
             <span id="heatmapLiveGatePill" class="heatmap-gate-pill gate-idle">READY</span>
@@ -226,14 +222,101 @@
           </div>
         </div>
 
-        <!-- 3. Ignore Masks (Draw / Toggle / Clear directly on Live View) -->
+        <!-- 3. Shake Gate & Marker Duration -->
+        <div class="heatmap-pop-section">
+          <div class="slider-header">
+            <span style="color:#fda4af;">Shake Gate (Camera Move)</span>
+            <span id="liveValHeatmapShakeGate" class="slider-val">18%</span>
+          </div>
+          <input id="liveSliderHeatmapShakeGate" type="range" min="5" max="50" step="1" value="18" class="radar-slider" />
+        </div>
+
+        <div class="heatmap-pop-section">
+          <div class="slider-header">
+            <span>Marker Duration</span>
+            <div class="duration-custom-controls">
+              <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Custom duration in seconds" />
+              <span id="valHeatmapDuration" class="slider-val" style="min-width:18px;">s</span>
+            </div>
+          </div>
+          <div class="duration-preset-row">
+            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="5">5s</button>
+            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="15">15s</button>
+            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn radar-btn-active" data-dur="30">30s</button>
+            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="60">60s</button>
+            <button type="button" id="btnHeatmapInfinite" class="radar-btn radar-btn-sm duration-preset-btn" title="Infinite Persistence">∞</button>
+          </div>
+          <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" />
+        </div>
+
+        <!-- 4. Auto-Save Clip on Hit -->
+        <div class="heatmap-pop-toggle-row">
+          <div class="heatmap-pop-toggle-text">
+            <span class="heatmap-pop-toggle-title">Auto-Save Clip on Hit</span>
+            <span class="heatmap-pop-toggle-sub">Saves RAM buffer on valid hit (15s+ cooldown)</span>
+          </div>
+          <button type="button" id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
+        </div>
+
+        <!-- 5. Ignore Masks (Draw / Move / Resize / Toggle / Clear directly on Live View) -->
         <div class="heatmap-pop-masks-row">
           <button type="button" id="btnLiveMaskDraw" class="radar-btn radar-btn-sm" title="Drag across Live camera feed to exclude wind/foliage zones">✎ Draw Mask</button>
           <button type="button" id="btnLiveMasksVisible" class="radar-btn radar-btn-sm" title="Show / Hide Ignore Masks while masking remains active">👁 Masks (0)</button>
           <button type="button" id="btnLiveClearMasks" class="radar-btn radar-btn-sm radar-btn-danger hidden" title="Remove all ignore mask zones">Clear All</button>
         </div>
         <div id="liveMaskDrawHint" class="heatmap-mask-hint hidden">
-          Drag directly on the camera feed to mask wind/foliage. Tap × on any box to delete.
+          Drag on the feed to draw a mask. Drag any mask or corner to move/resize, × to delete.
+        </div>
+      </aside>
+
+      <!-- MOVABLE LIVE REPLAY BUFFER SETTINGS WINDOW (Hidden until Setup opened) -->
+      <aside id="replayTunePopover" class="heatmap-tune-popover replay-tune-popover hidden" role="dialog" aria-label="Replay Buffer Settings">
+        <div id="replayPopoverHeader" class="heatmap-pop-header" title="Drag to move window">
+          <div class="heatmap-pop-title-group">
+            <span class="heatmap-pop-grip" aria-hidden="true">⋮⋮</span>
+            <span class="heatmap-pop-dot"></span>
+            <span class="heatmap-pop-title">Replay Setup</span>
+            <span id="valBufferResolution" class="heatmap-gate-pill gate-idle">1920×1080</span>
+          </div>
+          <div class="heatmap-pop-header-actions">
+            <button type="button" id="btnToggleBuffer" class="radar-btn radar-btn-sm radar-btn-active" title="Toggle Rolling RAM Video Buffer ON / OFF">
+              <span id="bufferDot" class="status-dot"></span>
+              <span id="bufferText">0/20s</span>
+            </button>
+            <button type="button" id="btnCloseReplaySetup" class="radar-btn radar-btn-sm radar-btn-primary" title="Hide Replay Settings">Done</button>
+          </div>
+        </div>
+
+        <div class="heatmap-pop-section">
+          <div class="slider-header">
+            <span>Buffer Duration</span>
+            <span id="valBufferDuration" class="slider-val">20s</span>
+          </div>
+          <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
+        </div>
+
+        <div class="heatmap-pop-section">
+          <div class="slider-header">
+            <span>Frame Rate</span>
+            <span id="valBufferFps" class="slider-val">15 FPS</span>
+          </div>
+          <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button type="button" id="btnBufferQuality" class="radar-btn radar-btn-sm radar-btn-active" title="720p Fast (0.75q) encodes 2-3x faster on USB/webcam streams while Live stays 1080p">Capture: 720p Fast</button>
+          <button type="button" id="btnBufferMic" class="radar-btn radar-btn-sm" title="Opt-in microphone audio waveform capture on replay timeline">Mic Peaks: OFF</button>
+        </div>
+
+        <div class="memory-meter-box">
+          <div class="memory-meter-labels">
+            <span id="memUsedLabel">USED: 0.0 MB</span>
+            <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
+          </div>
+          <div class="memory-bar-track">
+            <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
+            <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
+          </div>
         </div>
       </aside>
 
@@ -250,12 +333,17 @@
         <!-- Bottom-Center: Unified Minimalist Live Dock -->
         <div class="live-bottom-center">
           <div class="live-bottom-dock">
-            <button id="btnToggleOverlayTop" class="radar-btn radar-btn-active" title="Toggle Reticle Overlay">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" d="M12 2v7M12 15v7M2 12h7M15 12h7M9 10v4M15 10v4M10 9h4M10 15h4"/>
-              </svg>
-              <span class="dock-btn-lbl">Reticle</span>
-            </button>
+            <div class="reticle-dock-group is-reticle-on">
+              <button id="btnToggleOverlayTop" class="radar-btn radar-btn-active" title="Toggle Reticle Overlay">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" d="M12 2v7M12 15v7M2 12h7M15 12h7M9 10v4M15 10v4M10 9h4M10 15h4"/>
+                </svg>
+                <span class="dock-btn-lbl">Reticle</span>
+              </button>
+              <button id="btnToggleReticleFfp" type="button" class="radar-btn reticle-ffp-chip radar-btn-active" title="Focal Plane: FFP (Scales with zoom) — Tap for SFP" aria-pressed="true">
+                <span id="reticleFfpLabel">FFP</span>
+              </button>
+            </div>
 
             <div class="heatmap-dock-group">
               <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Micro-Change Heatmap (Long-press to calibrate)">
@@ -265,19 +353,17 @@
                 <span class="dock-btn-lbl">Heatmap</span>
                 <span id="heatmapHitBadge" class="dock-hit-badge hidden">0</span>
               </button>
+              <button id="btnLiveRezero" class="radar-btn dock-btn-dimmed" disabled title="Re-Zero Background Reference (Clear Heatmap)" aria-label="Re-Zero Background Reference">
+                <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/>
+                  <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
               <button id="btnHeatmapTune" type="button" class="radar-btn heatmap-tune-caret" title="Calibrate Sensitivity, Hit Size &amp; Ignore Masks on Live View" aria-expanded="false" aria-controls="heatmapTunePopover">
                 <span id="heatmapTuneSensChip">60%</span>
                 <span class="heatmap-caret-glyph">▴</span>
               </button>
             </div>
-
-            <button id="btnLiveRezero" class="radar-btn dock-btn-dimmed" disabled title="Re-Zero Background Reference (Clear Heatmap)">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/>
-                <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
-              </svg>
-              <span class="dock-btn-lbl">Re-Zero</span>
-            </button>
 
             <button id="btnToggleVoiceAnnounce" class="radar-btn radar-btn-muted" title="Voice Callouts: OFF — Tap to cycle OFF → POI → POA">
               <svg id="iconVoiceOn" class="voice-icon hidden" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -291,18 +377,18 @@
               <span id="voiceModeLabel" class="dock-btn-lbl voice-mode-lbl">OFF</span>
             </button>
 
-            <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Show / Hide Digital Loupe">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <button id="btnTogglePip" class="radar-btn radar-btn-active" title="Digital Loupe: ON — Tap to cycle ON → Auto Aim → OFF">
+              <svg id="iconLoupeOn" class="loupe-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
               </svg>
-              <span class="dock-btn-lbl">Loupe</span>
-            </button>
-
-            <button id="btnLiveAimLoupe" class="radar-btn dock-btn-dimmed" disabled title="Snap Digital Loupe to Latest Hit">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              <svg id="iconLoupeAuto" class="loupe-icon hidden" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
               </svg>
-              <span class="dock-btn-lbl">Aim Loupe</span>
+              <svg id="iconLoupeOff" class="loupe-icon hidden" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="6"/><path stroke-linecap="round" d="M12 3v3M12 18v3M3 12h3M18 12h3"/>
+                <line x1="21" y1="3" x2="3" y2="21" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+              <span id="loupeModeLabel" class="dock-btn-lbl loupe-mode-lbl">Loupe ON</span>
             </button>
 
             <div class="dock-divider"></div>
@@ -316,13 +402,19 @@
             <div class="dock-divider"></div>
 
             <div id="replayTriggerPod" style="display:inline-flex; gap:4px; align-items:center;">
-              <button id="btnReplay20s" class="radar-btn radar-btn-primary" title="Instant Replay (Open RAM Buffer)">
-                <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
-                </svg>
-                <span id="replayBtnLabel">Replay</span>
-              </button>
-              <button id="btnLiveSnapshot" class="radar-btn" title="Save Annotated PNG Snapshot (Frame + Reticle)" style="padding:0 9px;">📷</button>
+              <div class="replay-dock-group">
+                <button id="btnReplay20s" class="radar-btn radar-btn-primary" title="Instant Replay (Open RAM Buffer)">
+                  <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
+                  </svg>
+                  <span id="replayBtnLabel" class="dock-btn-lbl">Replay</span>
+                </button>
+                <button id="btnReplayTune" type="button" class="radar-btn replay-tune-caret" title="Configure Rolling RAM Buffer (ON/OFF, Duration, FPS, Quality &amp; Mic Peaks)" aria-expanded="false" aria-controls="replayTunePopover">
+                  <span id="replayDockDot" class="status-dot"></span>
+                  <span id="replayTuneDurChip">20s</span>
+                  <span class="heatmap-caret-glyph">▴</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -476,7 +568,7 @@
     </section>
 
     <!-- =================================================================== -->
-    <!-- SCREEN 3: UNIFIED SETUP (CAMERA / DETECTION / DISPLAY)              -->
+    <!-- SCREEN 3: UNIFIED SETUP (CAMERA / VOICE / DISPLAY)                  -->
     <!-- =================================================================== -->
     <section id="screenSettings" class="screen-view hidden">
       <header class="setup-screen-header">
@@ -485,8 +577,8 @@
         </button>
 
         <nav class="setup-nav-tabs" aria-label="Setup sections">
-          <button type="button" class="setup-nav-tab active" data-setup-tab="camera">Camera &amp; Buffer</button>
-          <button type="button" class="setup-nav-tab" data-setup-tab="detection">Detection &amp; Voice</button>
+          <button type="button" class="setup-nav-tab active" data-setup-tab="camera">Camera</button>
+          <button type="button" class="setup-nav-tab" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" id="btnOpenReticleScreen" class="setup-nav-tab">Reticle</button>
           <button type="button" id="btnOpenControllerScreen" class="setup-nav-tab">Controllers</button>
@@ -498,7 +590,7 @@
       </header>
 
       <div class="settings-screen-body">
-        <!-- SUB-TAB 1: CAMERA & MEMORY BUFFER -->
+        <!-- SUB-TAB 1: CAMERA -->
         <div id="setupTabCamera" class="setup-subtab-panel">
           <div class="settings-card" id="cardCameraSource">
             <div class="settings-card-header">
@@ -592,107 +684,10 @@
               </div>
             </div>
           </div>
-
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Replay Buffer (RAM)</span>
-              <span id="valBufferResolution" class="slider-val">1920×1080</span>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Buffer Duration</span>
-                <span id="valBufferDuration" class="slider-val">20s</span>
-              </div>
-              <input id="sliderBufferDuration" type="range" min="5" max="60" step="5" value="20" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Frame Rate</span>
-                <span id="valBufferFps" class="slider-val">15 FPS</span>
-              </div>
-              <input id="sliderBufferFps" type="range" min="5" max="30" step="5" value="15" class="radar-slider" />
-            </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <button type="button" id="btnBufferQuality" class="radar-btn radar-btn-sm radar-btn-active" title="720p Fast (0.75q) encodes 2-3x faster on USB/webcam streams while Live stays 1080p">Capture: 720p Fast</button>
-              <button type="button" id="btnBufferMic" class="radar-btn radar-btn-sm" title="Opt-in microphone audio waveform capture on replay timeline">Mic Peaks: OFF</button>
-            </div>
-
-            <div class="memory-meter-box">
-              <div class="memory-meter-labels">
-                <span id="memUsedLabel">USED: 0.0 MB</span>
-                <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
-              </div>
-              <div class="memory-bar-track">
-                <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
-                <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- SUB-TAB 2: DETECTION & VOICE -->
+        <!-- SUB-TAB 2: VOICE -->
         <div id="setupTabDetection" class="setup-subtab-panel hidden">
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-label">Motion Heatmap</span>
-              <button type="button" id="btnOpenLiveHeatmapTune" class="radar-btn radar-btn-sm radar-btn-active" title="Calibrate sensitivity, hit size &amp; ignore masks directly on Live camera view">Tune on Live →</button>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Sensitivity</span>
-                <span id="valHeatmapSens" class="slider-val">60%</span>
-              </div>
-              <input id="sliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Marker Duration</span>
-                <div class="duration-custom-controls">
-                  <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Custom duration in seconds" />
-                  <span id="valHeatmapDuration" class="slider-val" style="min-width:18px;">s</span>
-                </div>
-              </div>
-              <div class="duration-preset-row">
-                <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="5">5s</button>
-                <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="15">15s</button>
-                <button type="button" class="radar-btn radar-btn-sm duration-preset-btn radar-btn-active" data-dur="30">30s</button>
-                <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="60">60s</button>
-                <button type="button" id="btnHeatmapInfinite" class="radar-btn radar-btn-sm duration-preset-btn" title="Infinite Persistence">∞</button>
-              </div>
-              <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" />
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Max Hit Area (Multi-Hit Gate)</span>
-                <span id="valHeatmapMaxArea" class="slider-val">720 cells (5.0%)</span>
-              </div>
-              <input id="sliderHeatmapMaxArea" type="range" min="0" max="100" step="1" value="58" class="radar-slider" />
-              <div style="font-size:11px; color:var(--radar-text-muted);">Ignores simultaneous motion larger than this area (always &gt; Min Hit Size).</div>
-            </div>
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>Min Hit Size</span>
-                <span id="valHeatmapMinCells" class="slider-val">2 cells</span>
-              </div>
-              <input id="sliderHeatmapMinCells" type="range" min="1" max="20" step="1" value="2" class="radar-slider" />
-            </div>
-
-            <div class="settings-card-header" style="margin-top:8px;">
-              <div>
-                <span class="settings-label" style="font-size:12px;">Auto-Save Clip on Hit</span>
-                <div style="font-size:11px; color:var(--radar-text-muted);">Saves RAM buffer only when Heatmap logs a valid hit (OFF by default; 15s+ cooldown).</div>
-              </div>
-              <button id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
-            </div>
-          </div>
-
           <div class="settings-card">
             <div class="settings-card-header">
               <span class="settings-label">Voice Callouts</span>
@@ -828,8 +823,8 @@
         </button>
 
         <nav class="setup-nav-tabs" aria-label="Setup sections">
-          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="camera">Camera &amp; Buffer</button>
-          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Detection &amp; Voice</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="camera">Camera</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" class="setup-nav-tab active">Reticle</button>
           <button type="button" id="btnReticleToController" class="setup-nav-tab">Controllers</button>
@@ -889,13 +884,6 @@
               <button id="btnLoadCustomOverlay" data-ov="custom" class="ov-btn radar-btn">Upload Image</button>
             </div>
             <input id="fileCustomOverlay" type="file" accept="image/*" class="hidden" />
-
-            <div class="slider-group">
-              <div class="slider-header">
-                <span>First Focal Plane (FFP)</span>
-                <button id="btnToggleReticleFfp" class="radar-btn radar-btn-sm radar-btn-active" style="min-width:94px;">FFP: ON</button>
-              </div>
-            </div>
 
             <div class="slider-group">
               <div class="slider-header">
@@ -971,7 +959,7 @@
                 <span>Click Spacing</span>
                 <span id="valReticleSpacing" class="slider-val">32 px</span>
               </div>
-              <input id="sliderReticleSpacing" type="range" min="4" max="100" step="1" value="32" class="radar-slider" />
+              <input id="sliderReticleSpacing" type="range" min="4" max="100" step="0.1" value="32" class="radar-slider" />
             </div>
 
             <div class="slider-group">
@@ -994,6 +982,16 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
               <button id="btnToggleReticleLabels" class="radar-btn radar-btn-sm radar-btn-active">Labels: ON</button>
               <button id="btnToggleReticleRings" class="radar-btn radar-btn-sm">Rings: OFF</button>
+            </div>
+
+            <button id="btnToggleReticleSvd" class="radar-btn radar-btn-sm" style="width:100%;" title="Toggle SVD-style stadiametric rangefinder in bottom-right quadrant">SVD Rangefinder: OFF</button>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Mark Number Size</span>
+                <span id="valReticleLabelSize" class="slider-val">10 px</span>
+              </div>
+              <input id="sliderReticleLabelSize" type="range" min="6" max="24" step="1" value="10" class="radar-slider" />
             </div>
 
             <div class="slider-group">
@@ -1026,8 +1024,8 @@
         </button>
 
         <nav class="setup-nav-tabs" aria-label="Setup sections">
-          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="camera">Camera &amp; Buffer</button>
-          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Detection &amp; Voice</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="camera">Camera</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" id="btnControllerToReticle" class="setup-nav-tab">Reticle</button>
           <button type="button" class="setup-nav-tab active">Controllers</button>

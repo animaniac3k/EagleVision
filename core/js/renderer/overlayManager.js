@@ -51,8 +51,10 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       minorTickLen: 10,
       majorTickLen: 18,
       showLabels: true,
+      labelSize: 10,
       concentricRings: false,
       ringInterval: 5,
+      svdRangefinder: false,
       strokeWidth: 1.8,
       reticleColor: ''
     },
@@ -75,6 +77,7 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
   const minorLen = Math.min(Math.max(3, Number(cfg.minorTickLen) || 10), Math.max(5, step * 0.9));
   const majorLen = Math.min(Math.max(6, Number(cfg.majorTickLen) || 18), Math.max(8, step * 1.6));
   const showLabels = Boolean(cfg.showLabels);
+  const labelSize = Math.max(6, Math.min(24, Number(cfg.labelSize) || 10));
 
   const lines = [];
   const armLen = clicks * step;
@@ -158,8 +161,9 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       `<line x1="${xL}" y1="${cy - half}" x2="${xL}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
     if (showLabels && isMajor) {
+      const hLabelGap = Math.max(4, labelSize * 0.4);
       lines.push(
-        `<text x="${xL}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+        `<text x="${xL}" y="${(cy - half - hLabelGap).toFixed(1)}" fill="${strokeColor}" font-family="monospace" font-size="${labelSize}" font-weight="bold" text-anchor="middle">${t}</text>`
       );
     }
 
@@ -167,8 +171,9 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       `<line x1="${xR}" y1="${cy - half}" x2="${xR}" y2="${cy + half}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
     if (showLabels && isMajor) {
+      const hLabelGap = Math.max(4, labelSize * 0.4);
       lines.push(
-        `<text x="${xR}" y="${cy - half - 4}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="middle">${t}</text>`
+        `<text x="${xR}" y="${(cy - half - hLabelGap).toFixed(1)}" fill="${strokeColor}" font-family="monospace" font-size="${labelSize}" font-weight="bold" text-anchor="middle">${t}</text>`
       );
     }
   }
@@ -189,8 +194,10 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       `<line x1="${cx - half}" y1="${yT}" x2="${cx + half}" y2="${yT}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
     if (showLabels && isMajor) {
+      const vLabelGap = Math.max(4, labelSize * 0.4);
+      const vLabelDy = labelSize * 0.35;
       lines.push(
-        `<text x="${cx + half + 4}" y="${yT + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+        `<text x="${(cx + half + vLabelGap).toFixed(1)}" y="${(yT + vLabelDy).toFixed(1)}" fill="${strokeColor}" font-family="monospace" font-size="${labelSize}" font-weight="bold" text-anchor="start">${t}</text>`
       );
     }
 
@@ -198,10 +205,57 @@ export function buildGraduatedCrosshairSvg(customConfig = null) {
       `<line x1="${cx - half}" y1="${yB}" x2="${cx + half}" y2="${yB}" stroke="${strokeColor}" stroke-width="${tickW}" />`
     );
     if (showLabels && isMajor) {
+      const vLabelGap = Math.max(4, labelSize * 0.4);
+      const vLabelDy = labelSize * 0.35;
       lines.push(
-        `<text x="${cx + half + 4}" y="${yB + 3}" fill="${strokeColor}" font-family="monospace" font-size="10" font-weight="bold" text-anchor="start">${t}</text>`
+        `<text x="${(cx + half + vLabelGap).toFixed(1)}" y="${(yB + vLabelDy).toFixed(1)}" fill="${strokeColor}" font-family="monospace" font-size="${labelSize}" font-weight="bold" text-anchor="start">${t}</text>`
       );
     }
+  }
+
+  // SVD / PSO-1 Style Stadiametric Ranging Reticle (Bottom-Right Quadrant)
+  if (cfg.svdRangefinder) {
+    const svdStroke = sw;
+    const svdX0 = cx + Math.max(gapHalf + 28, 72);
+    const svdW = Math.max(96, Math.min(185, step * 4.2));
+    const svdX1 = Math.min(RETICLE_VIEWBOX_W - 24, svdX0 + svdW);
+    const actualW = Math.max(48, svdX1 - svdX0);
+    const svdBaseY = Math.min(RETICLE_VIEWBOX_H - 26, cy + Math.max(gapHalf + 96, 145));
+    const maxH = Math.min(92, Math.max(36, step * 2.0), svdBaseY - cy - Math.max(24, majorLen));
+    const svdLabelSize = Math.max(7, Math.min(14, Math.round(labelSize * 0.85)));
+
+    // Baseline
+    lines.push(
+      `<line x1="${svdX0.toFixed(1)}" y1="${svdBaseY.toFixed(1)}" x2="${(svdX0 + actualW).toFixed(1)}" y2="${svdBaseY.toFixed(1)}" stroke="${strokeColor}" stroke-width="${svdStroke}" />`
+    );
+
+    // Smooth hyperbolic 1/r curve from r=2 (200m) to r=10 (1000m)
+    const curvePts = [];
+    const samples = 24;
+    for (let i = 0; i <= samples; i++) {
+      const frac = i / samples;
+      const r = 2 + frac * 8;
+      const px = svdX0 + frac * actualW;
+      const py = svdBaseY - maxH * (2 / r);
+      curvePts.push(`${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`);
+    }
+    lines.push(
+      `<path d="${curvePts.join(' ')}" fill="none" stroke="${strokeColor}" stroke-width="${svdStroke}" stroke-linecap="round" />`
+    );
+
+    // Station vertical markers & range numerals (2, 4, 6, 8, 10)
+    const stations = [2, 4, 6, 8, 10];
+    stations.forEach((r) => {
+      const frac = (r - 2) / 8;
+      const sx = svdX0 + frac * actualW;
+      const topY = svdBaseY - maxH * (2 / r);
+      lines.push(
+        `<line x1="${sx.toFixed(1)}" y1="${topY.toFixed(1)}" x2="${sx.toFixed(1)}" y2="${(svdBaseY + 4).toFixed(1)}" stroke="${strokeColor}" stroke-width="${svdStroke}" />`
+      );
+      lines.push(
+        `<text x="${sx.toFixed(1)}" y="${(svdBaseY + svdLabelSize + 5).toFixed(1)}" fill="${strokeColor}" font-family="monospace" font-size="${svdLabelSize}" font-weight="bold" text-anchor="middle">${r}</text>`
+      );
+    });
   }
 
   return lines.join('\n');

@@ -13,6 +13,7 @@ import { buildCanvasFilterString } from './imageFilters.js';
 import { recordRenderedFrame } from '../camera/streamStats.js';
 import { getRtspCanvas, getRtspFrameSeq } from '../camera/streamManager.js';
 import { getClickDistanceInPixels, buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from './overlayManager.js';
+import { aimLoupeAtHit } from './zoomWindow.js';
 import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
 import { triggerAutoSaveHeatmapClip } from '../recorder/instantReplay.js';
@@ -23,7 +24,9 @@ export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
 const HEAT_W = 160;
 const HEAT_H = 90;
 const HEAT_CELLS = HEAT_W * HEAT_H;
-const GLOBAL_MOTION_REJECTION_RATIO = 0.18; // If >18% of image changes at once, treat as camera movement
+const DEFAULT_SHAKE_GATE_PCT = 18;
+const OVERSIZE_FREEZE_MS = 1500;
+const RECENT_ISLAND_WINDOW_MS = 550;
 const MAX_DETECTION_HITS = 30;
 
 let nextHitSeq = 1;
@@ -60,6 +63,76 @@ export function getLiveViewportProjection() {
  */
 export function rezeroHeatmap() {
   if (rezeroHandler) rezeroHandler();
+}
+
+const SINGULAR_UNIT_MAP = {
+  clicks: 'click',
+  mils: 'mil',
+  marks: 'mark',
+  units: 'unit',
+  degrees: 'degree',
+  meters: 'meter',
+  yards: 'yard'
+};
+
+function formatVoiceUnit(count, rawUnit) {
+  const clean = (rawUnit || 'clicks').trim();
+  if (count === 1) {
+    return SINGULAR_UNIT_MAP[clean.toLowerCase()] || clean;
+  }
+  return clean;
+}
+
+/**
+ * Computes axis click offsets and direction label from pixel displacement relative to optical center.
+ */
+export function computeClickCalloutOffset(dxPx, dyPx, clickPx, mode = appState.detectionCalloutMode) {
+  const safeClickPx = Math.max(1, Number(clickPx) || 1);
+  let xClicks = Math.abs(dxPx) >= safeClickPx * 0.4 ? Math.max(1, Math.round(Math.abs(dxPx) / safeClickPx)) : 0;
+  let yClicks = Math.abs(dyPx) >= safeClickPx * 0.4 ? Math.max(1, Math.round(Math.abs(dyPx) / safeClickPx)) : 0;
+
+  // Prevent diagonal hits >0.5 clicks away from snapping to Center on both axes
+  if (xClicks === 0 && yClicks === 0 && Math.hypot(dxPx, dyPx) >= safeClickPx * 0.5) {
+    if (Math.abs(dxPx) >= Math.abs(dyPx)) {
+      xClicks = 1;
+    } else {
+      yClicks = 1;
+    }
+  }
+
+  const calloutMode = mode === 'poa' ? 'poa' : 'poi';
+  const impactXDir = dxPx >= 0 ? 'right' : 'left';
+  const impactYDir = dyPx <= 0 ? 'up' : 'down';
+  const xDir = calloutMode === 'poa' ? (impactXDir === 'right' ? 'left' : 'right') : impactXDir;
+  const yDir = calloutMode === 'poa' ? (impactYDir === 'up' ? 'down' : 'up') : impactYDir;
+
+  const dirParts = [];
+  if (xClicks > 0) dirParts.push(`${xClicks} ${xDir[0].toUpperCase() + xDir.slice(1)}`);
+  if (yClicks > 0) dirParts.push(`${yClicks} ${yDir[0].toUpperCase() + yDir.slice(1)}`);
+  const baseLabel = dirParts.length ? dirParts.join(', ') : 'Center';
+  const dirLabel = calloutMode === 'poa' && dirParts.length ? `${baseLabel} (POA)` : baseLabel;
+
+  return { xClicks, xDir, yClicks, yDir, calloutMode, dirLabel };
+}
+
+/**
+ * Formats an axis-based voice callout phrase (e.g. "Detection! 3 clicks right, 2 clicks up").
+ */
+export function buildDetectionCalloutPhrase({ xClicks = 0, xDir = 'right', yClicks = 0, yDir = 'up' } = {}) {
+  const alertWord = (appState.voiceAlertKeyword || 'Detection').trim();
+  const rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
+
+  const segments = [];
+  if (xClicks > 0) {
+    segments.push(`${xClicks} ${formatVoiceUnit(xClicks, rawUnit)} ${xDir}`);
+  }
+  if (yClicks > 0) {
+    segments.push(`${yClicks} ${formatVoiceUnit(yClicks, rawUnit)} ${yDir}`);
+  }
+
+  return segments.length
+    ? `${alertWord}! ${segments.join(', ')}`
+    : `${alertWord}! Center`;
 }
 
 /**
@@ -220,11 +293,16 @@ export function initCompositor(videoEl) {
   const currentLuma = new Float32Array(HEAT_CELLS);
   const heatAccum = new Float32Array(HEAT_CELLS);
   const ignoreMaskGrid = new Uint8Array(HEAT_CELLS);
+  const recentActiveAt = new Float32Array(HEAT_CELLS);
+  const islandVisited = new Uint8Array(HEAT_CELLS);
+  const islandQueue = new Int32Array(HEAT_CELLS);
+  const islandCells = new Int32Array(HEAT_CELLS);
   const deltaHist = new Uint32Array(256);
   let lastMasksRef = null;
   let refInitialized = false;
   let lastHeatTimeMs = performance.now();
   let lastHeatComputeMs = 0;
+  let oversizeSinceMs = 0;
   let smoothNoiseDelta = 0;
   let smoothPeakDelta = 0;
   let setupCanvasCleared = true;
@@ -254,6 +332,8 @@ export function initCompositor(videoEl) {
 
   rezeroHandler = () => {
     heatAccum.fill(0);
+    recentActiveAt.fill(0);
+    oversizeSinceMs = 0;
     refInitialized = false;
     smoothNoiseDelta = 0;
     smoothPeakDelta = 0;
@@ -287,24 +367,6 @@ export function initCompositor(videoEl) {
     }
   }
 
-  const SINGULAR_UNIT_MAP = {
-    clicks: 'click',
-    mils: 'mil',
-    marks: 'mark',
-    units: 'unit',
-    degrees: 'degree',
-    meters: 'meter',
-    yards: 'yard'
-  };
-
-  function formatVoiceUnit(count, rawUnit) {
-    const clean = (rawUnit || 'clicks').trim();
-    if (count === 1) {
-      return SINGULAR_UNIT_MAP[clean.toLowerCase()] || clean;
-    }
-    return clean;
-  }
-
   function computeDirectionMetrics(detSourceNormX, detSourceNormY, sx, sy, cropW, cropH, vw, vh, cw, ch) {
     const detViewX = (detSourceNormX * vw - sx) / cropW;
     const detViewY = (detSourceNormY * vh - sy) / cropH;
@@ -314,52 +376,13 @@ export function initCompositor(videoEl) {
     const dyPx = (detViewY - 0.5) * ch;
 
     const clickPx = Math.max(1, getClickDistanceInPixels(cw, ch, appState.overlayScale));
-    let xClicks = Math.abs(dxPx) >= clickPx * 0.4 ? Math.max(1, Math.round(Math.abs(dxPx) / clickPx)) : 0;
-    let yClicks = Math.abs(dyPx) >= clickPx * 0.4 ? Math.max(1, Math.round(Math.abs(dyPx) / clickPx)) : 0;
-
-    // Prevent diagonal hits >0.5 clicks away from snapping to Center on both axes
-    if (xClicks === 0 && yClicks === 0 && Math.hypot(dxPx, dyPx) >= clickPx * 0.5) {
-      if (Math.abs(dxPx) >= Math.abs(dyPx)) {
-        xClicks = 1;
-      } else {
-        yClicks = 1;
-      }
-    }
-
-    const calloutMode = appState.detectionCalloutMode === 'poa' ? 'poa' : 'poi';
-    const impactXDir = dxPx >= 0 ? 'right' : 'left';
-    const impactYDir = dyPx <= 0 ? 'up' : 'down';
-    const xDir = calloutMode === 'poa' ? (impactXDir === 'right' ? 'left' : 'right') : impactXDir;
-    const yDir = calloutMode === 'poa' ? (impactYDir === 'up' ? 'down' : 'up') : impactYDir;
-
-    const dirParts = [];
-    if (xClicks > 0) dirParts.push(`${xClicks} ${xDir[0].toUpperCase() + xDir.slice(1)}`);
-    if (yClicks > 0) dirParts.push(`${yClicks} ${yDir[0].toUpperCase() + yDir.slice(1)}`);
-    const baseLabel = dirParts.length ? dirParts.join(', ') : 'Center';
-    const dirLabel = calloutMode === 'poa' && dirParts.length ? `${baseLabel} (POA)` : baseLabel;
-
-    return { detViewX, detViewY, xClicks, xDir, yClicks, yDir, calloutMode, dirLabel };
+    const offset = computeClickCalloutOffset(dxPx, dyPx, clickPx, appState.detectionCalloutMode);
+    return { detViewX, detViewY, ...offset };
   }
 
   function announceHitVoice(hitMetrics) {
     if (!appState.heatmapSpeechEnabled) return;
-    const { xClicks, xDir, yClicks, yDir } = hitMetrics;
-    const alertWord = (appState.voiceAlertKeyword || 'Detection').trim();
-    const rawUnit = (appState.voiceUnitKeyword || 'clicks').trim();
-
-    const segments = [];
-    if (xClicks > 0) {
-      segments.push(`${xClicks} ${formatVoiceUnit(xClicks, rawUnit)} ${xDir}`);
-    }
-    if (yClicks > 0) {
-      segments.push(`${yClicks} ${formatVoiceUnit(yClicks, rawUnit)} ${yDir}`);
-    }
-
-    const phrase = segments.length
-      ? `${alertWord}! ${segments.join(', ')}`
-      : `${alertWord}! Center`;
-
-    speakDetectionAnnouncement(phrase);
+    speakDetectionAnnouncement(buildDetectionCalloutPhrase(hitMetrics));
   }
 
   /**
@@ -426,11 +449,16 @@ export function initCompositor(videoEl) {
       frameH: vh
     };
 
+    const autoAimActive = Boolean(appState.pipEnabled && appState.autoAimLoupe);
     const nextHits = hits.length >= MAX_DETECTION_HITS ? [...hits.slice(1), newHit] : [...hits, newHit];
     updateState({
       detectionHits: nextHits,
-      selectedHitId: appState.selectedHitId ?? newHit.id
+      selectedHitId: autoAimActive ? newHit.id : (appState.selectedHitId ?? newHit.id)
     });
+
+    if (autoAimActive) {
+      aimLoupeAtHit(newHit, { switchToLive: false, ensurePipVisible: false });
+    }
 
     announceHitVoice(metrics);
     recordEvent('heatmap');
@@ -507,9 +535,11 @@ export function initCompositor(videoEl) {
     const minAllowedFrac = (minHitCells + 1) / Math.max(1, activeCells);
     const rawMaxAreaFrac = Math.max(0.0001, Math.min(0.25, (Number(appState.heatmapMaxAreaPct) || 5) / 100));
     const maxHitAreaFrac = Math.max(minAllowedFrac, rawMaxAreaFrac);
+    const maxAllowedCells = Math.max(minHitCells + 1, Math.round(maxHitAreaFrac * activeCells));
+    const shakeGatePct = Math.max(5, Math.min(50, Math.round(Number(appState.heatmapShakeGatePct) || DEFAULT_SHAKE_GATE_PCT)));
+    const shakeGateFrac = Math.max(maxHitAreaFrac, shakeGatePct / 100);
 
     let spikeCount = 0;
-    let maxSpikeHeat = 0;
     let spikeFraction = 0;
     let gateStatus = 'idle';
     let clusterMinX = HEAT_W;
@@ -517,41 +547,36 @@ export function initCompositor(videoEl) {
     let clusterMaxX = -1;
     let clusterMaxY = -1;
 
-    // Global Motion Gate: if the whole camera moved (>18% of scene changed simultaneously),
-    // re-anchor the background reference and do NOT light up the heatmap!
-    if (changedFraction > GLOBAL_MOTION_REJECTION_RATIO) {
+    // 1. Global Motion / Shake Gate: immediate background re-anchor when > shakeGatePct shifts at once
+    if (changedFraction > shakeGateFrac) {
       gateStatus = 'global_shake';
+      oversizeSinceMs = 0;
+      recentActiveAt.fill(0);
       for (let i = 0; i < HEAT_CELLS; i++) {
         refLuma[i] = currentLuma[i];
-        heatAccum[i] *= 0.4; // Rapidly clear stale markings when camera moves
+        heatAccum[i] *= 0.4;
       }
-    } else {
-      // Localized change: accumulate heat on small changes and decay over heatmapDuration seconds
-      let spikeWeightSum = 0;
-      let spikeSumX = 0;
-      let spikeSumY = 0;
-
+    } else if (changedFraction > maxHitAreaFrac) {
+      // 2. Oversized Flash / Area Gate: suppress without pumping heat & freeze pre-flash refLuma
+      //    briefly so simultaneous hits appear cleanly once a brief flash ends.
+      gateStatus = 'too_large';
+      if (oversizeSinceMs === 0) {
+        oversizeSinceMs = nowMs;
+      }
+      const permanentShift = nowMs - oversizeSinceMs >= OVERSIZE_FREEZE_MS;
+      if (permanentShift) {
+        oversizeSinceMs = 0;
+        recentActiveAt.fill(0);
+      }
       for (let i = 0; i < HEAT_CELLS; i++) {
         if (ignoreMaskGrid[i]) {
           heatAccum[i] = 0;
           refLuma[i] = currentLuma[i];
           continue;
         }
-        const delta = Math.abs(currentLuma[i] - refLuma[i]);
-        if (delta > threshold) {
-          const added = (delta - threshold) * 3.8;
-          heatAccum[i] = Math.min(255, heatAccum[i] + added);
-          if (heatAccum[i] > 115) {
-            const cellX = i % HEAT_W;
-            const cellY = (i / HEAT_W) | 0;
-            spikeWeightSum += added;
-            spikeSumX += cellX * added;
-            spikeSumY += cellY * added;
-            spikeCount++;
-            if (heatAccum[i] > maxSpikeHeat) maxSpikeHeat = heatAccum[i];
-          }
-        } else {
-          heatAccum[i] *= decayFactor;
+        heatAccum[i] *= decayFactor;
+        if (permanentShift) {
+          refLuma[i] = currentLuma[i];
         }
         if (heatAccum[i] > 28) {
           const cx = i % HEAT_W;
@@ -561,23 +586,179 @@ export function initCompositor(videoEl) {
           if (cx > clusterMaxX) clusterMaxX = cx;
           if (cy > clusterMaxY) clusterMaxY = cy;
         }
+      }
+    } else {
+      // 3. Localized Change: update heat & refLuma, then evaluate 8-connected islands
+      oversizeSinceMs = 0;
+
+      for (let i = 0; i < HEAT_CELLS; i++) {
+        if (ignoreMaskGrid[i]) {
+          heatAccum[i] = 0;
+          recentActiveAt[i] = 0;
+          refLuma[i] = currentLuma[i];
+          continue;
+        }
+        const delta = Math.abs(currentLuma[i] - refLuma[i]);
+        if (delta > threshold) {
+          const added = (delta - threshold) * 3.8;
+          heatAccum[i] = Math.min(255, heatAccum[i] + added);
+          recentActiveAt[i] = nowMs;
+        } else {
+          heatAccum[i] *= decayFactor;
+        }
         refLuma[i] += (currentLuma[i] - refLuma[i]) * 0.15;
       }
 
-      spikeFraction = activeCells > 0 ? spikeCount / activeCells : 0;
+      islandVisited.fill(0);
+      let bestHit = null;
+      let sawOversizeIsland = false;
+      let oversizeBounds = null;
+      let oversizeFrac = 0;
+      let bestSmallSpikes = 0;
+      let bestSmallBounds = null;
 
-      if (changedFraction > maxHitAreaFrac || spikeFraction > maxHitAreaFrac) {
-        gateStatus = 'too_large';
-      } else if (spikeCount > 0 && spikeCount < minHitCells) {
-        gateStatus = 'below_min';
-      } else if (spikeCount >= minHitCells && maxSpikeHeat >= 135 && spikeWeightSum > 0) {
+      for (let seed = 0; seed < HEAT_CELLS; seed++) {
+        if (ignoreMaskGrid[seed] || islandVisited[seed]) continue;
+        const rAt = recentActiveAt[seed];
+        if (rAt <= 0 || nowMs - rAt > RECENT_ISLAND_WINDOW_MS) continue;
+
+        let qHead = 0;
+        let qTail = 0;
+        let islandCount = 0;
+        let islandSpikes = 0;
+        let islandMaxHeat = 0;
+        let islandWeightSum = 0;
+        let islandSumX = 0;
+        let islandSumY = 0;
+        let minX = HEAT_W;
+        let minY = HEAT_H;
+        let maxX = -1;
+        let maxY = -1;
+
+        islandVisited[seed] = 1;
+        islandQueue[qTail++] = seed;
+
+        while (qHead < qTail) {
+          const idx = islandQueue[qHead++];
+          islandCells[islandCount++] = idx;
+
+          const cx = idx % HEAT_W;
+          const cy = (idx / HEAT_W) | 0;
+          if (cx < minX) minX = cx;
+          if (cy < minY) minY = cy;
+          if (cx > maxX) maxX = cx;
+          if (cy > maxY) maxY = cy;
+
+          const h = heatAccum[idx];
+          if (h > 115) {
+            const delta = Math.abs(currentLuma[idx] - refLuma[idx]);
+            const weight = Math.max(1, delta > threshold ? (delta - threshold) * 3.8 : h * 0.2);
+            islandSpikes++;
+            islandWeightSum += weight;
+            islandSumX += cx * weight;
+            islandSumY += cy * weight;
+            if (h > islandMaxHeat) islandMaxHeat = h;
+          }
+
+          for (let dy = -1; dy <= 1; dy++) {
+            const ny = cy + dy;
+            if (ny < 0 || ny >= HEAT_H) continue;
+            const rowOff = ny * HEAT_W;
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = cx + dx;
+              if (nx < 0 || nx >= HEAT_W) continue;
+              const nIdx = rowOff + nx;
+              if (islandVisited[nIdx] || ignoreMaskGrid[nIdx]) continue;
+              const nAt = recentActiveAt[nIdx];
+              if (nAt > 0 && nowMs - nAt <= RECENT_ISLAND_WINDOW_MS) {
+                islandVisited[nIdx] = 1;
+                islandQueue[qTail++] = nIdx;
+              }
+            }
+          }
+        }
+
+        if (islandCount > maxAllowedCells) {
+          // Suppress slow sweep / wide wind island while keeping recentActiveAt intact so sweeps stay linked
+          sawOversizeIsland = true;
+          const frac = activeCells > 0 ? islandCount / activeCells : 0;
+          if (frac > oversizeFrac) {
+            oversizeFrac = frac;
+            oversizeBounds = { minX, minY, maxX, maxY };
+          }
+          for (let k = 0; k < islandCount; k++) {
+            heatAccum[islandCells[k]] *= 0.35;
+          }
+        } else if (islandSpikes >= minHitCells && islandMaxHeat >= 135 && islandWeightSum > 0) {
+          if (!bestHit || islandWeightSum > bestHit.weightSum) {
+            bestHit = {
+              spikes: islandSpikes,
+              weightSum: islandWeightSum,
+              sumX: islandSumX,
+              sumY: islandSumY,
+              minX,
+              minY,
+              maxX,
+              maxY
+            };
+          }
+        } else if (islandSpikes > bestSmallSpikes || (changedCells > 0 && !bestSmallBounds)) {
+          bestSmallSpikes = Math.max(bestSmallSpikes, islandSpikes);
+          bestSmallBounds = { minX, minY, maxX, maxY };
+        }
+      }
+
+      if (bestHit) {
         gateStatus = 'valid';
-        const centroidNormX = (spikeSumX / spikeWeightSum + 0.5) / HEAT_W;
-        const centroidNormY = (spikeSumY / spikeWeightSum + 0.5) / HEAT_H;
+        spikeCount = bestHit.spikes;
+        spikeFraction = activeCells > 0 ? spikeCount / activeCells : 0;
+        clusterMinX = bestHit.minX;
+        clusterMinY = bestHit.minY;
+        clusterMaxX = bestHit.maxX;
+        clusterMaxY = bestHit.maxY;
+        const centroidNormX = (bestHit.sumX / bestHit.weightSum + 0.5) / HEAT_W;
+        const centroidNormY = (bestHit.sumY / bestHit.weightSum + 0.5) / HEAT_H;
         const metrics = computeDirectionMetrics(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
         handleConsolidatedDetection(centroidNormX, centroidNormY, videoSource, vw, vh, metrics);
+      } else if (sawOversizeIsland) {
+        gateStatus = 'too_large';
+        if (oversizeBounds) {
+          clusterMinX = oversizeBounds.minX;
+          clusterMinY = oversizeBounds.minY;
+          clusterMaxX = oversizeBounds.maxX;
+          clusterMaxY = oversizeBounds.maxY;
+        }
+      } else if (bestSmallSpikes > 0 && bestSmallSpikes < minHitCells) {
+        gateStatus = 'below_min';
+        spikeCount = bestSmallSpikes;
+        if (bestSmallBounds) {
+          clusterMinX = bestSmallBounds.minX;
+          clusterMinY = bestSmallBounds.minY;
+          clusterMaxX = bestSmallBounds.maxX;
+          clusterMaxY = bestSmallBounds.maxY;
+        }
       } else if (changedCells > 0) {
         gateStatus = changedCells < minHitCells ? 'below_min' : 'building';
+        if (bestSmallBounds) {
+          clusterMinX = bestSmallBounds.minX;
+          clusterMinY = bestSmallBounds.minY;
+          clusterMaxX = bestSmallBounds.maxX;
+          clusterMaxY = bestSmallBounds.maxY;
+        }
+      }
+
+      if (clusterMaxX < clusterMinX) {
+        for (let i = 0; i < HEAT_CELLS; i++) {
+          if (heatAccum[i] > 28) {
+            const cx = i % HEAT_W;
+            const cy = (i / HEAT_W) | 0;
+            if (cx < clusterMinX) clusterMinX = cx;
+            if (cy < clusterMinY) clusterMinY = cy;
+            if (cx > clusterMaxX) clusterMaxX = cx;
+            if (cy > clusterMaxY) clusterMaxY = cy;
+          }
+        }
       }
     }
 
@@ -681,6 +862,36 @@ export function initCompositor(videoEl) {
         ? `${effectiveMaxPct.toFixed(1)}%`
         : `${Math.round(effectiveMaxPct)}%`;
 
+    const shakeGatePct = Math.max(5, Math.min(50, Math.round(Number(appState.heatmapShakeGatePct) || DEFAULT_SHAKE_GATE_PCT)));
+    const shakeGateFrac = Math.max(maxHitAreaFrac, shakeGatePct / 100);
+    const shakeCellsAllowed = Math.round(shakeGateFrac * activeCells);
+
+    // 0. Outer Shake Gate Boundary (Re-anchors background above this area)
+    const shakeFrameFrac = shakeGateFrac * activeFrac;
+    const shakeLinScale = Math.sqrt(shakeFrameFrac);
+    const shakeBoxW = Math.max(12, ((shakeLinScale * vw) / cropW) * cw);
+    const shakeBoxH = Math.max(12, ((shakeLinScale * vh) / cropH) * ch);
+    const shakeLeft = (cw - shakeBoxW) / 2;
+    const shakeTop = (ch - shakeBoxH) / 2;
+
+    setupCtx.save();
+    setupCtx.strokeStyle = 'rgba(244, 63, 94, 0.45)';
+    setupCtx.lineWidth = 1.25;
+    setupCtx.setLineDash([4, 6]);
+    setupCtx.strokeRect(shakeLeft, shakeTop, shakeBoxW, shakeBoxH);
+    setupCtx.restore();
+
+    const shakeLabelX = Math.max(16, Math.min(cw - 220, shakeLeft + shakeBoxW - 210));
+    const shakeLabelY = Math.max(58, Math.min(ch - 260, shakeTop - 24));
+    drawSetupBadge(
+      setupCtx,
+      shakeLabelX,
+      shakeLabelY,
+      `SHAKE GATE · ${shakeGatePct}% (${shakeCellsAllowed}c)`,
+      'rgba(244, 63, 94, 0.72)',
+      '#fda4af'
+    );
+
     // 1. Exact Max Hit Area Footprint (proportional to unmasked source area, scaled to live zoom)
     const allowedFrameFrac = maxHitAreaFrac * activeFrac;
     const linScale = Math.sqrt(allowedFrameFrac);
@@ -777,7 +988,16 @@ export function initCompositor(videoEl) {
         setupCtx,
         Math.max(16, (cw - 240) / 2),
         66,
-        `SHAKE GATE ACTIVE (${(changedFraction * 100).toFixed(0)}% > 18%)`,
+        `SHAKE GATE ACTIVE (${(changedFraction * 100).toFixed(0)}% > ${shakeGatePct}%)`,
+        'rgba(244, 63, 94, 0.9)',
+        '#fda4af'
+      );
+    } else if (gateStatus === 'too_large' && clusterMaxX < clusterMinX) {
+      drawSetupBadge(
+        setupCtx,
+        Math.max(16, (cw - 260) / 2),
+        66,
+        `OVERSIZED SUPPRESSED (${(changedFraction * 100).toFixed(1)}% > ${maxPctLabel})`,
         'rgba(244, 63, 94, 0.9)',
         '#fda4af'
       );
@@ -814,7 +1034,7 @@ export function initCompositor(videoEl) {
         badgeText = `DETECTING · ${changedCells} cells`;
       } else if (effectiveStatus === 'global_shake') {
         strokeCol = '#f43f5e';
-        badgeText = `SHAKE GATE (>18%)`;
+        badgeText = `SHAKE GATE (>${shakeGatePct}%)`;
       }
 
       setupCtx.save();
@@ -869,6 +1089,8 @@ export function initCompositor(videoEl) {
     }
     if (!state.heatmapEnabled && !state.heatmapSpeechEnabled && !state.heatmapSetupOpen) {
       refInitialized = false;
+      recentActiveAt.fill(0);
+      oversizeSinceMs = 0;
     }
   });
 
@@ -937,7 +1159,7 @@ export function initCompositor(videoEl) {
         const showHeatmapOverlay = Boolean(appState.heatmapEnabled || appState.heatmapSetupOpen);
         if (isRtsp) {
           const heatTick = detectorActive ? Math.floor(performance.now() / 48) : 0;
-          const renderKey = `${getRtspFrameSeq()}|${vw}x${vh}|${cw}x${ch}|${pw}x${ph}|${appState.mainZoom}|${appState.mainPanX}|${appState.mainPanY}|${appState.pipEnabled}|${appState.pipZoom}|${appState.roiX}|${appState.roiY}|${appState.heatmapEnabled}|${appState.heatmapSpeechEnabled}|${appState.heatmapSetupOpen}|${appState.heatmapSensitivity}|${appState.heatmapMinCells}|${appState.heatmapMaxAreaPct}|${(appState.heatmapIgnoreMasks || []).length}|${heatTick}`;
+          const renderKey = `${getRtspFrameSeq()}|${vw}x${vh}|${cw}x${ch}|${pw}x${ph}|${appState.mainZoom}|${appState.mainPanX}|${appState.mainPanY}|${appState.pipEnabled}|${appState.pipZoom}|${appState.roiX}|${appState.roiY}|${appState.heatmapEnabled}|${appState.heatmapSpeechEnabled}|${appState.heatmapSetupOpen}|${appState.heatmapSensitivity}|${appState.heatmapMinCells}|${appState.heatmapMaxAreaPct}|${appState.heatmapShakeGatePct}|${(appState.heatmapIgnoreMasks || []).length}|${heatTick}`;
           if (renderKey === lastRenderKey) {
             requestAnimationFrame(renderLoop);
             return;

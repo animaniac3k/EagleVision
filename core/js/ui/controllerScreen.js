@@ -1916,29 +1916,11 @@ export function executeMappedAction(actionId) {
       cycleTheme(1);
       break;
 
-    case 'reticle_scale_up': {
-      if (appState.overlayType === 'custom') {
-        const nextScale = Math.min(200, (Number(appState.overlayScale) || 100) + 1);
-        updateState({ overlayScale: nextScale });
-        saveSettings(appState);
-        showReticleFfpToast(`OVERLAY SCALE: ${nextScale}%`);
-        break;
-      }
-      const cfg = appState.reticleConfig || {};
-      const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
-      const curSpacing = Number(cfg.clickSpacing) || Math.max(8, Math.floor(240 / clicks));
-      const nextSpacing = Math.min(100, Math.round(curSpacing + 1));
-      const nextCfg = Object.assign({}, cfg, { clickSpacing: nextSpacing });
-      updateState({ reticleConfig: nextCfg });
-      saveSettings(appState);
-      const modeStr = appState.reticleFfpMode ? 'FFP SYNC' : 'SFP';
-      showReticleFfpToast(`RETICLE SPACING: ${nextSpacing}px (${modeStr})`);
-      break;
-    }
-
+    case 'reticle_scale_up':
     case 'reticle_scale_down': {
+      const deltaSign = actionId === 'reticle_scale_up' ? 1 : -1;
       if (appState.overlayType === 'custom') {
-        const nextScale = Math.max(25, (Number(appState.overlayScale) || 100) - 1);
+        const nextScale = Math.max(25, Math.min(200, (Number(appState.overlayScale) || 100) + deltaSign));
         updateState({ overlayScale: nextScale });
         saveSettings(appState);
         showReticleFfpToast(`OVERLAY SCALE: ${nextScale}%`);
@@ -1947,12 +1929,32 @@ export function executeMappedAction(actionId) {
       const cfg = appState.reticleConfig || {};
       const clicks = Math.max(2, Math.min(30, Number(cfg.clickCount) || 10));
       const curSpacing = Number(cfg.clickSpacing) || Math.max(8, Math.floor(240 / clicks));
-      const nextSpacing = Math.max(4, Math.round(curSpacing - 1));
+
+      const vpEl = screen === 'reticle'
+        ? document.getElementById('reticlePreviewStage')
+        : screen === 'gallery'
+          ? (appState.galleryArchiveTab === 'hits'
+              ? document.getElementById('hitsMapViewport')
+              : document.getElementById('galleryClipsStage'))
+          : document.getElementById('viewportContainer');
+      const vw = vpEl?.clientWidth || window.innerWidth || 1920;
+      const vh = vpEl?.clientHeight || window.innerHeight || 1080;
+      const baseScale = Math.min(Math.max(1, vw) / 800, Math.max(1, vh) / 500);
+      const ffpFactor = (screen === 'live' ? appState.reticleFfpMode : false)
+        ? Math.max(1.0, Number(appState.mainZoom) || 1.0)
+        : 1.0;
+      const pxPerSvgUnit = Math.max(0.25, baseScale * ((Number(appState.overlayScale) || 100) / 100) * ffpFactor);
+
+      // Step so the outermost tick (full `clicks` arm) moves by 1 CSS pixel per press for ranging precision
+      const svgDelta = deltaSign / (pxPerSvgUnit * clicks);
+      const nextSpacing = Math.max(4, Math.min(100, Number((curSpacing + svgDelta).toFixed(4))));
+      const tickPx = nextSpacing * pxPerSvgUnit;
+      const armPx = Math.round(tickPx * clicks);
       const nextCfg = Object.assign({}, cfg, { clickSpacing: nextSpacing });
       updateState({ reticleConfig: nextCfg });
       saveSettings(appState);
       const modeStr = appState.reticleFfpMode ? 'FFP SYNC' : 'SFP';
-      showReticleFfpToast(`RETICLE SPACING: ${nextSpacing}px (${modeStr})`);
+      showReticleFfpToast(`RETICLE ARM: ${armPx}px (${tickPx.toFixed(1)}px/tick · ${modeStr})`);
       break;
     }
 
