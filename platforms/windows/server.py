@@ -542,18 +542,31 @@ class SPOTRRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def _is_port_available(bind_host, port):
-    """Returns True only if port is free on the target IPv4 address AND IPv6 ::1 (prevents localhost collision)."""
-    checks = [(socket.AF_INET, (bind_host, port))]
+    """Returns True only if port has no active listener AND can be bound exclusively on IPv4 & IPv6."""
+    # 1. Active listener check: catches processes bound to wildcard 0.0.0.0 / :: without SO_EXCLUSIVEADDRUSE
+    probe_targets = [(socket.AF_INET, ("127.0.0.1", port))]
     if bind_host in ("127.0.0.1", "0.0.0.0"):
-        checks.append((socket.AF_INET6, ("::1", port)))
-    for family, addr in checks:
+        probe_targets.append((socket.AF_INET6, ("::1", port)))
+    for family, addr in probe_targets:
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as conn:
+                conn.settimeout(0.15)
+                if conn.connect_ex(addr) == 0:
+                    return False
+        except OSError:
+            pass
+
+    # 2. Exclusive bind check: catches non-listening or exclusive-bound sockets
+    bind_checks = [(socket.AF_INET, (bind_host, port))]
+    if bind_host in ("127.0.0.1", "0.0.0.0"):
+        bind_checks.append((socket.AF_INET6, ("::1", port)))
+    for family, addr in bind_checks:
         try:
             with socket.socket(family, socket.SOCK_STREAM) as probe:
                 if os.name == 'nt' and hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
                     probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 probe.bind(addr)
         except OSError as e:
-            # Skip IPv6 check only if IPv6 is unavailable on this OS
             if family == socket.AF_INET6 and getattr(e, 'winerror', None) in (10047, 10049):
                 continue
             return False
