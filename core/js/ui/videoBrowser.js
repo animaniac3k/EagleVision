@@ -40,6 +40,7 @@ let galleryPlayer = null;
 let lastTimeLabel = '';
 let lastPlayBtnText = '';
 let setDrawerOpenFn = null;
+let syncGalleryZoomUiFn = null;
 let openingLiveBuffer = false;
 
 let activeClipWidth = 0;
@@ -353,7 +354,7 @@ async function selectClip(clip, autoPlay = true) {
   galleryZoom = 1.0;
   galleryPanX = 0;
   galleryPanY = 0;
-  syncGalleryZoomUI();
+  syncGalleryZoomUiFn?.();
 
   const titleEl = document.getElementById('activeClipTitle');
   const metaEl = document.getElementById('activeClipMeta');
@@ -493,6 +494,7 @@ export function initVideoBrowser() {
     galleryPlayer.draw();
     syncPlaybackReticleOverlay();
   }
+  syncGalleryZoomUiFn = syncGalleryZoomUI;
 
   btnZoomMinus?.addEventListener('click', () => {
     if (appState.galleryArchiveTab === 'hits') return;

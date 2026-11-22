@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.62.1';
+export const APP_VERSION = 'v0.62.2';
 
 const listeners = new Set();
 

@@ -1,4 +1,4 @@
-# SPOTR Software Architecture Document (v0.62.1)
+# SPOTR Software Architecture Document (v0.62.2)
 
 > **Repository Note:** This repository (`EagleVision`) hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*). All former specification notes from `docs/project_plan.txt` have been consolidated here as the single technical source of truth.
 
@@ -8,7 +8,7 @@
 
 **SPOTR** is a zero-dependency, offline-first Progressive Web Application (PWA) paired with:
 - A local Python 3 + OpenCV RTSP gateway (`platforms/windows/server.py`, with root proxy `server.py`), and
-- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 63` / `v0.62.1`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
+- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 64` / `v0.62.2`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
 
 Target hardware ranges from **low-power tablets** (e.g., **Lenovo IdeaPad Duet 3** 4 GB RAM, ARM SoCs) to rugged Android phones and desktop/laptop systems. Every subsystem is engineered for **field reliability**, **battery conservation**, and **zero cloud dependency**.
 
@@ -120,7 +120,7 @@ Both the Windows/Desktop gateway (`platforms/windows/server.py`) and the Android
 
 ---
 
-## 5. Slow-Hardware & Battery Optimizations (v0.62.1)
+## 5. Slow-Hardware & Battery Optimizations (v0.62.2)
 
 Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo IdeaPad Duet 3) cool, responsive, and OOM-free during multi-hour range sessions:
 
@@ -153,5 +153,5 @@ Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo 
 ## 7. Offline & Security Model
 
 - **100% On-Device Processing:** Video capture, 20 Hz luminance diffing, voice audio sprites, timestamps, and IndexedDB clips stay completely local.
-- **Service Worker (`core/sw.js`, `spotr-v0.62.1`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits.
+- **Service Worker (`core/sw.js`, `spotr-v0.62.2`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits.
 - **Localhost & SSRF Hardening:** Both gateways validate `rtsp://` schemes, whitelist `tcp`/`udp` transport, restrict `/api/rtsp/wake` to private/link-local/loopback hosts, block directory listing and `..` path traversal, and bind `127.0.0.1` by default.
