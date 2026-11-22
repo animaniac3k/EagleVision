@@ -1528,7 +1528,6 @@ export function initControllerScreen() {
   const microSvgContainer = document.getElementById('microSvgContainer');
   const remoteMappingTableBody = document.getElementById('remoteMappingTableBody');
   const btnToggleRingEnabled = document.getElementById('btnToggleRingEnabled');
-  const ringIsolationNotice = document.getElementById('ringIsolationNotice');
   const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
   const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
   const remoteLastSignalText = document.getElementById('remoteLastSignalText');
@@ -1572,14 +1571,8 @@ export function initControllerScreen() {
     }
     if (btnToggleRingEnabled) {
       const enabled = Boolean(appState.ringEnabled && appState.activeControllerProfile !== '8bitdo_micro');
-      btnToggleRingEnabled.textContent = enabled ? 'BT Ring: ON' : 'BT Ring: OFF (Isolated)';
+      btnToggleRingEnabled.textContent = enabled ? 'BT Ring: ON' : 'BT Ring: OFF';
       btnToggleRingEnabled.classList.toggle('radar-btn-active', enabled);
-    }
-    if (ringIsolationNotice) {
-      const enabled = Boolean(appState.ringEnabled && appState.activeControllerProfile !== '8bitdo_micro');
-      ringIsolationNotice.textContent = enabled
-        ? 'Bluetooth Ring is ACTIVE on Live & Playback. Keyboard/8BitDo Micro keys matching Ring bindings are routed to the Ring.'
-        : 'Bluetooth Ring is ISOLATED (OFF) so 8BitDo Micro and keyboard shortcuts are never hijacked. Enable above when pairing a Ring.';
     }
     if (btnToggleFfpTab) {
       const isLocked = Boolean(appState.reticleFfpMode);

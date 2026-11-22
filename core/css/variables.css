@@ -1,12 +1,12 @@
 :root {
-  /* High-Contrast Matte Tactical Palette (Zero GPU Blur + Crisp Sunlight Contrast) */
+  /* Calm Tactical Glass Palette (Neutral Dark Surfaces + Theme Accent) */
   --radar-bg-deep: #06090d;
   --radar-bg: #090e14;
-  --radar-panel: rgba(13, 19, 26, 0.94);
-  --radar-header: rgba(18, 26, 35, 0.96);
-  --radar-surface: rgba(20, 29, 39, 0.90);
-  --radar-surface-hover: rgba(34, 47, 61, 0.96);
-  --radar-border: rgba(255, 255, 255, 0.16);
+  --radar-panel: rgba(13, 19, 26, 0.82);
+  --radar-header: rgba(18, 26, 35, 0.92);
+  --radar-surface: rgba(20, 29, 39, 0.78);
+  --radar-surface-hover: rgba(34, 47, 61, 0.92);
+  --radar-border: rgba(255, 255, 255, 0.13);
   --radar-border-strong: #f97316;
   --radar-text: #f8fafc;
   --radar-text-secondary: #cbd5e1;
@@ -15,11 +15,11 @@
   --radar-accent-contrast: #090d12;
   --radar-danger: #f43f5e;
 
-  /* Typography & Gloved Touch Sizing (12-inch Tablet, Phone & Desktop) */
+  /* Typography & Touch Sizing (12-inch Tablet & Desktop) */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  --touch-target: 48px;
+  --touch-target: 44px;
   --ui-opacity: 1;
   --radius-sm: 8px;
   --radius-md: 12px;

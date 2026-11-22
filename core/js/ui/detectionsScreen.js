@@ -11,7 +11,6 @@ import {
   clearDetectionHits,
   exportAnnotatedCanvasPng
 } from '../renderer/compositor.js';
-import { aimLoupeAtHit } from '../renderer/zoomWindow.js';
 import {
   renderReticleOverlayLayer,
   computeFfpMatchScale,
@@ -87,7 +86,6 @@ export function initDetectionsScreen(subscribeState) {
   const btnHitPrev = document.getElementById('btnHitPrev');
   const btnHitNext = document.getElementById('btnHitNext');
   const hitSelectedSummary = document.getElementById('hitSelectedSummary');
-  const btnHitAimLoupe = document.getElementById('btnHitAimLoupe');
   const btnHitSnapshot = document.getElementById('btnHitSnapshot');
 
   let hitsDrawerOpen = false;
@@ -255,13 +253,13 @@ export function initDetectionsScreen(subscribeState) {
   }
 
   function syncHitsPinsVisibility() {
-    const showPins = appState.hitsMapShowPins !== false;
+    const showHits = Boolean(appState.heatmapEnabled);
     if (hitsPinsLayer) {
-      hitsPinsLayer.classList.toggle('hidden', !showPins);
+      hitsPinsLayer.classList.toggle('hidden', !showHits);
     }
     if (btnToggleHitsVisible) {
-      btnToggleHitsVisible.textContent = showPins ? 'Pins: ON' : 'Pins: OFF';
-      btnToggleHitsVisible.classList.toggle('radar-btn-active', showPins);
+      btnToggleHitsVisible.textContent = showHits ? 'Hits: ON' : 'Hits: OFF';
+      btnToggleHitsVisible.classList.toggle('radar-btn-active', showHits);
     }
     if (btnHitsClear) {
       const hasHits = Array.isArray(appState.detectionHits) && appState.detectionHits.length > 0;
@@ -328,7 +326,7 @@ export function initDetectionsScreen(subscribeState) {
       }
     }
 
-    [btnHitPrev, btnHitNext, btnHitAimLoupe, btnHitSnapshot].forEach((btn) => {
+    [btnHitPrev, btnHitNext, btnHitSnapshot].forEach((btn) => {
       if (btn) btn.disabled = !hasHits;
     });
 
@@ -517,7 +515,10 @@ export function initDetectionsScreen(subscribeState) {
   });
 
   btnToggleHitsVisible?.addEventListener('click', () => {
-    updateState({ hitsMapShowPins: !(appState.hitsMapShowPins !== false) });
+    const nextEnabled = !appState.heatmapEnabled;
+    if (nextEnabled) rezeroHeatmap();
+    updateState({ heatmapEnabled: nextEnabled });
+    saveSettings(appState);
   });
 
   btnToggleHitsTimestamps?.addEventListener('click', () => {
@@ -525,47 +526,13 @@ export function initDetectionsScreen(subscribeState) {
     saveSettings(appState);
   });
 
-  // Two-tap protection for destructive session-hit wipes in the field
-  const armTwoTap = (btn, defaultText, onConfirm) => {
-    let armed = false;
-    let timer = null;
-    const reset = () => {
-      armed = false;
-      clearTimeout(timer);
-      if (btn) {
-        btn.classList.remove('radar-btn-armed');
-        if (defaultText !== null) btn.textContent = defaultText;
-      }
-    };
-    btn?.addEventListener('click', () => {
-      if (!armed) {
-        armed = true;
-        btn.classList.add('radar-btn-armed');
-        if (defaultText !== null) btn.textContent = 'Sure?';
-        clearTimeout(timer);
-        timer = setTimeout(reset, 2600);
-        return;
-      }
-      reset();
-      onConfirm();
-    });
-  };
-
-  armTwoTap(btnHitsRezero, 'Re-Zero', () => {
+  btnHitsRezero?.addEventListener('click', () => {
     rezeroHeatmap();
     clearDetectionHits();
   });
 
-  armTwoTap(btnHitsClear, null, () => {
+  btnHitsClear?.addEventListener('click', () => {
     clearDetectionHits();
-  });
-
-  btnHitAimLoupe?.addEventListener('click', () => {
-    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
-    const selectedHit = getSelectedHit(hits);
-    if (selectedHit) {
-      aimLoupeAtHit(selectedHit, { switchToLive: true, ensurePipVisible: true });
-    }
   });
 
   btnHitPrev?.addEventListener('click', () => {
@@ -611,7 +578,7 @@ export function initDetectionsScreen(subscribeState) {
       prefix: 'SPOTR_Hits',
       drawExtra: async (ctx, w, h) => {
         ctx.save();
-        if (appState.hitsMapShowPins !== false) {
+        if (appState.heatmapEnabled) {
           hits.forEach((hit, idx) => {
             const px = hit.normX * w;
             const py = hit.normY * h;
@@ -668,7 +635,7 @@ export function initDetectionsScreen(subscribeState) {
     ) {
       syncHitsReticleOverlay();
     }
-    if (patch.hitsMapShowPins !== undefined) {
+    if (patch.heatmapEnabled !== undefined) {
       syncHitsPinsVisibility();
     }
     if (patch.showHitTimestamps !== undefined) {
@@ -679,7 +646,7 @@ export function initDetectionsScreen(subscribeState) {
       patch.selectedHitId !== undefined ||
       patch.heatmapIgnoreMasks !== undefined ||
       patch.showHitTimestamps !== undefined ||
-      patch.hitsMapShowPins !== undefined
+      patch.heatmapEnabled !== undefined
     ) {
       renderDetectionsMap();
     }

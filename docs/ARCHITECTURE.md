@@ -1,4 +1,4 @@
-# SPOTR Software Architecture Document (v0.62.0)
+# SPOTR Software Architecture Document (v0.62.1)
 
 > **Repository Note:** This repository (`EagleVision`) hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*). All former specification notes from `docs/project_plan.txt` have been consolidated here as the single technical source of truth.
 
@@ -8,9 +8,9 @@
 
 **SPOTR** is a zero-dependency, offline-first Progressive Web Application (PWA) paired with:
 - A local Python 3 + OpenCV RTSP gateway (`platforms/windows/server.py`, with root proxy `server.py`), and
-- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 62` / `v0.62.0`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
+- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 63` / `v0.62.1`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
 
-Target hardware ranges from **low-power tablets** (e.g., **Lenovo IdeaPad Duet 3** 4 GB RAM, ARM SoCs) to rugged Android phones and desktop/laptop systems. Every subsystem is engineered for **gloved field operation**, **battery conservation**, and **zero cloud dependency**.
+Target hardware ranges from **low-power tablets** (e.g., **Lenovo IdeaPad Duet 3** 4 GB RAM, ARM SoCs) to rugged Android phones and desktop/laptop systems. Every subsystem is engineered for **field reliability**, **battery conservation**, and **zero cloud dependency**.
 
 ---
 
@@ -22,7 +22,7 @@ flowchart TD
         BT["WebHID Bluetooth<br/>(DualShock 4 / DualSense)"]
         GP["HTML5 Gamepad API &<br/>8BitDo Micro (K-Mode)"]
         RING["Bluetooth Ring / Remote<br/>(Explicit Opt-In: ringEnabled)"]
-        TOUCH["Gloved Touch / Mouse / Keyboard<br/>(Rain/Carry Touch Lock)"]
+        TOUCH["Touch / Mouse / Keyboard"]
     end
 
     subgraph Store["2. Reactive State & Persistence"]
@@ -78,10 +78,9 @@ stateDiagram-v2
     HitsMap --> UnifiedPlayback: Switch Tab (Hits ↔ Playback)
     UnifiedPlayback --> LiveScreen: ← Live / Circle / Esc
     HitsMap --> LiveScreen: ← Live / Circle / Esc
-    HitsMap --> CalibrationScreen: Tap Calibrate
 
     LiveScreen --> SettingsScreen: Setup Gear
-    LiveScreen --> CalibrationScreen: Long-Press Hits
+    LiveScreen --> CalibrationScreen: Dock Gear / Long-Press Hits
     SettingsScreen --> ReticleScreen: Reticle Tab
     SettingsScreen --> CalibrationScreen: Calibration Tab
     SettingsScreen --> ControllerScreen: Controllers Tab
@@ -93,12 +92,12 @@ stateDiagram-v2
 
 | Screen | Container ID | Primary Purpose | Background Pipeline State |
 | :--- | :--- | :--- | :--- |
-| **1. Live** | `#screenLive` | 60 FPS scope viewport, FFP reticle, PiP loupe, streamlined gloved dock, Touch Lock, 1-tap snapshot, Source Status Pill | Compositor active, RAM buffer active (if enabled), RTSP/UVC active |
-| **2. Playback & Hits** | `#screenGallery` | Unified `LIVE BUFFER (RAM)` + IndexedDB clips (`0.5x` slow-mo, `-1/+1` step, `.webm` export) & Spatial Hits Map (decoupled `Pins: ON/OFF`, `Aim Loupe`, `Calibrate`) | Live compositor paused, RAM buffer paused, gateway JPEG encoding paused |
-| **3. Setup** | `#screenSettings` | Camera sources (USB / Wi-Fi RTSP), Voice tuning, Display & Theme (6 swatches + custom picker, Display Timestamps, Telemetry HUD toggle) | Live compositor paused, RAM buffer paused, gateway paused |
-| **4. Reticle** | `#screenReticle` | Parametric crosshair studio (FFP/SFP, 4 center styles, independent reticle color swatches, custom image DataURL persistence, 2-tap Reset) | Live compositor paused, RAM buffer paused, gateway paused |
+| **1. Live** | `#screenLive` | 60 FPS scope viewport, FFP reticle, PiP loupe, translucent glass bottom dock (`Hits \| 🗑 \| ⚙`), icon-only Setup & Clean View | Compositor active, RAM buffer active (if enabled), RTSP/UVC active |
+| **2. Playback & Hits** | `#screenGallery` | Unified `LIVE BUFFER (RAM)` + IndexedDB clips (`0.5x` slow-mo, `-1/+1` step, `.webm` export) & Spatial Hits Map (`Reticle: ON/OFF`, synced `Hits: ON/OFF`, PNG export) | Live compositor paused, RAM buffer paused, gateway JPEG encoding paused |
+| **3. Setup** | `#screenSettings` | Camera sources (USB / Wi-Fi RTSP), Voice tuning, Display & Theme (6 swatches + custom picker, Display & Hit Timestamps) | Live compositor paused, RAM buffer paused, gateway paused |
+| **4. Reticle** | `#screenReticle` | Parametric crosshair studio (FFP/SFP, 4 center styles, unified color theme swatches, custom image DataURL persistence) | Live compositor paused, RAM buffer paused, gateway paused |
 | **5. Controllers** | `#screenController` | DualShock 4/5 WebHID, 8BitDo Micro K-Mode, isolated Bluetooth Ring toggle (`ringEnabled`, OFF by default), visual remap & JSON profile import/export | Live compositor paused, RAM buffer paused, gateway paused |
-| **6. Calibration** | `#screenCalibration` | 1:1 thermal heatmap debug view, 3 Environment Presets (`Indoor`, `Calm Range`, `Wind / Mirage`), `✦ Auto-Tune`, noise meter, Ignore Zones | Live camera & 20Hz heatmap active (hit logging suppressed), RAM buffer paused |
+| **6. Calibration** | `#screenCalibration` | 1:1 thermal heatmap debug view, `✦ Auto-Tune`, noise-floor telemetry meter, Min/Max hit size, Ignore Zones, Shake Gate & Trail settings | Live camera & 20Hz heatmap active (hit logging suppressed), RAM buffer paused |
 
 ---
 
@@ -121,17 +120,19 @@ Both the Windows/Desktop gateway (`platforms/windows/server.py`) and the Android
 
 ---
 
-## 5. Slow-Hardware & Battery Optimizations (v0.62.0)
+## 5. Slow-Hardware & Battery Optimizations (v0.62.1)
 
 Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo IdeaPad Duet 3) cool, responsive, and OOM-free during multi-hour range sessions:
 
-1. **Zero `backdrop-filter: blur()` Over Live Video:** All translucent glass blur passes have been replaced with crisp, high-contrast matte surfaces (`rgba(13, 19, 26, 0.94)`), eliminating 17+ per-frame GPU blur passes over 60 FPS video.
-2. **Demand-Driven Render & Polling Loops:**
+1. **Demand-Driven Render & Polling Loops:**
    - The 60–120 Hz compositor `requestAnimationFrame` loop pauses automatically when `document.hidden` or off Live/Calibration.
    - USB `<video>` canvas blits are deduplicated via `videoEl.currentTime` (zero redundant blits on 30 FPS cameras running on 60–120 Hz screens).
    - The `gamepadController.js` polling loop stops completely when no gamepad is connected or the tab is hidden.
    - The playback canvas loop stops whenever playback is paused or on the Hits tab.
    - The 20 Hz 14,400-cell thermal debug `putImageData` pass runs exclusively on Screen 6 Calibration.
+2. **GPU-Composited Meters & Patch-Gated UI Sync:**
+   - Memory and noise-floor meters animate via GPU `transform: scaleX()` instead of layout-thrashing `width`.
+   - State subscribers gate DOM updates by changed keys, and Hits age timers update text/classes in place instead of rebuilding the Hits list every 5 seconds.
 3. **Conservative Memory Guardrails:**
    - `voice-sprite.mp3` is decoded lazily only when Voice Callouts are enabled (saving 19–38 MB RAM on boot when muted).
    - `memoryRingBuffer.js` inspects `navigator.deviceMemory` and caps RAM allocation (`<= 220 MB` on 4 GB tablets) with generation-safe reset handling.
@@ -146,12 +147,11 @@ Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo 
 ## 6. Input Isolation Architecture
 
 - **Bluetooth Ring Isolation (`appState.ringEnabled`, default `false`):** `ringController.js` ignores all HID key, wheel, and synthetic touch events unless the operator explicitly enables **BT Ring: ON** in **Setup → Controllers → Bluetooth Ring & Remote** (and automatically yields when the **8BitDo Micro** profile is active). This guarantees Bluetooth Rings never hijack 8BitDo Micro K-Mode or keyboard shortcuts.
-- **Rain / Carry Touch Lock (`#btnToggleTouchLock`):** Locks the Live viewport behind a protective shield (`#touchLockOverlay`) so rain droplets or sling contact cannot alter zoom, reticle, or hits. Unlocking requires a deliberate **1-second hold** on `#btnUnlockTouchScreen`.
 
 ---
 
 ## 7. Offline & Security Model
 
 - **100% On-Device Processing:** Video capture, 20 Hz luminance diffing, voice audio sprites, timestamps, and IndexedDB clips stay completely local.
-- **Service Worker (`core/sw.js`, `spotr-v0.62.0`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits or RAM buffers.
+- **Service Worker (`core/sw.js`, `spotr-v0.62.1`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits.
 - **Localhost & SSRF Hardening:** Both gateways validate `rtsp://` schemes, whitelist `tcp`/`udp` transport, restrict `/api/rtsp/wake` to private/link-local/loopback hosts, block directory listing and `..` path traversal, and bind `127.0.0.1` by default.

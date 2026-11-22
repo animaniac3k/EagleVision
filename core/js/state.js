@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.62.0';
+export const APP_VERSION = 'v0.62.1';
 
 const listeners = new Set();
 
@@ -93,7 +93,6 @@ export const appState = {
   heatmapIgnoreMasks: [], // Normalized exclude zones: Array<{ x, y, w, h }> in [0..1]
   detectionHits: [],      // Session spatial detection log: Array<{ id, timestampMs, normX, normY, clockHour, clicks, dirLabel, thumbDataUrl }>
   selectedHitId: null,    // Currently highlighted detection hit ID in Detections drawer/map
-  hitsMapShowPins: true,  // Local display toggle for Archive -> Hits pins (decoupled from Live heatmapEnabled)
   galleryArchiveTab: 'clips', // 'clips' | 'hits' inside Screen 2 archive
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
   voiceRate: 0.80,        // Voice speech rate (0.6..1.0)

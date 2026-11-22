@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (v0.62.0) — Architecture &amp; Data Flow Infographic</title>
+  <title>SPOTR (v0.62.1) — Architecture &amp; Data Flow Infographic</title>
   <style>
     :root {
       --bg: #050a0f;
@@ -195,14 +195,14 @@
   <div class="wrap">
     <header class="card card-orange banner">
       <div>
-        <div class="eyebrow">System Architecture Infographic • Release v0.62.0 (Android vCode 62)</div>
+        <div class="eyebrow">System Architecture Infographic • Release v0.62.1 (Android vCode 63)</div>
         <h1>SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
-        <p class="subtitle">Offline-First PWA &amp; Native Android/ChromeOS App • Lenovo Duet 3 Slow-Hardware Tuned • Gloved Field UI • Isolated Hardware Inputs</p>
+        <p class="subtitle">Offline-First PWA &amp; Native Android/ChromeOS App • Lenovo Duet 3 Slow-Hardware Tuned • Isolated Hardware Inputs</p>
       </div>
       <div class="kpi-row">
         <div class="kpi">
           <div class="kpi-label">Rendering Engine</div>
-          <div class="kpi-val">60 FPS Zero-Blur Matte</div>
+          <div class="kpi-val">60 FPS Demand-Driven</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Hardware Inputs</div>
@@ -220,19 +220,19 @@
       <div class="screens-grid">
         <div class="screen-chip primary">
           <h3>1. Live (#screenLive)</h3>
-          <p>Dual-canvas 60 FPS scope, FFP reticle, PiP loupe, streamlined 48px dock, Source Pill, Touch Lock &amp; 1-tap Snapshot.</p>
+          <p>Dual-canvas 60 FPS scope, FFP reticle, PiP loupe, translucent glass dock (Hits | 🗑 | ⚙) &amp; icon-only Setup / Clean View.</p>
         </div>
         <div class="screen-chip">
           <h3>2. Archive (#screenGallery)</h3>
-          <p>Unified LIVE BUFFER (RAM) + saved clips (.webm export) &amp; Spatial Hits Map (decoupled Pins, Aim Loupe, Calibrate).</p>
+          <p>Unified LIVE BUFFER (RAM) + saved clips (.webm export) &amp; Spatial Hits Map (synced Reticle &amp; Hits toggles, PNG export).</p>
         </div>
         <div class="screen-chip">
           <h3>3. Setup (#screenSettings)</h3>
-          <p>USB/RTSP camera sources, Voice tuning, 6 theme swatches + custom picker, Timestamps &amp; Telemetry HUD toggle.</p>
+          <p>USB/RTSP camera sources, Voice tuning, 6 theme swatches + custom picker, Display &amp; Hit Timestamps.</p>
         </div>
         <div class="screen-chip">
           <h3>4. Reticle (#screenReticle)</h3>
-          <p>Parametric crosshair studio, 4 center styles, independent reticle colors, persisted custom overlay &amp; 2-tap Reset.</p>
+          <p>Parametric crosshair studio, 4 center styles, unified color theme swatches, persisted custom overlay &amp; Reset Defaults.</p>
         </div>
         <div class="screen-chip">
           <h3>5. Input (#screenController)</h3>
@@ -240,7 +240,7 @@
         </div>
         <div class="screen-chip">
           <h3>6. Calib (#screenCalibration)</h3>
-          <p>1:1 thermal debug canvas, 3 Environment Presets (Indoor / Calm / Wind), Auto-Tune, noise meter &amp; Ignore Zones.</p>
+          <p>1:1 thermal debug canvas, 1-tap ✦ Auto-Tune, GPU noise-floor meter, Min/Max hit size guides &amp; draggable Ignore Zones.</p>
         </div>
       </div>
     </section>
@@ -260,7 +260,7 @@
               <li><strong>DualShock 4 / DualSense (WebHID):</strong> Demand-driven polling (0% CPU when idle), touchpad virtual mouse, L2/R2 drag/click, dt-normalized sticks.</li>
               <li><strong>8BitDo Micro (K-Mode):</strong> 16-button zero-sleep HID keyboard profile with screen-scoped shortcuts.</li>
               <li><strong>Bluetooth Ring (Isolated):</strong> Disabled by default (<code>ringEnabled: false</code>) so it never hijacks 8BitDo Micro or keyboard navigation.</li>
-              <li><strong>Rain / Carry Touch Lock:</strong> Top-left shield blocks accidental rain/sling touches; 1-second hold to unlock.</li>
+              <li><strong>Keyboard &amp; Touch:</strong> Screen-scoped shortcuts (<code>I</code> HUD, <code>N</code> Snapshot, <code>R</code> Replay) &amp; pinch-zoom / pan gestures.</li>
             </ul>
           </div>
         </article>
@@ -274,7 +274,7 @@
             <ul>
               <li><strong>UVC USB Cameras:</strong> Browser <code>getUserMedia</code> + native Android <code>libuvc</code> (<code>UsbUvcSessionManager.kt</code>).</li>
               <li><strong>Bresser Wi-Fi (192.168.0.1):</strong> Validated local wake proxy (<code>/api/rtsp/wake</code>) + <code>ch0</code> (1080p) / <code>ch1</code> (540p) with Android 10+ camera Wi-Fi binding.</li>
-              <li><strong>Resilient Recovery:</strong> 4-step exponential backoff reconnect + live Top-Center Source Status Pill.</li>
+              <li><strong>Resilient Recovery:</strong> 4-step exponential backoff auto-reconnect + truthful RTSP status &amp; FPS telemetry.</li>
               <li><strong>Gateway Pause Sync:</strong> Automatically pauses JPEG/H.264 decode off Live &amp; Calibration.</li>
             </ul>
           </div>
@@ -290,7 +290,7 @@
               <div class="state-cell">• currentScreen (1..6)<br/>• streamStatus</div>
               <div class="state-cell">• reticleConfig + FFP<br/>• overlayEnabled</div>
               <div class="state-cell">• mainZoom / Pan<br/>• pipEnabled / AA</div>
-              <div class="state-cell">• hitsMapShowPins<br/>• heatmapIgnoreMasks</div>
+              <div class="state-cell">• heatmapEnabled<br/>• heatmapIgnoreMasks</div>
               <div class="state-cell">• ringEnabled (false)<br/>• themeColor (6+custom)</div>
               <div class="state-cell">• bufferMaxSec / FPS<br/>• displayTimestamps</div>
             </div>
@@ -314,13 +314,13 @@
               <div>• Skips redundant USB <code>&lt;video&gt;</code> blits via <code>currentTime</code>.</div>
               <div>• Stops rAF completely off Live/Calibration or when tab hidden.</div>
               <div>• Zero-flicker <code>#liveOverlayCanvas</code> for Hit Pins &amp; adaptive timestamps.</div>
-              <div>• 1-tap Live PNG snapshot bakes CSS filters, reticle, pins &amp; timestamps.</div>
+              <div>• Annotated PNG snapshot bakes CSS filters, reticle, pins &amp; timestamps.</div>
             </div>
             <div class="subbox">
               <div class="subbox-title">B. 20Hz Consolidated Micro-Change Detector</div>
               <div>• 160×90 luminance grid with <code>Float64Array</code> tracking &amp; Ignore Masks.</div>
               <div>• Global Shake Gate (&gt;18%) + Max Hit Area (default 5%) + Min Cells.</div>
-              <div>• 3 Calibration Presets: <strong>Indoor</strong>, <strong>Calm Range</strong>, <strong>Wind / Mirage</strong>.</div>
+              <div>• 1-tap <strong>✦ Auto-Tune</strong> samples live scene noise floor for 1.3s.</div>
               <div>• 14,400-cell thermal debug <code>putImageData</code> runs only on Calibration.</div>
             </div>
             <div class="subbox">
@@ -340,7 +340,7 @@
           <div class="node-body">
             <ul>
               <li><strong>First Focal Plane (FFP):</strong> Scales crosshair subtensions 1:1 with digital zoom.</li>
-              <li><strong>Independent Reticle Swatches:</strong> Change crosshair color without altering app accent theme.</li>
+              <li><strong>Unified Theme Swatches:</strong> 6 tactical swatches + custom picker with WCAG-computed button text contrast.</li>
               <li><strong>Persisted Custom Reticle:</strong> Uploads stored as DataURL (&lt;= 1 MB) across restarts.</li>
               <li><strong>Digital Loupe (PiP):</strong> 1.5x–12.0x movable/resizable zoom window with <code>Loupe AA</code> auto-snap to hits.</li>
             </ul>
@@ -373,9 +373,9 @@
           </div>
           <div class="node-body">
             <ul>
-              <li><strong>Playback Tab:</strong> Opens <code>LIVE BUFFER (RAM)</code> unsaved; 0.5x slow-mo, -1/+1 frame step, 46px gloved scrubber, on-demand Save Clip &amp; <code>.webm</code> export (picker invoked before encoding).</li>
+              <li><strong>Playback Tab:</strong> Opens <code>LIVE BUFFER (RAM)</code> unsaved; 0.5x slow-mo, -1/+1 frame step, audio-peak CCTV scrubber, on-demand Save Clip &amp; <code>.webm</code> export (picker invoked before encoding).</li>
               <li><strong>Memory Cleanup:</strong> Frees 50–300 MB <code>activeBufferClip</code> immediately upon returning to Live.</li>
-              <li><strong>Spatial Hits Map:</strong> Decoupled <code>Pins: ON/OFF</code>, <strong>Aim Loupe</strong>, <strong>Calibrate</strong>, 2-tap <strong>Re-Zero</strong> &amp; <strong>Clear</strong>, in-place age timers.</li>
+              <li><strong>Spatial Hits Map:</strong> Synced <code>Reticle: ON/OFF</code> &amp; <code>Hits: ON/OFF</code>, 1-tap <strong>Re-Zero</strong> &amp; <strong>Clear</strong>, in-place age timers, PNG snapshot export.</li>
             </ul>
           </div>
         </article>
@@ -387,7 +387,7 @@
           </div>
           <div class="node-body">
             <ul>
-              <li><strong>Android APK (v0.62.0 / vCode 62):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
+              <li><strong>Android APK (v0.62.1 / vCode 63):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
               <li><strong>Windows/Desktop (server.py):</strong> <code>TCP_NODELAY</code> + coalesced MJPEG writes, localhost-by-default security (<code>--lan</code> opt-in for iOS/iPad), SSRF &amp; scheme validation.</li>
             </ul>
           </div>
@@ -397,12 +397,12 @@
 
     <footer class="card footer-bar">
       <div>
-        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.62.0)</strong>
-        Pre-caches all 40 core assets for 100% offline field use. Bypasses cross-origin camera requests (192.168.0.1) so camera wake probes never hang, and preserves active hits/buffers across SW updates.
+        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.62.1)</strong>
+        Pre-caches all 40 core assets for 100% offline field use. Bypasses cross-origin camera requests (192.168.0.1) so camera wake probes never hang, and preserves active hits across SW updates.
       </div>
       <div>
-        <strong>GLOVED &amp; LOW-POWER FIELD ERGONOMICS</strong>
-        Zero GPU backdrop blur, 48px Live dock targets, 2-tap destructive confirmations (Re-Zero / Clear / Reset), Rain/Carry Touch Lock, and automatic background sleep keep tablets fast and cool on the range.
+        <strong>LOW-POWER ENGINE &amp; INPUT ISOLATION</strong>
+        Demand-driven compositor/gamepad/playback loops, GPU <code>scaleX()</code> meters, lazy voice decoding, RAM caps, and opt-in Bluetooth Ring isolation keep 4 GB tablets cool and responsive on the range.
       </div>
     </footer>
   </div>

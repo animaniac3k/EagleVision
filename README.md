@@ -1,8 +1,8 @@
-# SPOTR — Tactical Camera & Scope Overlay System (`v0.62.0`)
+# SPOTR — Tactical Camera & Scope Overlay System (`v0.62.1`)
 
 > **Repository Note:** The `EagleVision` repository hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*).
 
-An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 62`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for gloved field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
+An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 63`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for reliable field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
 
 ---
 
@@ -17,27 +17,26 @@ An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`
 
 ---
 
-## Key Features (`v0.62.0`)
+## Key Features (`v0.62.1`)
 
-- **Gloved Field-First Live Workspace**:
-  - **Streamlined Bottom Dock (48px Targets):** Large, high-contrast matte buttons (`Reticle · FFP`, `Hits | 🗑`, `Voice OFF/POI/POA`, `Loupe ON/AA/OFF`, `Zoom −/1.0x/+`, `Replay · 20s ▴`) with zero GPU `backdrop-filter: blur()` overhead.
-  - **Top-Left Field Controls:** Setup, Clean View, **Rain/Carry Touch Lock** (1-second hold to unlock), and **1-Tap Annotated Live Snapshot** (bakes CSS filters, reticle, hit pins & timestamps).
-  - **Live Source Status Pill:** Always-visible top-center connection pill (`LIVE`, `RECONNECTING`, `TEST SIGNAL`) with 4-step automatic exponential-backoff reconnect.
-  - **6 High-Contrast Matte UI Themes + Custom Color Picker** (WCAG-computed button contrast).
+- **Clean Translucent Glass Live Workspace**:
+  - **Bottom Control Dock:** Compact translucent glass dock (`Reticle · FFP`, `Hits | 🗑 | ⚙`, `Voice OFF/POI/POA`, `Loupe ON/AA/OFF`, `Zoom −/1.0x/+`, `Replay · 20s ▴`) keeping the sight picture unobstructed.
+  - **Quiet Top-Left Controls:** Icon-only **Setup** (`⚙`) and **Clean View** (`👁`) pills that stay accessible even in Clean View mode.
+  - **6 Tactical UI Themes + Custom Color Picker** with WCAG-computed button text contrast.
 
 - **Multi-Source Camera Ingestion & Resilient Native Gateways**:
   - **USB UVC Scopes & Webcams:** Browser `getUserMedia` + native Android `libuvc` hotplug capture (`UsbUvcSessionManager.kt`).
-  - **Bresser Wi-Fi (`192.168.0.1`) & ONVIF/RTSP Cameras:** Validated local wake proxy (`/api/rtsp/wake`), `ch0` (1080p) / `ch1` (540p) streams, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, Android 10+ no-internet camera Wi-Fi binding, `FLAG_KEEP_SCREEN_ON`, low-latency `WifiLock`, and `TCP_NODELAY` coalesced writes on Windows.
+  - **Bresser Wi-Fi (`192.168.0.1`) & ONVIF/RTSP Cameras:** Validated local wake proxy (`/api/rtsp/wake`), `ch0` (1080p) / `ch1` (540p) streams, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, Android 10+ no-internet camera Wi-Fi binding, `FLAG_KEEP_SCREEN_ON`, low-latency `WifiLock`, 4-step automatic exponential-backoff reconnect, and `TCP_NODELAY` coalesced writes on Windows.
 
 - **Slow-Hardware & Battery Optimizations (Lenovo Duet 3 Ready)**:
   - Demand-driven compositor & gamepad loops (0% CPU when hidden, paused, or controller unplugged), USB `<video>` frame deduplication, lazy studio voice sprite decoding (saves 19–38 MB RAM when muted), `navigator.deviceMemory` RAM buffer caps (`<= 220 MB` on 4 GB tablets), and fast semi-planar NV21 UV bulk copy on Android.
 
 - **Detection Calibration (Screen 6) & 1:1 Synced Voice**:
-  - **3 One-Tap Environment Presets** (`Indoor`, `Calm Range`, `Wind / Mirage`) + **1-Tap `✦ Auto-Tune`**, live noise-floor meter, draggable **Ignore Zones**, and 1:1 synced Hit Pin + Cartesian/clock-face Voice Callouts (`OFF → POI → POA`).
+  - Live 1:1 thermal heatmap debug view, **1-Tap `✦ Auto-Tune`**, live noise-floor meter, draggable **Ignore Zones**, and 1:1 synced Hit Pin + Cartesian/clock-face Voice Callouts (`OFF → POI → POA`).
 
 - **Unified Instant Replay & Spatial Hits Map (Screen 2)**:
-  - **Playback Tab:** Unsaved `LIVE BUFFER (RAM)` review (`0.5x` slow-mo, `-1/+1` stepping, 46px gloved scrubber, on-demand **Save Clip** to IndexedDB, `.webm` export with upfront save-file picker).
-  - **Hits Map:** **Decoupled `Pins: ON/OFF`** (peek underneath pins without toggling live detection), **`⌖ Aim Loupe`**, direct **`⚙ Calibrate`**, and 2-tap safety confirmations on **Re-Zero** & **Clear**.
+  - **Playback Tab:** Unsaved `LIVE BUFFER (RAM)` review (`0.5x` slow-mo, `-1/+1` stepping, audio-peak CCTV scrubber, on-demand **Save Clip** to IndexedDB, `.webm` export with upfront save-file picker).
+  - **Hits Map:** Synchronized `Reticle: ON/OFF` & `Hits: ON/OFF` toggles, hit timestamps, 1-tap **Re-Zero** & **Clear**, collapsible Hit Log drawer, and annotated PNG snapshot export.
 
 - **Isolated Hands-Free Controllers**:
   - **DualShock 4 / DualSense (WebHID)** with touchpad virtual mouse, **8BitDo Micro (K-Mode)**, and **Bluetooth Ring (Isolated / OFF by default)** so a Ring never hijacks 8BitDo Micro or keyboard shortcuts.

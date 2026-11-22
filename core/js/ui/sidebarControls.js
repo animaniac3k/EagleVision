@@ -24,8 +24,7 @@ import {
   speakModeAnnouncement,
   stopVoiceAnnouncement,
   rezeroHeatmap,
-  clearDetectionHits,
-  captureAnnotatedSnapshot
+  clearDetectionHits
 } from '../renderer/compositor.js';
 import { snapLoupeToLatestHit } from '../renderer/zoomWindow.js';
 import { openCalibrationScreen } from './calibrationScreen.js';
@@ -61,13 +60,14 @@ export function applyThemeColor(hex) {
 
   const root = document.documentElement.style;
 
-  // High-contrast matte surfaces (no 4% transparent glass washout outdoors, zero GPU blur needed)
+  // Background and panels
+  // Neutral dark glass surfaces & legible slate text regardless of accent hue
   root.setProperty('--radar-bg-deep', '#06090d');
   root.setProperty('--radar-bg', '#0b1016');
-  root.setProperty('--radar-panel', 'rgba(13, 19, 26, 0.94)');
-  root.setProperty('--radar-header', 'rgba(17, 24, 33, 0.96)');
-  root.setProperty('--radar-surface', 'rgba(20, 29, 39, 0.90)');
-  root.setProperty('--radar-surface-hover', 'rgba(34, 47, 61, 0.96)');
+  root.setProperty('--radar-panel', 'rgba(13, 19, 26, 0.84)');
+  root.setProperty('--radar-header', 'rgba(17, 24, 33, 0.90)');
+  root.setProperty('--radar-surface', 'rgba(255, 255, 255, 0.04)');
+  root.setProperty('--radar-surface-hover', 'rgba(255, 255, 255, 0.08)');
 
   // Text and accents
   root.setProperty('--radar-text', '#f8fafc');
@@ -414,50 +414,7 @@ export function initSidebarAndTopControls(videoEl) {
     }
   }
 
-  // 0b. 1-Tap Live Snapshot & Rain/Carry Touch Lock
-  const btnLiveSnapshot = document.getElementById('btnLiveSnapshot');
-  btnLiveSnapshot?.addEventListener('click', async () => {
-    btnLiveSnapshot.classList.add('radar-btn-active');
-    try {
-      await captureAnnotatedSnapshot();
-    } finally {
-      setTimeout(() => btnLiveSnapshot.classList.remove('radar-btn-active'), 450);
-    }
-  });
-
-  const btnToggleTouchLock = document.getElementById('btnToggleTouchLock');
-  const touchLockOverlay = document.getElementById('touchLockOverlay');
-  const btnUnlockTouchScreen = document.getElementById('btnUnlockTouchScreen');
-  btnToggleTouchLock?.addEventListener('click', () => {
-    touchLockOverlay?.classList.remove('hidden');
-  });
-  btnUnlockTouchScreen?.addEventListener('click', () => {
-    touchLockOverlay?.classList.add('hidden');
-  });
-
-  let clearHitsArmed = false;
-  let clearHitsArmTimer = null;
-  function resetClearHitsArm() {
-    clearHitsArmed = false;
-    clearTimeout(clearHitsArmTimer);
-    if (btnLiveClearHits) {
-      btnLiveClearHits.classList.remove('radar-btn-armed');
-      btnLiveClearHits.title = 'Clear Hit Markers & Re-Zero Background';
-    }
-  }
-
   btnLiveClearHits?.addEventListener('click', () => {
-    const hitsCount = Array.isArray(appState.detectionHits) ? appState.detectionHits.length : 0;
-    // Require 2-tap confirmation when logged hits would be wiped; allow instant Re-Zero at 0 hits
-    if (hitsCount > 0 && !clearHitsArmed) {
-      clearHitsArmed = true;
-      btnLiveClearHits.classList.add('radar-btn-armed');
-      btnLiveClearHits.title = 'Tap again to confirm clearing hits';
-      clearTimeout(clearHitsArmTimer);
-      clearHitsArmTimer = setTimeout(resetClearHitsArm, 2600);
-      return;
-    }
-    resetClearHitsArm();
     clearDetectionHits();
     rezeroHeatmap();
     btnLiveClearHits.classList.add('radar-btn-active');
@@ -1258,7 +1215,7 @@ export function initSidebarAndTopControls(videoEl) {
     if (colorPickerCustom && colorPickerCustom.value.toLowerCase() !== clean) {
       colorPickerCustom.value = color || '#f97316';
     }
-    swatches.forEach((s) => {
+    document.querySelectorAll('.theme-swatch').forEach((s) => {
       s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === clean);
     });
   }
@@ -1434,7 +1391,7 @@ export function initSidebarAndTopControls(videoEl) {
       }
     }
 
-    // Live Source Status Pill & RTSP Status / FPS Banner (truthful async connection telemetry)
+    // RTSP Status / FPS Banner (truthful async connection telemetry)
     if (
       isInit ||
       patch.streamStatus !== undefined ||
@@ -1444,22 +1401,6 @@ export function initSidebarAndTopControls(videoEl) {
       patch.isSimulatedStream !== undefined
     ) {
       const status = state.streamStatus || (state.isSimulatedStream ? 'simulated' : 'live');
-      const liveSourceDot = document.getElementById('liveSourceDot');
-      const liveSourceLabel = document.getElementById('liveSourceLabel');
-      if (liveSourceDot && liveSourceLabel) {
-        liveSourceDot.className = `live-source-dot status-${status}`;
-        if (status === 'reconnecting') {
-          liveSourceLabel.textContent = 'RECONNECTING...';
-        } else if (status === 'offline') {
-          liveSourceLabel.textContent = 'STREAM OFFLINE';
-        } else if (status === 'connecting') {
-          liveSourceLabel.textContent = 'CONNECTING...';
-        } else if (status === 'simulated' || state.isSimulatedStream) {
-          liveSourceLabel.textContent = 'TEST SIGNAL';
-        } else {
-          liveSourceLabel.textContent = `LIVE · ${(state.activeDeviceLabel || 'CAMERA').slice(0, 18)}`;
-        }
-      }
       if (state.isRtspStream) {
         if (textRtspStatus) {
           if (status === 'live') textRtspStatus.textContent = `LIVE: ${state.activeDeviceLabel}`;

@@ -1,7 +1,7 @@
 /**
  * Stream Telemetry HUD Controller
  */
-import { appState, updateState, subscribeState } from '../state.js';
+import { subscribeState } from '../state.js';
 
 const HUD_KEYS = [
   'hudOpen', 'fps', 'activeDeviceLabel', 'streamWidth', 'streamHeight',
@@ -17,11 +17,6 @@ export function initHudController() {
   const hudMainZoom = document.getElementById('hudMainZoom');
   const hudPipZoom = document.getElementById('hudPipZoom');
   const hudBufferText = document.getElementById('hudBufferText');
-  const btnToggleHud = document.getElementById('btnToggleHud');
-
-  btnToggleHud?.addEventListener('click', () => {
-    updateState({ hudOpen: !appState.hudOpen });
-  });
 
   function updateHud(state, patch) {
     const isInit = !patch || Object.keys(patch).length === 0;
@@ -34,11 +29,6 @@ export function initHudController() {
         }
       }
       if (!relevant) return;
-    }
-
-    if (btnToggleHud && (isInit || 'hudOpen' in patch)) {
-      btnToggleHud.textContent = state.hudOpen ? 'ON' : 'OFF';
-      btnToggleHud.classList.toggle('radar-btn-active', Boolean(state.hudOpen));
     }
 
     if (!hudOverlay) return;

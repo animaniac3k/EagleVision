@@ -12,6 +12,7 @@
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
+import { applyThemeColor } from './sidebarControls.js';
 import { buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from '../renderer/overlayManager.js';
 import { speakDetectionAnnouncement, computeClickCalloutOffset, buildDetectionCalloutPhrase } from '../renderer/compositor.js';
 
@@ -115,8 +116,7 @@ export function initReticleScreen() {
       b.classList.toggle('radar-btn-active', b.dataset.ov === (appState.overlayType || 'crosshair'));
     });
     document.querySelectorAll('.theme-swatch-reticle').forEach(sw => {
-      const effectiveReticleColor = (cfg.reticleColor || appState.themeColor || '#f97316').toLowerCase();
-      const isSel = (sw.dataset.color || '').toLowerCase() === effectiveReticleColor;
+      const isSel = (sw.dataset.color || '').toLowerCase() === (appState.themeColor || '#f97316').toLowerCase();
       sw.classList.toggle('active', isSel);
     });
 
@@ -409,28 +409,8 @@ export function initReticleScreen() {
     updateState({ currentScreen: 'settings' });
   });
 
-  // Reset reticle defaults (2-tap safety confirmation so calibrated reticles aren't wiped accidentally)
-  let resetReticleArmed = false;
-  let resetReticleTimer = null;
-  function disarmResetReticle() {
-    resetReticleArmed = false;
-    clearTimeout(resetReticleTimer);
-    if (btnResetReticle) {
-      btnResetReticle.classList.remove('radar-btn-armed');
-      btnResetReticle.textContent = 'Reset Defaults';
-    }
-  }
+  // Reset reticle defaults
   btnResetReticle?.addEventListener('click', () => {
-    if (!resetReticleArmed) {
-      resetReticleArmed = true;
-      btnResetReticle.classList.add('radar-btn-armed');
-      btnResetReticle.textContent = 'Confirm Reset?';
-      clearTimeout(resetReticleTimer);
-      resetReticleTimer = setTimeout(disarmResetReticle, 2800);
-      showReticleToast('TAP RESET AGAIN TO CONFIRM');
-      return;
-    }
-    disarmResetReticle();
     updateReticleConfig({
       clickCount: 10,
       clickSpacing: 32,
@@ -516,13 +496,24 @@ export function initReticleScreen() {
     e.target.value = '';
   });
 
-  // Reticle-Specific Color Swatches (only changes reticleColor, never hijacks global UI theme)
+  // Color Theme Swatches on Reticle Screen
   document.querySelectorAll('.theme-swatch-reticle').forEach((sw) => {
     sw.addEventListener('click', (e) => {
       e.stopPropagation();
       const color = sw.dataset.color;
       if (!color) return;
-      updateReticleConfig({ reticleColor: color });
+      applyThemeColor(color);
+      document.querySelectorAll('.theme-swatch').forEach((s) => {
+        s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === color.toLowerCase());
+      });
+      const colorPickerCustom = document.getElementById('colorPickerCustom');
+      if (colorPickerCustom) colorPickerCustom.value = color;
+      const patch = { themeColor: color };
+      if (appState.reticleConfig?.reticleColor) {
+        patch.reticleConfig = Object.assign({}, appState.reticleConfig, { reticleColor: '' });
+      }
+      updateState(patch);
+      saveSettings(appState);
     });
   });
 

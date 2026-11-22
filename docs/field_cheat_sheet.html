@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR v0.62.0 — 1-Page Field Cheat Sheet (Printable)</title>
+  <title>SPOTR v0.62.1 — 1-Page Field Cheat Sheet (Printable)</title>
   <style>
     @page {
       size: letter landscape;
@@ -134,7 +134,7 @@
 </head>
 <body>
   <div class="toolbar">
-    <span><strong>SPOTR v0.62.0</strong> — Laminated 1-Page Field Card (Low-Ink Print Ready)</span>
+    <span><strong>SPOTR v0.62.1</strong> — Laminated 1-Page Field Card (Low-Ink Print Ready)</span>
     <div style="display:flex; gap:8px;">
       <a href="./user_manual.html">Full 5-Page Manual</a>
       <button type="button" onclick="window.print()">Print Field Card</button>
@@ -147,7 +147,7 @@
         <h1>SPOTR<span>™</span> — RANGE FIELD CHEAT SHEET</h1>
       </div>
       <div class="hdr-meta">
-        RELEASE v0.62.0 • ANDROID vCode 62 • OFFLINE PWA<br/>
+        RELEASE v0.62.1 • ANDROID vCode 63 • OFFLINE PWA<br/>
         LAMINATE &amp; KEEP IN RANGE BAG
       </div>
     </header>
@@ -160,17 +160,17 @@
           <ul>
             <li><strong>USB UVC Scope:</strong> Plug in USB-C/OTG cable → accept Android USB prompt → select camera in <strong>Setup → Camera</strong>.</li>
             <li><strong>Bresser Wi-Fi Scope:</strong> Join camera Wi-Fi SSID → open <strong>Setup → Camera → Wi-Fi / RTSP</strong> → tap <strong>Wake &amp; Connect</strong> (<code>192.168.0.1</code>). Android 10+ auto-binds local Wi-Fi even with LTE on.</li>
-            <li><strong>Confirm Feed:</strong> Top-center <strong>Source Status Pill</strong> turns green (<code>LIVE</code>).</li>
-            <li><strong>Zero &amp; Calibrate:</strong> Long-press <strong>Hits</strong> → pick <strong>Indoor</strong>, <strong>Calm Range</strong>, or <strong>Wind / Mirage</strong> (or tap <strong>✦ Auto-Tune</strong>).</li>
+            <li><strong>Auto-Reconnect:</strong> Stream recovers automatically with 4-step exponential backoff if Wi-Fi momentarily dips.</li>
+            <li><strong>Zero &amp; Calibrate:</strong> Tap <strong>⚙</strong> next to <strong>Hits</strong> (or long-press <strong>Hits</strong>) → tap <strong>✦ Auto-Tune</strong>.</li>
           </ul>
         </section>
 
         <section class="box box-accent">
-          <h2>2. Live Screen Gloved Controls</h2>
+          <h2>2. Live Screen Controls</h2>
           <ul>
-            <li><strong>Top-Left Bar:</strong> ⚙ Setup · 👁 Clean View · 🔒 <strong>Touch Lock</strong> (hold 1s to unlock) · 📷 <strong>1-Tap Snapshot</strong>.</li>
+            <li><strong>Top-Left Pills:</strong> ⚙ Setup · 👁 Clean View (hides controls &amp; reticle; both pills remain reachable).</li>
             <li><strong>Reticle · FFP:</strong> Toggle crosshair; tap FFP pill to lock subtensions 1:1 with zoom.</li>
-            <li><strong>Hits | 🗑:</strong> Toggle live pins; <strong>long-press Hits</strong> for Calibration; 🗑 Re-Zeros (2-tap confirm).</li>
+            <li><strong>Hits | 🗑 | ⚙:</strong> Toggle live pins; 🗑 Clears &amp; Re-Zeros immediately; ⚙ opens Calibration.</li>
             <li><strong>Voice:</strong> Cycles <code>OFF → POI → POA</code> (Cartesian clicks + clock bearings).</li>
             <li><strong>Loupe:</strong> Cycles <code>ON → AA (Auto Aim) → OFF</code>. Drag corners to resize.</li>
             <li><strong>Replay · 20s ▴:</strong> Opens unsaved <code>LIVE BUFFER</code>; tap <code>20s ▴</code> for duration/RAM meter.</li>
@@ -181,15 +181,15 @@
       <!-- Column 2: Calibration & Screen 2 Archive -->
       <div style="display:flex; flex-direction:column; gap:9px;">
         <section class="box box-green">
-          <h2>3. Calibration Presets (Screen 6)</h2>
+          <h2>3. Detection Calibration (Screen 6)</h2>
           <table>
             <thead>
-              <tr><th>Condition</th><th>Preset</th><th>Best For</th></tr>
+              <tr><th>Control</th><th>Purpose</th></tr>
             </thead>
             <tbody>
-              <tr><td>Stable light</td><td><strong>Indoor</strong></td><td>25–50m indoor bays, zero breeze</td></tr>
-              <tr><td>Normal range</td><td><strong>Calm Range</strong></td><td>Outdoor 50–100m, light air</td></tr>
-              <tr><td>Mirage / gusty</td><td><strong>Wind / Mirage</strong></td><td>Heat shimmer, swaying backers</td></tr>
+              <tr><td><strong>✦ Auto-Tune</strong></td><td>1.3s ambient noise sample → auto-sets Sensitivity</td></tr>
+              <tr><td><strong>Min / Max Hit Size</strong></td><td>1:1 visual guides reject sensor speckles &amp; swaying foliage</td></tr>
+              <tr><td><strong>Shake Gate</strong></td><td>Suppresses tripod bumps (&gt;18% frame delta default)</td></tr>
             </tbody>
           </table>
           <ul>
@@ -201,10 +201,9 @@
         <section class="box box-accent">
           <h2>4. Playback &amp; Hits Map (Screen 2)</h2>
           <ul>
-            <li><strong>Playback Tab:</strong> Scrub 46px track, tap <strong>0.5x</strong> slow-mo or <strong>-1 / +1</strong> frame step. Tap <strong>Save Clip</strong> only for shots worth keeping; <strong>Export</strong> saves <code>.webm</code>.</li>
-            <li><strong>Hits Tab:</strong> <strong>Pins: ON/OFF</strong> peeks underneath pins without disabling live detection.</li>
-            <li><strong>⌖ Aim Loupe:</strong> Snaps Live PiP Loupe onto selected impact &amp; returns to Live.</li>
-            <li><strong>2-Tap Safety:</strong> <strong>Re-Zero</strong>, <strong>Clear (🗑)</strong> &amp; Reticle <strong>Reset</strong> require 2 taps ("Sure?").</li>
+            <li><strong>Playback Tab:</strong> Scrub audio-peak track, tap <strong>0.5x</strong> slow-mo or <strong>-1 / +1</strong> frame step. Tap <strong>Save Clip</strong> only for shots worth keeping; <strong>Export</strong> saves <code>.webm</code>.</li>
+            <li><strong>Hits Tab:</strong> <strong>Reticle: ON/OFF</strong> and <strong>Hits: ON/OFF</strong> stay synchronized with Live; toggle 🕒 for hit timestamps.</li>
+            <li><strong>Re-Zero / Clear (🗑):</strong> 1-tap Re-Zero or Clear hits; tap 📷 to export annotated PNG snapshot.</li>
           </ul>
         </section>
       </div>
@@ -224,7 +223,7 @@
               <tr><td><span class="kbd">▢</span> · <span class="kbd">O</span>/<span class="kbd">S</span></td><td>Reticle</td><td>0.5x Slow-Mo</td></tr>
               <tr><td><span class="kbd">◄/►</span></td><td>Cycle Tool</td><td>Step -1/+1 · Hit</td></tr>
               <tr><td><span class="kbd">Share</span> · <span class="kbd">R</span></td><td>Instant Replay</td><td>Back to Live</td></tr>
-              <tr><td><span class="kbd">Z / H / V</span></td><td>Loupe/Hits/Voice</td><td>—</td></tr>
+              <tr><td><span class="kbd">I</span> / <span class="kbd">N</span></td><td>HUD / Snapshot</td><td>—</td></tr>
             </tbody>
           </table>
           <ul>
@@ -237,7 +236,7 @@
           <h2>6. Field Troubleshooting</h2>
           <ul>
             <li><strong>Wi-Fi Camera Won't Wake:</strong> Confirm Wi-Fi SSID connected, verify <code>192.168.0.1</code>, tap <strong>Wake &amp; Connect</strong> again (auto-retries 4x on drop).</li>
-            <li><strong>Rain / Accidental Touches:</strong> Tap top-left 🔒 <strong>Touch Lock</strong> (hold 1s to unlock).</li>
+            <li><strong>Accidental Taps / Clean View:</strong> Tap top-left 👁 <strong>Clean View</strong> to hide bottom controls &amp; reticle.</li>
             <li><strong>iOS / iPad RTSP:</strong> Run <code>start_spotr.bat --lan</code> on Windows laptop &amp; open laptop LAN IP on iPad Safari.</li>
           </ul>
         </section>
@@ -245,7 +244,7 @@
     </div>
 
     <footer class="foot">
-      <div>SPOTR v0.62.0 • 100% OFFLINE ON-DEVICE PROCESSING • ZERO CLOUD TELEMETRY</div>
+      <div>SPOTR v0.62.1 • 100% OFFLINE ON-DEVICE PROCESSING • ZERO CLOUD TELEMETRY</div>
       <div>FULL MANUAL: docs/USER_MANUAL.pdf</div>
     </footer>
   </main>

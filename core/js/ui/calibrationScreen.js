@@ -1,9 +1,9 @@
 /**
  * Hit Detection Calibration Screen Controller (#screenCalibration)
  *
- * Houses the live thermal heatmap debug view, 3 environment presets, 1-tap Auto-Tune,
- * noise-floor telemetry meter, Min/Max hit size tuning, ignore-zone masking, and
- * collapsed Advanced settings (Shake Gate, Thermal Trail, Auto-Save).
+ * Houses the live thermal heatmap debug view, 1-tap Auto-Tune, noise-floor
+ * telemetry meter, Min/Max hit size tuning, ignore-zone masking, and
+ * Advanced settings (Shake Gate, Thermal Trail, Auto-Save).
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
@@ -94,35 +94,6 @@ export function initCalibrationScreen() {
   let autoTuneActive = false;
   let autoTuneNoiseSamples = [];
   let autoTunePeakSamples = [];
-
-  const CALIB_ENV_PRESETS = {
-    indoor: { heatmapSensitivity: 78, heatmapMinCells: 2, heatmapMaxAreaPct: 4, heatmapShakeGatePct: 22 },
-    calm: { heatmapSensitivity: 62, heatmapMinCells: 2, heatmapMaxAreaPct: 5, heatmapShakeGatePct: 18 },
-    windy: { heatmapSensitivity: 44, heatmapMinCells: 3, heatmapMaxAreaPct: 3.5, heatmapShakeGatePct: 12 }
-  };
-
-  function syncEnvPresetHighlight() {
-    const sens = Number(appState.heatmapSensitivity) || 60;
-    document.querySelectorAll('.calib-env-preset[data-preset]').forEach((btn) => {
-      const p = CALIB_ENV_PRESETS[btn.dataset.preset];
-      if (!p) return;
-      const matches = Math.abs(sens - p.heatmapSensitivity) <= 2 &&
-        Number(appState.heatmapMinCells || 2) === p.heatmapMinCells &&
-        Number(appState.heatmapShakeGatePct || 18) === p.heatmapShakeGatePct;
-      btn.classList.toggle('radar-btn-active', matches);
-    });
-  }
-
-  document.querySelectorAll('.calib-env-preset[data-preset]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const preset = CALIB_ENV_PRESETS[btn.dataset.preset];
-      if (!preset) return;
-      updateState(preset);
-      rezeroHeatmap();
-      saveSettings(appState);
-      syncEnvPresetHighlight();
-    });
-  });
 
   let clearMasksArmTimer = null;
   let clearMasksArmed = false;
@@ -714,7 +685,6 @@ export function initCalibrationScreen() {
   syncShakeGateUI(appState.heatmapShakeGatePct ?? 18, appState.heatmapMaxAreaPct ?? 5);
   syncDurationUI(appState.heatmapDuration ?? 30);
   syncAutoSaveUI(Boolean(appState.heatmapAutoSave));
-  syncEnvPresetHighlight();
 
   subscribeState((state, patch = {}) => {
     if (patch.currentScreen !== undefined) {
@@ -740,13 +710,6 @@ export function initCalibrationScreen() {
     }
     if (patch.heatmapDuration !== undefined) syncDurationUI(state.heatmapDuration);
     if (patch.heatmapAutoSave !== undefined) syncAutoSaveUI(Boolean(state.heatmapAutoSave));
-    if (
-      patch.heatmapSensitivity !== undefined ||
-      patch.heatmapMinCells !== undefined ||
-      patch.heatmapShakeGatePct !== undefined
-    ) {
-      syncEnvPresetHighlight();
-    }
     if (
       patch.currentScreen !== undefined ||
       patch.heatmapIgnoreMasks !== undefined ||

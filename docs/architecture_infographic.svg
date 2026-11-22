@@ -42,10 +42,10 @@
     SPOTR<tspan fill="#f97316" font-size="13" font-weight="700" dy="-7">™</tspan><tspan fill="#f8fafc" font-size="22" font-weight="800" dy="7"> — SYSTEM ARCHITECTURE &amp; DATA FLOW</tspan>
   </text>
   <text x="54" y="75" fill="#94a3b8" font-family="'Segoe UI', -apple-system, Roboto, sans-serif" font-size="13" font-weight="500">
-    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — v0.62.0 • Slow-Hardware Tuned PWA + Python OpenCV &amp; Android MediaCodec Gateways
+    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — v0.62.1 • Slow-Hardware Tuned PWA + Python OpenCV &amp; Android MediaCodec Gateways
   </text>
   <rect x="1156" y="36" width="234" height="38" rx="6" fill="#09111a" stroke="#f97316" stroke-width="1.5"/>
-  <text x="1273" y="60" text-anchor="middle" fill="#fdba74" font-family="monospace" font-size="12.5" font-weight="bold">v0.62.0 • ANDROID vCode 62</text>
+  <text x="1273" y="60" text-anchor="middle" fill="#fdba74" font-family="monospace" font-size="12.5" font-weight="bold">v0.62.1 • ANDROID vCode 63</text>
 
   <!-- COLUMN 1: INGESTION, INPUTS & STATE (x=30..365) -->
   <g transform="translate(30, 114)">
@@ -60,7 +60,7 @@
       <text x="14" y="48" fill="#38bdf8" font-family="monospace" font-size="11.5" font-weight="bold">streamManager.js • server.py • SpotrServer.kt</text>
       <text x="14" y="67" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• UVC USB: getUserMedia + Android libuvc bridge</text>
       <text x="14" y="85" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Bresser 192.168.0.1: Wake proxy + ch0/ch1</text>
-      <text x="14" y="103" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 4-Step Auto-Reconnect + Live Source Status Pill</text>
+      <text x="14" y="103" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 4-Step Auto-Reconnect + Truthful RTSP Telemetry</text>
       <text x="14" y="121" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Gateway Auto-Pause off Live &amp; Calibration</text>
       <text x="14" y="140" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• TCP_NODELAY + Android fast NV21 UV copy</text>
     </g>
@@ -77,8 +77,8 @@
       <text x="14" y="103" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Demand-Driven Loop: 0% CPU when unplugged</text>
       <text x="14" y="121" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 8BitDo Micro K-Mode: 16-button HID profile</text>
       <text x="14" y="139" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Screen-scoped shortcuts + JSON import/export</text>
-      <text x="14" y="159" fill="#fbbf24" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Rain / Carry Touch Lock: 1s Hold-to-Unlock</text>
-      <text x="14" y="179" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Prevents rain/sling false taps on gloved tablets</text>
+      <text x="14" y="159" fill="#fbbf24" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Clean View Declutter + Full Keyboard Mapping</text>
+      <text x="14" y="179" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Safe profile import + persisted Micro slot bindings</text>
     </g>
 
     <!-- Isolated Bluetooth Ring -->
@@ -102,7 +102,7 @@
       <text x="14" y="48" fill="#2dd4bf" font-family="monospace" font-size="11.5" font-weight="bold">js/state.js &amp; settingsStore.js</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Isolated try/catch pub/sub (patch-gated UI)</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Debounced (250ms) + clamped localStorage</text>
-      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Decoupled hitsMapShowPins &amp; reticle colors</text>
+      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Synced Hits/Reticle toggles across all screens</text>
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Persisted custom reticle DataURL (&lt;= 1 MB)</text>
       <text x="14" y="144" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">↔ IndexedDB (videoStore.js) + pagehide flush</text>
     </g>
@@ -110,7 +110,7 @@
 
   <!-- COLUMN 2: COMPOSITOR, CV, VOICE & RETICLE (x=400..900) -->
   <g transform="translate(400, 114)">
-    <text x="0" y="0" fill="#2dd4bf" font-family="'Segoe UI', Roboto, sans-serif" font-size="13.5" font-weight="700" letter-spacing="0.8">2. ZERO-BLUR 60 FPS COMPOSITOR &amp; DETECTION</text>
+    <text x="0" y="0" fill="#2dd4bf" font-family="'Segoe UI', Roboto, sans-serif" font-size="13.5" font-weight="700" letter-spacing="0.8">2. DEMAND-DRIVEN 60 FPS COMPOSITOR &amp; CV</text>
 
     <!-- Dual-Canvas Compositor -->
     <g transform="translate(0, 14)">
@@ -121,18 +121,18 @@
       <rect x="14" y="42" width="472" height="74" rx="5" fill="#141e2b" stroke="#1e3a4c"/>
       <text x="24" y="60" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">PRIMARY VIEWPORT (#mainCanvas + #liveOverlayCanvas)</text>
       <text x="24" y="78" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Frame-deduped USB blits; rAF sleeps when hidden/off-Live</text>
-      <text x="24" y="96" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Zero-flicker Hit Pins, adaptive timestamps &amp; 1-tap PNG snapshot</text>
+      <text x="24" y="96" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Zero-flicker Hit Pins, adaptive timestamps &amp; PNG snapshot</text>
 
       <rect x="14" y="126" width="472" height="82" rx="5" fill="#141e2b" stroke="#f59e0b"/>
       <text x="24" y="144" fill="#fbbf24" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">20Hz CONSOLIDATED DETECTOR &amp; CALIBRATION</text>
       <text x="24" y="162" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 160×90 luma grid (Float64Array) • &gt;18% Shake Gate • 5% Max Area</text>
-      <text x="24" y="180" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 3 Presets (Indoor / Calm Range / Wind) + 1-tap ✦ Auto-Tune</text>
+      <text x="24" y="180" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 1-Tap ✦ Auto-Tune (1.3s live noise sample) + Ignore Zones</text>
       <text x="24" y="198" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• 14,400-cell thermal debug putImageData runs only on Calibration</text>
 
       <rect x="14" y="218" width="472" height="66" rx="5" fill="#141e2b" stroke="#38bdf8"/>
       <text x="24" y="236" fill="#7dd3fc" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">DIGITAL ZOOM LOUPE (#pipCanvas) + AUTO AIM</text>
-      <text x="24" y="254" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 1.5x–12.0x movable/resizable PiP; 38px gloved corner handles</text>
-      <text x="24" y="272" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Loupe AA snaps ROI to latest hit automatically on Live or Hits</text>
+      <text x="24" y="254" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 1.5x–12.0x movable/resizable PiP window + draggable ROI crosshair</text>
+      <text x="24" y="272" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Loupe AA snaps ROI to latest hit automatically</text>
     </g>
 
     <!-- Studio Voice Engine -->
@@ -158,11 +158,11 @@
       <text x="14" y="48" fill="#fdba74" font-family="monospace" font-size="11.5" font-weight="bold">overlayManager.js • reticleScreen.js</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• First Focal Plane (FFP): Subtensions scale 1:1 with digital zoom</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 4 Center Styles: Empty, Dot, Cross, Chevron • 2–30 Clicks/Arm</text>
-      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Independent Reticle Color Swatches (decoupled from UI accent)</text>
+      <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 6 Unified Tactical Themes + Custom Picker (WCAG contrast)</text>
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Synced Reticle ON/OFF across Live, Playback, Hits &amp; Studio</text>
-      <text x="14" y="140" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 6 Existing High-Contrast Matte UI Themes + Custom Color Picker</text>
-      <text x="14" y="158" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 2-Tap "Confirm Reset?" safety + Clean View declutter mode</text>
-      <text x="14" y="177" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Zero backdrop-filter blur anywhere for smooth tablet frame pacing</text>
+      <text x="14" y="140" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Interactive click-to-test voice callouts on 4 scene backdrops</text>
+      <text x="14" y="158" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Translucent glass UI + Clean View declutter mode</text>
+      <text x="14" y="177" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Custom PNG/SVG reticle persists across restarts (&lt;= 1 MB)</text>
     </g>
   </g>
 
@@ -193,12 +193,12 @@
       <circle cx="16" cy="14" r="4.5" fill="#38bdf8"/>
       <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">UNIFIED SCREEN 2: PLAYBACK &amp; HITS MAP</text>
       <text x="14" y="48" fill="#7dd3fc" font-family="monospace" font-size="11.5" font-weight="bold">videoBrowser.js • detectionsScreen.js • videoStore.js</text>
-      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Playback: 0.5x Slow-Mo, -1/+1 step, 46px scrubber</text>
+      <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Playback: 0.5x Slow-Mo, -1/+1 step, audio-peak scrubber</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Save Clip to IndexedDB + .webm / PNG export</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• File picker requested BEFORE MediaRecorder encode</text>
       <text x="14" y="122" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Corrupt-JPEG safe LRU ImageBitmap frame decoder</text>
-      <text x="14" y="142" fill="#fbbf24" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Hits Map: Decoupled Pins: ON/OFF + Aim Loupe</text>
-      <text x="14" y="160" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Direct Calibrate button + 2-tap Re-Zero &amp; Clear</text>
+      <text x="14" y="142" fill="#fbbf24" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="bold">• Hits Map: Synced Reticle &amp; Hits toggles + Log drawer</text>
+      <text x="14" y="160" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 1-tap Re-Zero &amp; Clear + annotated PNG snapshot export</text>
       <text x="14" y="178" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• 640px hit thumbnails + in-place age timer updates</text>
       <text x="14" y="198" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10.5">• Playback rAF stops cleanly when paused or on Hits</text>
     </g>
@@ -209,7 +209,7 @@
       <rect width="475" height="28" rx="6" fill="#052e16"/>
       <circle cx="16" cy="14" r="4.5" fill="#22c55e"/>
       <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">OFFLINE PWA &amp; NATIVE PACKAGING</text>
-      <text x="14" y="48" fill="#4ade80" font-family="monospace" font-size="11.5" font-weight="bold">sw.js (spotr-v0.62.0) • MainActivity.kt • server.py</text>
+      <text x="14" y="48" fill="#4ade80" font-family="monospace" font-size="11.5" font-weight="bold">sw.js (spotr-v0.62.1) • MainActivity.kt • server.py</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Pre-caches all 40 core assets; bypasses cross-origin IPs</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Android: FLAG_KEEP_SCREEN_ON + Low-Latency WifiLock</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Android 10+: Binds camera Wi-Fi AP even with LTE active</text>
@@ -225,32 +225,32 @@
   <g transform="translate(30, 822)">
     <rect width="1380" height="136" rx="8" fill="#0f1722" stroke="#1e3a4c" stroke-width="1.5" filter="url(#shadow)"/>
     <rect width="1380" height="28" rx="8" fill="#141e2b"/>
-    <text x="18" y="19" fill="#f8fafc" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">4. SIX-SCREEN INTERFACE TOPOLOGY (v0.62.0)</text>
+    <text x="18" y="19" fill="#f8fafc" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">4. SIX-SCREEN INTERFACE TOPOLOGY (v0.62.1)</text>
 
     <g transform="translate(16, 40)">
       <rect x="0" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#f97316" stroke-width="1.5"/>
       <text x="10" y="19" fill="#fdba74" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">1. LIVE VIEWPORT</text>
-      <text x="10" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 48px streamlined bottom dock</text>
-      <text x="10" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Source Pill + Touch Lock + Snap</text>
+      <text x="10" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Translucent glass bottom dock</text>
+      <text x="10" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Icon-only Setup &amp; Clean View</text>
       <text x="10" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• FFP Reticle + PiP Loupe AA</text>
 
       <rect x="226" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#38bdf8" stroke-width="1.2"/>
       <text x="236" y="19" fill="#7dd3fc" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">2. PLAYBACK &amp; HITS</text>
       <text x="236" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• LIVE BUFFER + IndexedDB clips</text>
       <text x="236" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 0.5x Slow-Mo, -1/+1, .webm</text>
-      <text x="236" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Decoupled Pins + Aim Loupe</text>
+      <text x="236" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Synced Hits Map + PNG Export</text>
 
       <rect x="452" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#2dd4bf" stroke-width="1.2"/>
       <text x="462" y="19" fill="#2dd4bf" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">3. UNIFIED SETUP</text>
       <text x="462" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• USB &amp; Wi-Fi RTSP sources</text>
       <text x="462" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Voice tone, 6 themes + picker</text>
-      <text x="462" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Timestamps &amp; HUD toggle</text>
+      <text x="462" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Display &amp; Hit Timestamps</text>
 
       <rect x="678" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#a855f7" stroke-width="1.2"/>
       <text x="688" y="19" fill="#c084fc" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">4. RETICLE STUDIO</text>
       <text x="688" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Parametric clicks &amp; gap</text>
-      <text x="688" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Independent reticle colors</text>
-      <text x="688" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Custom overlay + 2-tap Reset</text>
+      <text x="688" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Unified theme swatches</text>
+      <text x="688" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Custom overlay + 4 backdrops</text>
 
       <rect x="904" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#f59e0b" stroke-width="1.2"/>
       <text x="914" y="19" fill="#fcd34d" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">5. CONTROLLERS</text>
@@ -261,8 +261,8 @@
       <rect x="1130" y="0" width="218" height="82" rx="5" fill="#09111a" stroke="#22c55e" stroke-width="1.2"/>
       <text x="1140" y="19" fill="#4ade80" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="700">6. CALIBRATION</text>
       <text x="1140" y="37" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 1:1 thermal debug + noise bar</text>
-      <text x="1140" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Indoor / Calm / Wind presets</text>
-      <text x="1140" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• ✦ Auto-Tune &amp; Ignore Zones</text>
+      <text x="1140" y="53" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• 1-tap ✦ Auto-Tune &amp; Shake Gate</text>
+      <text x="1140" y="69" fill="#94a3b8" font-family="'Segoe UI', sans-serif" font-size="10">• Draggable Ignore Zones</text>
     </g>
   </g>
 

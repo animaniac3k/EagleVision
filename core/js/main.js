@@ -119,9 +119,9 @@ async function bootstrapApp() {
     const hadController = Boolean(navigator.serviceWorker.controller);
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // Never wipe active live field hits or rolling RAM replay buffer mid-session
-      const hasSessionData = (appState.detectionHits && appState.detectionHits.length > 0) || (appState.bufferedSeconds || 0) >= 2;
-      if (hadController && !reloading && !hasSessionData) {
+      // Only skip auto-reload if the shooter has active recorded hits on screen
+      const hasLoggedHits = Array.isArray(appState.detectionHits) && appState.detectionHits.length > 0;
+      if (hadController && !reloading && !hasLoggedHits) {
         reloading = true;
         window.location.reload();
       }
