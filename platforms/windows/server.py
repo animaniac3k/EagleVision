@@ -21,6 +21,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import webbrowser
 
 try:
     import cv2
@@ -31,6 +32,8 @@ except ImportError:
 
 PORT = 8080
 BIND_HOST = os.environ.get("SPOTR_BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
+OPEN_BROWSER = False
+AUTO_PORT = False
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Auto-detect web assets directory (supports both platforms/windows/ and root execution)
@@ -273,6 +276,14 @@ rtsp_session = RtspSession()
 class SPOTRServer(socketserver.ThreadingTCPServer):
     daemon_threads = True
     allow_reuse_address = (os.name != 'nt')
+
+    def server_bind(self):
+        if os.name == 'nt' and hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+            try:
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            except OSError:
+                pass
+        super().server_bind()
 
 
 class SPOTRRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -530,11 +541,34 @@ class SPOTRRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
 
+def _is_port_available(bind_host, port):
+    """Returns True only if port is free on the target IPv4 address AND IPv6 ::1 (prevents localhost collision)."""
+    checks = [(socket.AF_INET, (bind_host, port))]
+    if bind_host in ("127.0.0.1", "0.0.0.0"):
+        checks.append((socket.AF_INET6, ("::1", port)))
+    for family, addr in checks:
+        try:
+            with socket.socket(family, socket.SOCK_STREAM) as probe:
+                if os.name == 'nt' and hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                    probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                probe.bind(addr)
+        except OSError as e:
+            # Skip IPv6 check only if IPv6 is unavailable on this OS
+            if family == socket.AF_INET6 and getattr(e, 'winerror', None) in (10047, 10049):
+                continue
+            return False
+    return True
+
+
 def parse_cli_args(argv):
-    global PORT, BIND_HOST
+    global PORT, BIND_HOST, OPEN_BROWSER, AUTO_PORT
     for arg in argv[1:]:
         if arg == "--lan":
             BIND_HOST = "0.0.0.0"
+        elif arg == "--open":
+            OPEN_BROWSER = True
+        elif arg == "--auto-port":
+            AUTO_PORT = True
         elif arg.startswith("--host="):
             BIND_HOST = arg.split("=", 1)[1].strip() or "127.0.0.1"
         elif arg.isdigit():
@@ -542,6 +576,7 @@ def parse_cli_args(argv):
 
 
 def run_server():
+    global PORT
     mimetypes.init()
     mimetypes.add_type('application/javascript', '.js')
     mimetypes.add_type('application/javascript', '.mjs')
@@ -552,19 +587,40 @@ def run_server():
     mimetypes.add_type('image/x-icon', '.ico')
     mimetypes.add_type('font/woff2', '.woff2')
 
-    with SPOTRServer((BIND_HOST, PORT), SPOTRRequestHandler) as httpd:
+    requested_port = PORT
+    if AUTO_PORT and not _is_port_available(BIND_HOST, PORT):
+        found = None
+        for candidate in range(PORT + 1, PORT + 25):
+            if _is_port_available(BIND_HOST, candidate):
+                found = candidate
+                break
+        if found is not None:
+            print(f"[!] Port {requested_port} is already in use by another process — switching to port {found}.")
+            PORT = found
+
+    try:
+        httpd = SPOTRServer((BIND_HOST, PORT), SPOTRRequestHandler)
+    except OSError as e:
+        print(f"[ERROR] Could not bind {BIND_HOST}:{PORT}: {e}")
+        print(f"        Another process is using port {PORT}. Close it or run with another port (e.g. server.py 8081).")
+        sys.exit(1)
+
+    with httpd:
+        url = f"http://localhost:{PORT}"
         print("============================================================")
         print("  SPOTR PORTABLE SERVER & RTSP STREAMING GATEWAY")
         print("============================================================")
         print(f"[*] Bind Address:      {BIND_HOST}:{PORT}")
-        print(f"[*] Local Web App:     http://localhost:{PORT}")
+        print(f"[*] Local Web App:     {url}")
         if BIND_HOST == "0.0.0.0":
-            print(f"[*] LAN Mode:          ENABLED (accessible from phones/iPads on local Wi-Fi)")
+            print("[*] LAN Mode:          ENABLED (accessible from phones/iPads on local Wi-Fi)")
         print(f"[*] Serving Root:      {WEB_DIR}")
-        print(f"[*] RTSP Gateway API:  http://localhost:{PORT}/api/rtsp/status")
+        print(f"[*] RTSP Gateway API:  {url}/api/rtsp/status")
         print(f"[*] OpenCV Backend:    {'ONLINE (' + cv2.__version__ + ')' if CV2_AVAILABLE else 'OFFLINE'}")
         print("[*] Ready. Press Ctrl+C to terminate.")
         print("============================================================")
+        if OPEN_BROWSER:
+            threading.Timer(0.35, lambda: webbrowser.open(url)).start()
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
