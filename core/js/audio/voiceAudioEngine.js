@@ -16,6 +16,7 @@ let spriteAudioBuffer = null;
 let loadPromise = null;
 let isLoaded = false;
 let activeSources = [];
+let speakGeneration = 0;
 
 /**
  * Acquire or initialize the Web Audio Context with auto-resume
@@ -69,6 +70,7 @@ export async function preloadVoiceAudio() {
  * Cancel any ongoing speech immediately
  */
 export function stopVoiceAnnouncement() {
+  speakGeneration += 1;
   if (activeSources.length > 0) {
     activeSources.forEach((src) => {
       try {
@@ -78,6 +80,32 @@ export function stopVoiceAnnouncement() {
     });
     activeSources = [];
   }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch (_) {}
+  }
+}
+
+/**
+ * Speaks short UI mode announcements (e.g. "Point of Impact", "Point of Aim")
+ * via Web Speech API while respecting user pitch/rate settings.
+ */
+export function speakModeAnnouncement(phrase) {
+  if (!phrase || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  try {
+    stopVoiceAnnouncement();
+    const u = new SpeechSynthesisUtterance(phrase);
+    u.lang = 'en-US';
+    u.pitch = Math.max(0.75, Math.min(1.6, Number(appState.voicePitch) || 1.25));
+    u.rate = Math.max(0.65, Math.min(1.25, (Number(appState.voiceRate) || 0.80) + 0.15));
+    const voices = window.speechSynthesis.getVoices?.() || [];
+    const enVoice =
+      voices.find((v) => /en[-_]US/i.test(v.lang) && /jenny|aria|samantha|zira|female/i.test(v.name)) ||
+      voices.find((v) => /^en/i.test(v.lang));
+    if (enVoice) u.voice = enVoice;
+    window.speechSynthesis.speak(u);
+  } catch (_) {}
 }
 
 /**
@@ -223,18 +251,26 @@ export function parsePhraseToTokens(phrase) {
 export async function speakDetectionAnnouncement(phrase) {
   if (!phrase) return;
 
+  const myGen = ++speakGeneration;
   const ctx = getVoiceAudioContext();
   if (!ctx) return;
+
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume(); } catch (_) {}
+  }
+  if (myGen !== speakGeneration) return;
 
   // Ensure audio sprite is in memory
   if (!spriteAudioBuffer) {
     await preloadVoiceAudio();
   }
+  if (myGen !== speakGeneration) return;
 
   if (!spriteAudioBuffer) {
     // Fallback: if sprite failed to fetch, try native speech if available
     if ('speechSynthesis' in window) {
       try {
+        window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(phrase.replace(/,\s+/g, '. '));
         u.pitch = Number(appState.voicePitch) || 1.25;
         u.rate = Number(appState.voiceRate) || 0.80;
@@ -247,13 +283,22 @@ export async function speakDetectionAnnouncement(phrase) {
   const tokens = parsePhraseToTokens(phrase);
   if (!tokens || tokens.length === 0) return;
 
-  // Interrupt prior speech cleanly
-  stopVoiceAnnouncement();
+  // Interrupt prior active sources without bumping myGen
+  if (activeSources.length > 0) {
+    activeSources.forEach((src) => {
+      try { src.stop(); src.disconnect(); } catch (_) {}
+    });
+    activeSources = [];
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+  }
 
   const rate = Math.max(0.50, Math.min(1.5, Number(appState.voiceRate) || 0.80));
   const pitchMultiplier = Math.max(0.75, Math.min(1.5, Number(appState.voicePitch) || 1.25));
-  // Standard semitone detune: 1200 * log2(pitch)
+  // Standard semitone detune: 1200 * log2(pitch). Effective buffer consumption speed is rate * pitchMultiplier.
   const detuneCents = Math.round(1200 * Math.log2(pitchMultiplier));
+  const effectiveSpeed = Math.max(0.45, Math.min(2.0, rate * pitchMultiplier));
 
   let scheduledTime = ctx.currentTime + 0.03; // 30ms scheduling lookahead
 
@@ -286,22 +331,26 @@ export async function speakDetectionAnnouncement(phrase) {
     source.start(scheduledTime, startSec, durSec);
     activeSources.push(source);
 
-    // Natural inter-word spacing: slight extra breath after alert word, tighter between numbers & units
-    const effectiveDur = durSec / rate;
+    // Account for true playback speed (rate * pitchMultiplier) so words neither collide nor leave wide gaps
+    const effectiveDur = durSec / effectiveSpeed;
     const gap = (i === 0 ? 0.08 : 0.045) / rate;
     scheduledTime += effectiveDur + gap;
   }
 }
 
 /**
- * Install global user-interaction listeners to unlock AudioContext on first tap/key
+ * Keep AudioContext unlocked across Android/Bluetooth suspension transitions without
+ * eagerly decoding the 98.5s sprite (~19-38MB RAM) until voice callouts are enabled.
  */
 if (typeof window !== 'undefined') {
   const unlockEvents = ['pointerdown', 'keydown', 'touchstart', 'click'];
   const unlockHandler = () => {
-    getVoiceAudioContext();
-    preloadVoiceAudio();
-    unlockEvents.forEach((ev) => window.removeEventListener(ev, unlockHandler));
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    } else if (!audioCtx && appState.heatmapSpeechEnabled) {
+      getVoiceAudioContext();
+      preloadVoiceAudio();
+    }
   };
   unlockEvents.forEach((ev) => window.addEventListener(ev, unlockHandler, { passive: true }));
 }

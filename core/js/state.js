@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.1.13';
+export const APP_VERSION = 'v0.62.0';
 
 const listeners = new Set();
 
@@ -9,6 +9,7 @@ export const appState = {
   // Camera & Stream
   activeDeviceId: 'auto',
   activeDeviceLabel: 'INITIALIZING...',
+  streamStatus: 'connecting',  // 'live' | 'reconnecting' | 'simulated' | 'connecting' | 'offline'
   streamWidth: 1920,
   streamHeight: 1080,
   fps: 60,
@@ -38,7 +39,7 @@ export const appState = {
   roiX: 0.5,
   roiY: 0.5,
 
-  // UI Windows Visibility & Active Screen ('live' | 'gallery' | 'settings' | 'reticle' | 'controller')
+  // UI Windows Visibility & Active Screen ('live' | 'gallery' | 'settings' | 'reticle' | 'calibration' | 'controller')
   hudOpen: false,
   currentScreen: 'live',
   galleryDrawerOpen: false,
@@ -46,8 +47,6 @@ export const appState = {
 
   // Superimposed Overlay Guide & Reticle Customization
   overlayEnabled: true,
-  playbackReticleEnabled: false, // Playback reticle toggle (OFF by default)
-  hitsReticleEnabled: true,      // Hits map reticle toggle (ON by default)
   overlayType: 'crosshair',
   overlayOpacity: 75,
   overlayScale: 100,
@@ -80,10 +79,10 @@ export const appState = {
 
   // Localized Micro-Change Heatmap (ignores global camera shake)
   heatmapEnabled: false,
-  heatmapSetupOpen: false, // Transient live-screen calibration popover & visual feedback
+  heatmapSetupOpen: false, // Transient calibration active flag
   replaySetupOpen: false,  // Transient live-screen replay buffer settings popover
-  liveMaskDrawActive: false, // Transient mask drawing mode on live viewport
-  liveMasksVisible: false, // Transient mask visibility on live viewport (auto-shown in setup)
+  liveMaskDrawActive: false, // Transient mask drawing mode on calibration viewport
+  liveMasksVisible: true, // Show ignore masks on calibration viewport
   heatmapSensitivity: 60, // 10 (low) to 95 (high)
   heatmapDuration: 30.0,  // Adjustable: 0.5s to 9999s / Infinity
   heatmapMaxAreaPct: 5,   // Max simultaneous changed area (% of screen, default 5% = 1/20th)
@@ -94,6 +93,7 @@ export const appState = {
   heatmapIgnoreMasks: [], // Normalized exclude zones: Array<{ x, y, w, h }> in [0..1]
   detectionHits: [],      // Session spatial detection log: Array<{ id, timestampMs, normX, normY, clockHour, clicks, dirLabel, thumbDataUrl }>
   selectedHitId: null,    // Currently highlighted detection hit ID in Detections drawer/map
+  hitsMapShowPins: true,  // Local display toggle for Archive -> Hits pins (decoupled from Live heatmapEnabled)
   galleryArchiveTab: 'clips', // 'clips' | 'hits' inside Screen 2 archive
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
   voiceRate: 0.80,        // Voice speech rate (0.6..1.0)
@@ -110,10 +110,15 @@ export const appState = {
   bufferedSeconds: 0,
   bufferBytes: 0,
 
-  // Interface Theme Color, Global UI Opacity, Declutter Mode, Gamepad & Remote / Ring Controls
+  // Interface Theme Color, Global UI Opacity, Declutter Mode, Timestamps, Gamepad & Remote / Ring Controls
   themeColor: '#f97316',
   uiOpacity: 100,
   uiDecluttered: false,
+  showDisplayTimestamp: true,
+  timestampPosition: 'bottom-right', // 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right'
+  timestampOpacity: 60,
+  timestampAdaptive: true,
+  showHitTimestamps: false,
   touchpadSensitivity: 50, // 15% to 150%, default 50% (50% less for precision)
   reticleAimSpeed: 50,     // 15% to 150%, default 50% (50% max speed for pinpoint reticle positioning)
   ringPanSpeed: 70,        // 10% to 150%, default 70% (fine step size for Bluetooth ring/remote panning)
@@ -126,6 +131,7 @@ export const appState = {
   customControllerProfiles: {},       // User custom profiles: Record<id, ProfileObject>
   controllerBindings: null,           // User-configured active controller & key mappings
   microSlotActions: {},               // Persisted 8BitDo Micro slot -> action overrides
+  ringEnabled: false,                 // Explicit Bluetooth Ring / Remote isolation toggle (prevents hijacking keyboard & 8BitDo Micro)
   ringKeyMap: {},                     // User-configured active Bluetooth Ring / Remote mappings
   gamepadConnected: false,
   gamepadName: '',
@@ -135,7 +141,11 @@ export const appState = {
 export function updateState(patch) {
   Object.assign(appState, patch);
   for (const fn of listeners) {
-    fn(appState, patch);
+    try {
+      fn(appState, patch);
+    } catch (err) {
+      console.warn('[updateState listener error]', err);
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-/* Minimalist Glass Buttons & Touch Controls */
+/* Matte High-Contrast Tactical Buttons & Gloved Touch Controls (Zero GPU blur overhead) */
 .radar-btn {
   height: var(--touch-target);
   min-width: var(--touch-target);
@@ -16,8 +16,6 @@
   justify-content: center;
   gap: 7px;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, transform 0.08s ease;
 }
 
@@ -36,19 +34,20 @@
   pointer-events: none;
 }
 
-/* Toggle Active State: Calm tinted glass + accent border (doesn't scream like a primary CTA) */
+/* Toggle Active State: High-contrast matte tint + accent border (with fallback for older WebViews) */
 .radar-btn-active {
-  background-color: color-mix(in srgb, var(--radar-accent) 18%, rgba(15, 22, 30, 0.88)) !important;
+  background-color: rgba(249, 115, 22, 0.22) !important;
+  background-color: color-mix(in srgb, var(--radar-accent) 22%, rgba(15, 22, 30, 0.94)) !important;
   color: var(--radar-text) !important;
   border-color: var(--radar-border-strong) !important;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--radar-accent) 30%, transparent), 0 4px 14px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.35), 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 /* Primary CTA State: Solid accent fill reserved strictly for key actions (Replay, Connect, Save) */
 .radar-btn-primary {
   background-color: var(--radar-accent) !important;
   color: var(--radar-accent-contrast) !important;
-  border-color: transparent !important;
+  border-color: var(--radar-border-strong) !important;
   font-weight: 700;
   box-shadow: var(--shadow-glow);
 }
@@ -62,11 +61,23 @@
   border-radius: var(--radius-pill);
 }
 
+.btn-icon-only {
+  width: var(--touch-target);
+  min-width: var(--touch-target);
+  padding: 0;
+}
+
 .radar-btn-sm {
-  height: 36px;
-  min-width: 36px;
-  padding: 0 11px;
+  height: 42px;
+  min-width: 42px;
+  padding: 0 12px;
   font-size: 13px;
+}
+
+.radar-btn-sm.btn-icon-only {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
 }
 
 .radar-btn-danger {
@@ -151,11 +162,9 @@
   gap: 6px;
   background: var(--radar-panel);
   border: 1px solid var(--radar-border);
-  padding: 5px;
+  padding: 4px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .control-pod-top {
@@ -164,8 +173,8 @@
 }
 
 .control-pod-top .radar-btn {
-  height: 36px;
-  min-width: 36px;
+  height: 40px;
+  min-width: 40px;
 }
 
 .zoom-readout {
@@ -193,31 +202,37 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Unified Bottom Live Dock */
+/* Streamlined Gloved Bottom Live Dock (Fewer, Larger 48px Buttons + Scroll Safe on Phones) */
 .live-bottom-dock {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
+  gap: 7px;
+  padding: 6px 8px;
   background: var(--radar-panel);
-  border: 1px solid var(--radar-border);
+  border: 1.5px solid var(--radar-border);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   pointer-events: auto;
   flex-wrap: nowrap;
-  max-width: 100%;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.live-bottom-dock::-webkit-scrollbar {
+  display: none;
 }
 
 .live-bottom-dock .radar-btn {
-  height: 38px;
-  min-width: 38px;
+  height: 48px;
+  min-width: 48px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
   border-color: transparent;
   background-color: transparent;
-  padding: 0 11px;
+  padding: 0 13px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -228,19 +243,20 @@
 }
 
 .live-bottom-dock .radar-btn:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.1);
   border-color: transparent;
 }
 
 .live-bottom-dock .radar-btn.radar-btn-active {
-  background-color: color-mix(in srgb, var(--radar-accent) 22%, rgba(255, 255, 255, 0.06)) !important;
-  border-color: color-mix(in srgb, var(--radar-accent) 55%, transparent) !important;
+  background-color: rgba(249, 115, 22, 0.24) !important;
+  background-color: color-mix(in srgb, var(--radar-accent) 24%, rgba(255, 255, 255, 0.06)) !important;
+  border-color: var(--radar-border-strong) !important;
   color: var(--radar-text) !important;
 }
 
 .live-bottom-dock .radar-btn.radar-btn-primary {
-  padding: 0 16px;
-  height: 38px;
+  padding: 0 18px;
+  height: 48px;
 }
 
 .dock-divider {
@@ -373,8 +389,8 @@ input[type="range"].radar-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.12);
+  height: 10px;
+  background: rgba(255, 255, 255, 0.14);
   border: none;
   border-radius: 999px;
   outline: none;
@@ -384,13 +400,23 @@ input[type="range"].radar-slider {
 input[type="range"].radar-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--radar-accent);
-  border: 2px solid #ffffff;
+  border: 2.5px solid #ffffff;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+input[type="range"].radar-slider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--radar-accent);
+  border: 2.5px solid #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
 
 /* 2-Column Grid for Overlay Buttons */
@@ -438,8 +464,11 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   left: 0;
   top: 0;
   bottom: 0;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
   background: rgba(255, 255, 255, 0.22);
-  transition: width 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .memory-bar-used {
@@ -447,15 +476,18 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   left: 0;
   top: 0;
   bottom: 0;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
   background: var(--radar-accent);
   border-radius: 999px;
-  transition: width 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
-/* CCTV Scrubber Track */
+/* CCTV Scrubber Track (Gloved 46px height; slider sits above markers so drag is never blocked) */
 .cctv-scrub-wrap {
   flex: 1 1 auto;
-  min-width: 140px;
+  min-width: 160px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -464,9 +496,9 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
 .cctv-scrub-track {
   position: relative;
   flex: 1 1 auto;
-  min-width: 100px;
-  height: 34px;
-  background: rgba(6, 10, 14, 0.85);
+  min-width: 120px;
+  height: 46px;
+  background: rgba(6, 10, 14, 0.9);
   border: 1px solid var(--radar-border);
   border-radius: 8px;
   overflow: hidden;
@@ -489,12 +521,10 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   flex: 1 1 0%;
   min-width: 1px;
   border-radius: 1px 1px 0 0;
-  transition: height 0.08s ease;
 }
 
 .cctv-wave-bar.peak {
   background: #38bdf8;
-  box-shadow: 0 0 4px rgba(56, 189, 248, 0.7);
 }
 
 .cctv-wave-bar.ambient {
@@ -505,7 +535,7 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 12;
+  z-index: 8;
 }
 
 .cctv-event-marker {
@@ -517,16 +547,14 @@ input[type="range"].radar-slider::-webkit-slider-thumb {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  pointer-events: auto;
-  cursor: pointer;
-  z-index: 13;
+  pointer-events: none;
+  z-index: 9;
 }
 
 .cctv-event-marker-pip {
-  width: 7px;
-  height: 5px;
+  width: 8px;
+  height: 6px;
   background: #f59e0b;
-  box-shadow: 0 0 6px #f59e0b;
   border-radius: 1px;
 }
 
@@ -545,7 +573,7 @@ input[type="range"].cctv-slider-input {
   background: transparent;
   border: none;
   cursor: pointer;
-  z-index: 10;
+  z-index: 15;
   -webkit-appearance: none;
   appearance: none;
 }
@@ -553,17 +581,28 @@ input[type="range"].cctv-slider-input {
 input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 10px;
-  height: 34px;
+  width: 16px;
+  height: 46px;
   background: var(--radar-accent);
   border: 2px solid #ffffff;
-  border-radius: 3px;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.75);
+  cursor: ew-resize;
+}
+
+input[type="range"].cctv-slider-input::-moz-range-thumb {
+  width: 16px;
+  height: 46px;
+  background: var(--radar-accent);
+  border: 2px solid #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.75);
   cursor: ew-resize;
 }
 
 @media (max-width: 900px) {
-  .live-bottom-dock .dock-btn-lbl {
+  /* Hide generic labels on small screens, but KEEP POI/POA & Loupe mode labels visible so state is never ambiguous! */
+  .live-bottom-dock .dock-btn-lbl:not(.voice-mode-lbl):not(.loupe-mode-lbl) {
     display: none;
   }
 }
@@ -628,18 +667,20 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
 }
 
 @media (hover: none) and (pointer: coarse) {
-  .floating-strip .radar-btn,
+  /* Preserve active, primary, danger-armed & archive-pill-half backgrounds on all touchscreens! */
   .control-pod,
   .live-bottom-dock,
   .quick-tool-pill,
   .heatmap-tune-popover {
-    backdrop-filter: none !important;
-    background: rgba(13, 19, 26, 0.94) !important;
+    background: rgba(13, 19, 26, 0.96);
     contain: paint;
+  }
+  .floating-strip .radar-btn:not(.radar-btn-active):not(.radar-btn-primary):not(.radar-btn-armed):not(.archive-pill-half) {
+    background: rgba(13, 19, 26, 0.94);
   }
 }
 
-/* Split Clips | Hits Archive Pill & Heatmap Dock Badge */
+/* Split Clips | Hits Archive Pill */
 .archive-split-pill {
   display: inline-flex;
   align-items: center;
@@ -647,7 +688,6 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(12px);
   overflow: hidden;
 }
 
@@ -666,31 +706,157 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
 }
 
 .hit-count-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
   font-family: var(--font-mono);
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1;
+  background: rgba(245, 158, 11, 0.24);
+  border: 1px solid rgba(245, 158, 11, 0.55);
   color: #fbbf24;
+  transition: background-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.hit-count-num.has-hits {
+  background: #f59e0b;
+  border-color: #fbbf24;
+  color: #090d13;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+}
+
+.ts-pos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ts-pos-btn {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  height: 32px;
+  padding: 0 6px;
 }
 
 #btnToggleHeatmap {
   position: relative;
 }
 
-.dock-hit-badge {
+/* Live Source Status Pill, Touch Lock Overlay, Calibration Presets & Ring Isolation Notice */
+.live-source-pill {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: #f59e0b;
-  color: #0b0f17;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 38;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  background: var(--radar-panel);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-panel);
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 16px;
-  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--radar-text);
   pointer-events: none;
+  white-space: nowrap;
+  opacity: var(--ui-opacity, 1);
+}
+
+@media (max-width: 720px) {
+  .live-source-pill {
+    top: calc(68px + env(safe-area-inset-top, 0px));
+    height: 28px;
+    font-size: 11px;
+    padding: 0 10px;
+  }
+}
+
+.live-source-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex-shrink: 0;
+}
+
+.live-source-dot.status-live {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.75);
+}
+
+.live-source-dot.status-simulated,
+.live-source-dot.status-connecting {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+}
+
+.live-source-dot.status-reconnecting,
+.live-source-dot.status-offline {
+  background: #f43f5e;
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.8);
+}
+
+.touch-lock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 95;
+  background: rgba(6, 9, 13, 0.42);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-lock-card {
+  background: var(--radar-panel);
+  border: 2px solid var(--radar-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.touch-lock-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--radar-accent);
+  letter-spacing: 0.05em;
+}
+
+.touch-lock-sub {
+  font-size: 12px;
+  color: var(--radar-text-muted);
+}
+
+.calib-preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ring-isolation-notice {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--radar-text-secondary);
+  background: rgba(8, 12, 17, 0.78);
+  border: 1px solid var(--radar-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
 }
 
 /* Integrated Reticle, Heatmap (Tri-Part) & Replay Split Triggers */
@@ -739,14 +905,28 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
 }
 
 .heatmap-dock-group #btnToggleHeatmap {
-  padding: 0 10px;
+  padding: 0 11px;
 }
 
-.heatmap-dock-group #btnLiveRezero {
+.heatmap-dock-group #btnLiveClearHits {
   border-radius: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  min-width: 34px;
-  padding: 0 8px;
+  min-width: 44px;
+  padding: 0 11px;
+  color: var(--radar-text-secondary);
+}
+
+.heatmap-dock-group #btnLiveClearHits.dock-btn-dimmed {
+  color: var(--radar-text-muted);
+}
+
+.heatmap-dock-group #btnLiveClearHits:hover {
+  background-color: rgba(244, 63, 94, 0.16);
+  color: #fff1f2;
+}
+
+.calib-autotune-btn {
+  font-size: 12px;
+  padding: 0 10px;
 }
 
 .reticle-dock-group .reticle-ffp-chip,
@@ -786,23 +966,22 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
 
 .heatmap-tune-popover {
   position: absolute;
-  bottom: 70px;
+  bottom: 78px;
   left: 50%;
   transform: translateX(-50%);
   width: min(370px, calc(100vw - 24px));
-  max-height: calc(100vh - 96px);
+  max-height: calc(100dvh - 104px);
   overflow-y: auto;
+  touch-action: pan-y;
   z-index: 45;
-  background: rgba(10, 15, 22, 0.9);
-  border: 1px solid color-mix(in srgb, var(--radar-accent) 55%, rgba(255, 255, 255, 0.18));
+  background: rgba(10, 15, 22, 0.95);
+  border: 1px solid var(--radar-border-strong);
   border-radius: var(--radius-md);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.68), 0 0 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: 11px 13px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   pointer-events: auto;
 }
 
@@ -929,10 +1108,13 @@ input[type="range"].cctv-slider-input::-webkit-slider-thumb {
 }
 
 .heatmap-noise-fill {
+  width: 100%;
   height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
   border-radius: 999px;
   background: #10b981;
-  transition: width 0.08s linear, background-color 0.14s ease;
+  transition: transform 0.08s linear, background-color 0.14s ease;
 }
 
 .heatmap-noise-fill.level-warn {

@@ -9,39 +9,88 @@ let audioCtx = null;
 let analyserNode = null;
 let micStream = null;
 let isListening = false;
+let initInProgress = false;
+let samplerGen = 0;
 let dataArray = null;
 
+function resumeSamplerAudioContext() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+if (typeof window !== 'undefined') {
+  ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => {
+    window.addEventListener(ev, resumeSamplerAudioContext, { passive: true });
+  });
+}
+
 export async function initSoundSampler() {
-  if (isListening) return true;
+  if (isListening) {
+    resumeSamplerAudioContext();
+    return true;
+  }
+  if (initInProgress) return false;
+
+  const myGen = ++samplerGen;
+  initInProgress = true;
+  let acquiredStream = null;
+  let createdCtx = null;
+
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       return false;
     }
-    micStream = await navigator.mediaDevices.getUserMedia({
+    acquiredStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false
       }
     });
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaStreamSource(micStream);
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 256;
-    analyserNode.smoothingTimeConstant = 0.25;
-    source.connect(analyserNode);
+
+    // If stopSoundSampler() or a newer init ran while permission prompt was open, discard cleanly
+    if (myGen !== samplerGen) {
+      acquiredStream.getTracks().forEach((t) => t.stop());
+      return false;
+    }
+
+    createdCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = createdCtx.createMediaStreamSource(acquiredStream);
+    const analyser = createdCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.25;
+    source.connect(analyser);
+
+    micStream = acquiredStream;
+    audioCtx = createdCtx;
+    analyserNode = analyser;
     dataArray = new Uint8Array(analyserNode.frequencyBinCount);
     isListening = true;
+    resumeSamplerAudioContext();
     return true;
   } catch (err) {
-    // Microphone not granted, denied or unavailable - gracefully silent
+    if (acquiredStream) {
+      acquiredStream.getTracks().forEach((t) => t.stop());
+    }
+    if (createdCtx && createdCtx.state !== 'closed') {
+      try { createdCtx.close(); } catch {}
+    }
     isListening = false;
     return false;
+  } finally {
+    if (myGen === samplerGen) {
+      initInProgress = false;
+    }
   }
 }
 
 export function getSoundPeak() {
   if (!isListening || !analyserNode || !dataArray) return 0.0;
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+    return 0.0;
+  }
   try {
     analyserNode.getByteTimeDomainData(dataArray);
     let sumSquares = 0;
@@ -59,6 +108,8 @@ export function getSoundPeak() {
 }
 
 export function stopSoundSampler() {
+  samplerGen += 1;
+  initInProgress = false;
   if (micStream) {
     micStream.getTracks().forEach((t) => t.stop());
     micStream = null;

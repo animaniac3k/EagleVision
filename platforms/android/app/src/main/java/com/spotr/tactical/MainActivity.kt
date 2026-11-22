@@ -5,14 +5,21 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.View
+import android.view.WindowManager
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -34,9 +41,15 @@ class MainActivity : AppCompatActivity() {
     private var permissionRequestInFlight = false
     private lateinit var webView: WebView
 
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
+    private var boundCameraWifiNetwork: Network? = null
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
 
         // Enable immersive fullscreen tactical mode for ChromeOS & tablets
@@ -47,10 +60,14 @@ class MainActivity : AppCompatActivity() {
 
         logAvailableNativeCameras()
 
+        // Bind to no-internet camera Wi-Fi APs (e.g. 192.168.0.1) even when LTE/5G is enabled
+        registerCameraWifiBinder()
+        initWifiLock()
+
         // 1. Initialize USB UVC manager & boot local embedded server
         uvcSessionManager = UsbUvcSessionManager(applicationContext) {
             runOnUiThread {
-                if (this::webView.isInitialized) {
+                if (this::webView.isInitialized && !isDestroyed && !isFinishing) {
                     webView.evaluateJavascript("window.__spotrRefreshCameras?.()", null)
                 }
             }
@@ -62,8 +79,143 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         configureWebView()
 
+        // Modern back gesture / button handling
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (this@MainActivity::webView.isInitialized && webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+
         // 3. Navigate to local SPOTR web application
         webView.loadUrl("http://127.0.0.1:$SERVER_PORT/index.html")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        enableImmersiveFullscreen()
+        acquireWifiLock()
+        server?.setAppBackgrounded(false)
+        if (this::webView.isInitialized) {
+            webView.onResume()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        server?.setAppBackgrounded(true)
+        releaseWifiLock()
+        if (this::webView.isInitialized) {
+            webView.onPause()
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enableImmersiveFullscreen()
+        }
+    }
+
+    private fun initWifiLock() {
+        try {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                @Suppress("DEPRECATION")
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            }
+            wifiLock = wm.createWifiLock(mode, "SPOTR:CameraStreamWifiLock").apply {
+                setReferenceCounted(false)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WifiLock init notice: ${e.message}")
+        }
+    }
+
+    private fun acquireWifiLock() {
+        try {
+            if (wifiLock?.isHeld == false) {
+                wifiLock?.acquire()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WifiLock acquire notice: ${e.message}")
+        }
+    }
+
+    private fun releaseWifiLock() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "WifiLock release notice: ${e.message}")
+        }
+    }
+
+    private fun registerCameraWifiBinder() {
+        try {
+            val cm = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return
+            connectivityManager = cm
+            val request = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    val hasValidatedInternet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    if (!hasValidatedInternet) {
+                        if (boundCameraWifiNetwork != network) {
+                            boundCameraWifiNetwork = network
+                            cm.bindProcessToNetwork(network)
+                            Log.i(TAG, "Bound process to local camera Wi-Fi network (no internet)")
+                        }
+                    } else if (boundCameraWifiNetwork == network) {
+                        boundCameraWifiNetwork = null
+                        cm.bindProcessToNetwork(null)
+                        Log.i(TAG, "Unbound process network (Wi-Fi has validated internet)")
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    if (boundCameraWifiNetwork == network) {
+                        boundCameraWifiNetwork = null
+                        cm.bindProcessToNetwork(null)
+                        Log.i(TAG, "Local camera Wi-Fi lost; restored default process routing")
+                    }
+                }
+            }
+            wifiNetworkCallback = callback
+            cm.registerNetworkCallback(request, callback)
+        } catch (e: Exception) {
+            Log.w(TAG, "Camera Wi-Fi binder setup notice: ${e.message}")
+        }
+    }
+
+    private fun unregisterCameraWifiBinder() {
+        try {
+            val cm = connectivityManager
+            val cb = wifiNetworkCallback
+            if (cm != null && cb != null) {
+                cm.unregisterNetworkCallback(cb)
+            }
+            if (boundCameraWifiNetwork != null) {
+                cm?.bindProcessToNetwork(null)
+                boundCameraWifiNetwork = null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Camera Wi-Fi binder teardown notice: ${e.message}")
+        } finally {
+            wifiNetworkCallback = null
+            connectivityManager = null
+        }
     }
 
     private fun logAvailableNativeCameras() {
@@ -97,17 +249,24 @@ class MainActivity : AppCompatActivity() {
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
         settings.mediaPlaybackRequiresUserGesture = false
-        settings.allowFileAccess = true
+        settings.allowFileAccess = false
         settings.allowContentAccess = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT
 
-        // Hardware-accelerated Canvas 2D promotion
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-
-        // Grant camera and microphone access once Android runtime permissions are granted
+        // Grant camera and microphone access only to our local embedded server origin
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest?) {
                 val req = request ?: return
+                val originHost = req.origin?.host?.lowercase()
+                val originPort = req.origin?.port ?: -1
+                val isLocalOrigin = (originHost == "127.0.0.1" || originHost == "localhost") &&
+                    (originPort == SERVER_PORT || originPort == -1)
+                if (!isLocalOrigin) {
+                    Log.w(TAG, "Denying WebChromeClient permission request from untrusted origin: ${req.origin}")
+                    req.deny()
+                    return
+                }
+
                 val missingAndroidPerms = mutableListOf<String>()
                 if (PermissionRequest.RESOURCE_VIDEO_CAPTURE in req.resources &&
                     ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
@@ -215,34 +374,48 @@ class MainActivity : AppCompatActivity() {
             pendingWebPermissionRequest = null
         }
 
-        if (this::webView.isInitialized) {
+        if (this::webView.isInitialized && !isDestroyed) {
             webView.evaluateJavascript("window.__spotrOnAndroidCameraPermission?.($cameraGranted)", null)
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        if (this::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         pendingWebPermissionRequest = null
-        try {
-            server?.stop()
-            Log.i(TAG, "SPOTR Local Server stopped.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping server: ${e.message}")
+        releaseWifiLock()
+        unregisterCameraWifiBinder()
+
+        if (this::webView.isInitialized) {
+            try {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+                webView.destroy()
+            } catch (e: Exception) {
+                Log.w(TAG, "WebView destroy warning: ${e.message}")
+            }
         }
-        try {
-            uvcSessionManager?.destroy()
-            uvcSessionManager = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error destroying UVC manager: ${e.message}")
+
+        val serverToStop = server
+        server = null
+        val uvcToDestroy = uvcSessionManager
+        uvcSessionManager = null
+
+        // Run native network/USB teardown off the main thread to prevent ANRs
+        Thread({
+            try {
+                serverToStop?.stop()
+                Log.i(TAG, "SPOTR Local Server stopped.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping server: ${e.message}")
+            }
+            try {
+                uvcToDestroy?.destroy()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error destroying UVC manager: ${e.message}")
+            }
+        }, "SpotrTeardown").apply {
+            isDaemon = true
+            start()
         }
     }
 }

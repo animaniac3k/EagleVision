@@ -39,15 +39,20 @@ class UsbUvcSessionManager(
         private const val UVC_DEVICE_ID_PREFIX = "uvc:"
     }
 
+    private data class FramePacket(val jpeg: ByteArray, val seq: Long)
+
     private val appContext = context.applicationContext
-    private val usbManager = appContext.getSystemService(Context.USB_SERVICE) as UsbManager
+    private val usbManager: UsbManager? = appContext.getSystemService(Context.USB_SERVICE) as? UsbManager
 
     private val lock = Object()
+    private val cameraOpLock = Any()
     private val sessionSeqGen = AtomicLong(0L)
 
+    @Volatile
     private var currentSessionId = 0L
     private var activeDeviceId: String? = null
     private var targetDeviceName: String? = null
+    @Volatile
     private var isRunning = false
     private var stage = "idle"
     private var latestJpeg: ByteArray? = null
@@ -58,6 +63,7 @@ class UsbUvcSessionManager(
     private var fps = 0.0
     private var framesCaptured = 0L
     private var errorMessage: String? = null
+    private var activeClientCount = 0
 
     @Volatile
     private var encodePaused = false
@@ -94,7 +100,7 @@ class UsbUvcSessionManager(
                         stage = "disconnected"
                         lock.notifyAll()
                     }
-                    stop()
+                    stop(preserveDisconnectState = true)
                 }
                 onDevicesChanged()
             }
@@ -130,7 +136,11 @@ class UsbUvcSessionManager(
             }
             if (shouldStop) {
                 Log.i(TAG, "USB UVC disconnected: ${device.deviceName}")
-                stop()
+                synchronized(lock) {
+                    if (errorMessage == null) errorMessage = "USB camera disconnected"
+                    stage = "disconnected"
+                }
+                stop(preserveDisconnectState = true)
             }
         }
 
@@ -150,6 +160,7 @@ class UsbUvcSessionManager(
     private val usbMonitor = USBMonitor(appContext, deviceConnectListener)
 
     fun register() {
+        if (usbManager == null) return
         try {
             if (!usbMonitor.isRegistered) {
                 usbMonitor.register()
@@ -183,8 +194,9 @@ class UsbUvcSessionManager(
 
     fun listUvcCamerasJson(): JSONArray {
         val arr = JSONArray()
+        val mgr = usbManager ?: return arr
         val devices = try {
-            usbManager.deviceList.values
+            mgr.deviceList.values
                 .filter(::isUvcDevice)
                 .sortedBy { it.deviceName }
         } catch (e: Exception) {
@@ -206,7 +218,7 @@ class UsbUvcSessionManager(
                 put("label", label)
                 put("vendorId", device.vendorId)
                 put("productId", device.productId)
-                put("hasPermission", usbManager.hasPermission(device))
+                put("hasPermission", mgr.hasPermission(device))
             })
         }
         return arr
@@ -227,14 +239,19 @@ class UsbUvcSessionManager(
         stop()
 
         val sid = sessionSeqGen.incrementAndGet()
-        if (targetDevice == null) {
+        val mgr = usbManager
+        if (mgr == null || targetDevice == null) {
             synchronized(lock) {
                 currentSessionId = sid
                 activeDeviceId = cleanReq
                 targetDeviceName = null
                 isRunning = false
                 stage = "not-found"
-                errorMessage = "USB UVC camera not found ($cleanReq)"
+                errorMessage = if (mgr == null) {
+                    "USB Host service unavailable on this device"
+                } else {
+                    "USB UVC camera not found ($cleanReq)"
+                }
                 lock.notifyAll()
             }
             return sid
@@ -245,7 +262,7 @@ class UsbUvcSessionManager(
             activeDeviceId = "$UVC_DEVICE_ID_PREFIX${targetDevice.deviceName}"
             targetDeviceName = targetDevice.deviceName
             isRunning = true
-            stage = if (usbManager.hasPermission(targetDevice)) "opening-usb" else "requesting-permission"
+            stage = if (mgr.hasPermission(targetDevice)) "opening-usb" else "requesting-permission"
             latestJpeg = null
             latestFrameSeq = 0L
             latestFrameTimeMs = 0L
@@ -255,6 +272,7 @@ class UsbUvcSessionManager(
             framesCaptured = 0L
             errorMessage = null
             encodePaused = false
+            activeClientCount = 0
         }
 
         register()
@@ -275,8 +293,9 @@ class UsbUvcSessionManager(
     }
 
     private fun findTargetDevice(requestedDeviceId: String): UsbDevice? {
+        val mgr = usbManager ?: return null
         val uvcDevices = try {
-            usbManager.deviceList.values.filter(::isUvcDevice).sortedBy { it.deviceName }
+            mgr.deviceList.values.filter(::isUvcDevice).sortedBy { it.deviceName }
         } catch (_: Exception) {
             emptyList()
         }
@@ -289,7 +308,8 @@ class UsbUvcSessionManager(
         } else {
             requestedDeviceId
         }
-        return uvcDevices.firstOrNull { it.deviceName == stripped } ?: uvcDevices.firstOrNull()
+        // Do NOT silently fall back to a different camera when a specific deviceId was requested
+        return uvcDevices.firstOrNull { it.deviceName == stripped }
     }
 
     private data class PreviewSpec(val width: Int, val height: Int, val format: Int)
@@ -299,133 +319,137 @@ class UsbUvcSessionManager(
         device: UsbDevice,
         ctrlBlock: USBMonitor.UsbControlBlock
     ) {
-        var cam: UVCCamera? = null
-        var reader: ImageReader? = null
-        var hThread: HandlerThread? = null
-
-        try {
-            synchronized(lock) {
-                if (!isRunning || currentSessionId != sessionId) return
-                stage = "opening-uvc"
-            }
-
-            cam = UVCCamera()
-            cam.open(ctrlBlock)
-
-            val spec = selectBestPreviewSpec(cam)
-            var activeW = spec.width
-            var activeH = spec.height
-            Log.i(TAG, "Opening UVC ${device.deviceName} at ${activeW}x${activeH} format=${spec.format}")
+        synchronized(cameraOpLock) {
+            var cam: UVCCamera? = null
+            var reader: ImageReader? = null
+            var hThread: HandlerThread? = null
 
             try {
-                cam.setPreviewSize(activeW, activeH, spec.format)
-            } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "Selected size ${activeW}x${activeH} format=${spec.format} rejected (${e.message}), trying fallback")
+                synchronized(lock) {
+                    if (!isRunning || currentSessionId != sessionId) return
+                    stage = "opening-uvc"
+                }
+
+                cam = UVCCamera()
+                cam.open(ctrlBlock)
+
+                val spec = selectBestPreviewSpec(cam)
+                var activeW = spec.width
+                var activeH = spec.height
+                Log.i(TAG, "Opening UVC ${device.deviceName} at ${activeW}x${activeH} format=${spec.format}")
+
                 try {
-                    cam.setPreviewSize(activeW, activeH, UVCCamera.FRAME_FORMAT_YUYV)
-                } catch (_: IllegalArgumentException) {
-                    activeW = UVCCamera.DEFAULT_PREVIEW_WIDTH
-                    activeH = UVCCamera.DEFAULT_PREVIEW_HEIGHT
+                    cam.setPreviewSize(activeW, activeH, spec.format)
+                } catch (e: IllegalArgumentException) {
+                    Log.w(TAG, "Selected size ${activeW}x${activeH} format=${spec.format} rejected (${e.message}), trying fallback")
                     try {
-                        cam.setPreviewSize(activeW, activeH, UVCCamera.FRAME_FORMAT_MJPEG)
-                    } catch (_: IllegalArgumentException) {
                         cam.setPreviewSize(activeW, activeH, UVCCamera.FRAME_FORMAT_YUYV)
+                    } catch (_: IllegalArgumentException) {
+                        activeW = UVCCamera.DEFAULT_PREVIEW_WIDTH
+                        activeH = UVCCamera.DEFAULT_PREVIEW_HEIGHT
+                        try {
+                            cam.setPreviewSize(activeW, activeH, UVCCamera.FRAME_FORMAT_MJPEG)
+                        } catch (_: IllegalArgumentException) {
+                            cam.setPreviewSize(activeW, activeH, UVCCamera.FRAME_FORMAT_YUYV)
+                        }
                     }
                 }
-            }
 
-            cam.previewSize?.let { actual ->
-                if (actual.width > 0 && actual.height > 0) {
-                    activeW = actual.width
-                    activeH = actual.height
-                }
-            }
-
-            hThread = HandlerThread("SpotrUvcSurface-$sessionId").apply { start() }
-            val surfaceHandler = Handler(hThread.looper)
-            reader = ImageReader.newInstance(activeW, activeH, PixelFormat.RGBA_8888, 2).apply {
-                setOnImageAvailableListener({ r ->
-                    try {
-                        r.acquireLatestImage()?.close()
-                    } catch (_: Exception) {
+                cam.previewSize?.let { actual ->
+                    if (actual.width > 0 && actual.height > 0) {
+                        activeW = actual.width
+                        activeH = actual.height
                     }
-                }, surfaceHandler)
-            }
-
-            synchronized(lock) {
-                if (!isRunning || currentSessionId != sessionId) {
-                    reader.close()
-                    hThread.quitSafely()
-                    cam.close()
-                    cam.destroy()
-                    return
                 }
-                activeCamera = cam
-                activeImageReader = reader
-                surfaceThread = hThread
-                streamWidth = activeW
-                streamHeight = activeH
-                stage = "starting-preview"
-            }
 
-            startJpegEncoderThread(sessionId)
+                hThread = HandlerThread("SpotrUvcSurface-$sessionId").apply { start() }
+                val surfaceHandler = Handler(hThread.looper)
+                reader = ImageReader.newInstance(activeW, activeH, PixelFormat.RGBA_8888, 2).apply {
+                    setOnImageAvailableListener({ r ->
+                        try {
+                            r.acquireLatestImage()?.close()
+                        } catch (_: Exception) {
+                        }
+                    }, surfaceHandler)
+                }
 
-            val expectedNv21Bytes = activeW * activeH * 3 / 2
-            val frameCallback = IFrameCallback { frame ->
-                if (!isRunning || currentSessionId != sessionId || encodePaused) return@IFrameCallback
-                val available = frame.remaining()
-                if (available < expectedNv21Bytes) return@IFrameCallback
+                val expectedNv21Bytes = activeW * activeH * 3 / 2
+                val frameCallback = IFrameCallback { frame ->
+                    if (!isRunning || currentSessionId != sessionId || encodePaused) return@IFrameCallback
+                    val available = frame.remaining()
+                    if (available < expectedNv21Bytes) return@IFrameCallback
 
-                synchronized(encodeLock) {
-                    if (encoderStopped) return@IFrameCallback
-                    val buf = recycledNv21?.takeIf { it.size >= expectedNv21Bytes }
-                        ?: ByteArray(expectedNv21Bytes)
-                    recycledNv21 = null
-                    frame.get(buf, 0, expectedNv21Bytes)
-                    val oldPending = pendingNv21
-                    if (oldPending != null && (recycledNv21 == null || recycledNv21!!.size < oldPending.size)) {
-                        recycledNv21 = oldPending
+                    synchronized(encodeLock) {
+                        if (encoderStopped) return@IFrameCallback
+                        val buf = recycledNv21?.takeIf { it.size >= expectedNv21Bytes }
+                            ?: ByteArray(expectedNv21Bytes)
+                        recycledNv21 = null
+                        frame.get(buf, 0, expectedNv21Bytes)
+                        val oldPending = pendingNv21
+                        if (oldPending != null && (recycledNv21 == null || recycledNv21!!.size < oldPending.size)) {
+                            recycledNv21 = oldPending
+                        }
+                        pendingNv21 = buf
+                        pendingW = activeW
+                        pendingH = activeH
+                        encodeLock.notifyAll()
                     }
-                    pendingNv21 = buf
-                    pendingW = activeW
-                    pendingH = activeH
-                    encodeLock.notifyAll()
                 }
-            }
 
-            cam.setPreviewDisplay(reader.surface)
-            cam.setFrameCallback(frameCallback, UVCCamera.PIXEL_FORMAT_NV21)
-            cam.startPreview()
+                synchronized(lock) {
+                    if (!isRunning || currentSessionId != sessionId) {
+                        runCatching { reader.close() }
+                        runCatching { hThread.quitSafely() }
+                        runCatching { cam.close() }
+                        runCatching { cam.destroy() }
+                        return
+                    }
+                    stage = "starting-preview"
+                }
 
-            synchronized(lock) {
-                if (isRunning && currentSessionId == sessionId) {
+                cam.setPreviewDisplay(reader.surface)
+                cam.setFrameCallback(frameCallback, UVCCamera.PIXEL_FORMAT_NV21)
+                cam.startPreview()
+
+                // Only register active handles and start JPEG encoder thread after startPreview succeeds
+                synchronized(lock) {
+                    if (!isRunning || currentSessionId != sessionId) {
+                        runCatching { cam.setFrameCallback(null, 0) }
+                        runCatching { cam.stopPreview() }
+                        runCatching { cam.close() }
+                        runCatching { cam.destroy() }
+                        runCatching { reader.close() }
+                        runCatching { hThread.quitSafely() }
+                        return
+                    }
+                    activeCamera = cam
+                    activeImageReader = reader
+                    surfaceThread = hThread
+                    streamWidth = activeW
+                    streamHeight = activeH
                     stage = "waiting-first-frame"
                 }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start UVC camera ${device.deviceName}: ${e.message}", e)
-            try {
-                reader?.close()
-            } catch (_: Exception) {
-            }
-            try {
-                hThread?.quitSafely()
-            } catch (_: Exception) {
-            }
-            try {
-                cam?.close()
-                cam?.destroy()
-            } catch (_: Exception) {
-            }
-            synchronized(lock) {
-                if (currentSessionId == sessionId) {
-                    isRunning = false
-                    stage = "error"
-                    errorMessage = e.message ?: "Failed to open USB UVC camera"
-                    activeCamera = null
-                    activeImageReader = null
-                    surfaceThread = null
-                    lock.notifyAll()
+
+                startJpegEncoderThread(sessionId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start UVC camera ${device.deviceName}: ${e.message}", e)
+                stopJpegEncoderThread()
+                runCatching { cam?.setFrameCallback(null, 0) }
+                runCatching { cam?.stopPreview() }
+                runCatching { cam?.close() }
+                runCatching { cam?.destroy() }
+                runCatching { reader?.close() }
+                runCatching { hThread?.quitSafely() }
+                synchronized(lock) {
+                    if (currentSessionId == sessionId) {
+                        isRunning = false
+                        stage = "error"
+                        errorMessage = e.message ?: "Failed to open USB UVC camera"
+                        activeCamera = null
+                        activeImageReader = null
+                        surfaceThread = null
+                        lock.notifyAll()
+                    }
                 }
             }
         }
@@ -537,70 +561,82 @@ class UsbUvcSessionManager(
             isDaemon = true
             start()
         }
-        encoderThread = t
+        synchronized(lock) {
+            encoderThread = t
+        }
     }
 
-    fun stop(expectedSessionId: Long? = null) {
-        val camToClose: UVCCamera?
-        val readerToClose: ImageReader?
-        val sThreadToQuit: HandlerThread?
-        val encThreadToJoin: Thread?
-
-        synchronized(lock) {
-            if (expectedSessionId != null && expectedSessionId != currentSessionId) {
-                return
-            }
-            if (!isRunning && activeCamera == null && activeImageReader == null) {
-                return
-            }
-            isRunning = false
-            stage = "stopped"
-            encodePaused = false
-            camToClose = activeCamera
-            activeCamera = null
-            readerToClose = activeImageReader
-            activeImageReader = null
-            sThreadToQuit = surfaceThread
-            surfaceThread = null
-            encThreadToJoin = encoderThread
+    private fun stopJpegEncoderThread() {
+        val encThreadToJoin: Thread? = synchronized(lock) {
+            val t = encoderThread
             encoderThread = null
-            latestJpeg = null
-            activeDeviceId = null
-            targetDeviceName = null
-            lock.notifyAll()
+            t
         }
-
         synchronized(encodeLock) {
             encoderStopped = true
             pendingNv21 = null
             recycledNv21 = null
             encodeLock.notifyAll()
         }
-
-        try {
-            camToClose?.setFrameCallback(null, 0)
-            camToClose?.stopPreview()
-            camToClose?.close()
-            camToClose?.destroy()
-        } catch (e: Exception) {
-            Log.w(TAG, "Error closing UVC camera: ${e.message}")
-        }
-
-        try {
-            readerToClose?.close()
-        } catch (_: Exception) {
-        }
-
-        try {
-            sThreadToQuit?.quitSafely()
-        } catch (_: Exception) {
-        }
-
         if (encThreadToJoin != null && encThreadToJoin.isAlive && Thread.currentThread() !== encThreadToJoin) {
             try {
                 encThreadToJoin.join(800L)
             } catch (_: InterruptedException) {
             }
+        }
+    }
+
+    fun stop(expectedSessionId: Long? = null, preserveDisconnectState: Boolean = false) {
+        synchronized(cameraOpLock) {
+            val camToClose: UVCCamera?
+            val readerToClose: ImageReader?
+            val sThreadToQuit: HandlerThread?
+
+            synchronized(lock) {
+                if (expectedSessionId != null && expectedSessionId != currentSessionId) {
+                    return
+                }
+                if (!isRunning && activeCamera == null && activeImageReader == null && encoderThread == null) {
+                    if (!preserveDisconnectState && expectedSessionId == null) {
+                        errorMessage = null
+                        stage = "idle"
+                    }
+                    return
+                }
+                isRunning = false
+                if (!preserveDisconnectState) {
+                    stage = "stopped"
+                    errorMessage = null
+                }
+                encodePaused = false
+                activeClientCount = 0
+                camToClose = activeCamera
+                activeCamera = null
+                readerToClose = activeImageReader
+                activeImageReader = null
+                sThreadToQuit = surfaceThread
+                surfaceThread = null
+                latestJpeg = null
+                activeDeviceId = null
+                targetDeviceName = null
+                lock.notifyAll()
+            }
+
+            stopJpegEncoderThread()
+
+            if (camToClose != null) {
+                runCatching { camToClose.setFrameCallback(null, 0) }
+                    .onFailure { Log.w(TAG, "UVC setFrameCallback(null) notice: ${it.message}") }
+                runCatching { camToClose.stopPreview() }
+                    .onFailure { Log.w(TAG, "UVC stopPreview notice: ${it.message}") }
+                runCatching { camToClose.close() }
+                    .onFailure { Log.w(TAG, "UVC close notice: ${it.message}") }
+                runCatching { camToClose.destroy() }
+                    .onFailure { Log.w(TAG, "UVC destroy notice: ${it.message}") }
+            }
+
+            runCatching { readerToClose?.close() }
+            runCatching { sThreadToQuit?.quitSafely() }
         }
     }
 
@@ -632,17 +668,18 @@ class UsbUvcSessionManager(
     }
 
     fun streamMjpegTo(sessionId: Long, out: OutputStream) {
+        synchronized(lock) {
+            if (currentSessionId == sessionId && isRunning) {
+                activeClientCount++
+            }
+        }
         var lastSentSeq = 0L
         val bufferedOut = BufferedOutputStream(out, 65536)
         try {
             while (true) {
-                val jpeg = awaitNextFrame(sessionId, lastSentSeq) ?: break
-                lastSentSeq++
-                synchronized(lock) {
-                    if (latestFrameSeq > lastSentSeq) {
-                        lastSentSeq = latestFrameSeq
-                    }
-                }
+                val pkt = awaitNextFrame(sessionId, lastSentSeq) ?: break
+                lastSentSeq = pkt.seq
+                val jpeg = pkt.jpeg
                 val header = (
                     "--frame\r\n" +
                         "Content-Type: image/jpeg\r\n" +
@@ -657,16 +694,27 @@ class UsbUvcSessionManager(
         } catch (_: IOException) {
             // Client closed connection
         } finally {
-            stop(expectedSessionId = sessionId)
+            val shouldStop = synchronized(lock) {
+                if (currentSessionId == sessionId) {
+                    activeClientCount = (activeClientCount - 1).coerceAtLeast(0)
+                    activeClientCount == 0
+                } else {
+                    false
+                }
+            }
+            if (shouldStop) {
+                stop(expectedSessionId = sessionId)
+            }
         }
     }
 
-    private fun awaitNextFrame(sessionId: Long, lastSentSeq: Long): ByteArray? {
+    private fun awaitNextFrame(sessionId: Long, lastSentSeq: Long): FramePacket? {
         synchronized(lock) {
             while (isRunning && currentSessionId == sessionId) {
                 val jpeg = latestJpeg
-                if (jpeg != null && latestFrameSeq > lastSentSeq) {
-                    return jpeg
+                val seq = latestFrameSeq
+                if (jpeg != null && seq > lastSentSeq) {
+                    return FramePacket(jpeg, seq)
                 }
                 try {
                     lock.wait(100L)

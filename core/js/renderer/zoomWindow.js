@@ -9,21 +9,25 @@
 import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { shouldHoldCanvasPan } from '../ui/ringController.js';
+import { getLiveViewportDimensions } from './overlayManager.js';
 
 /**
  * Aims the digital Loupe crosshair onto a normalized source frame coordinate on the Live screen.
  */
 export function aimLoupeAtHit(hit, { switchToLive = true, ensurePipVisible = true } = {}) {
   if (!hit) return false;
-  const nx = Math.max(0.02, Math.min(0.98, Number(hit.normX) || 0.5));
-  const ny = Math.max(0.02, Math.min(0.98, Number(hit.normY) || 0.5));
+  const rawNx = Number(hit.normX);
+  const rawNy = Number(hit.normY);
+  const nx = Math.max(0.02, Math.min(0.98, Number.isFinite(rawNx) ? rawNx : 0.5));
+  const ny = Math.max(0.02, Math.min(0.98, Number.isFinite(rawNy) ? rawNy : 0.5));
   const zoom = Math.max(1.0, appState.mainZoom || 1.0);
 
   const vw = hit.frameW || appState.streamWidth || 1920;
   const vh = hit.frameH || appState.streamHeight || 1080;
+  const liveDims = getLiveViewportDimensions();
   const mainCanvas = document.getElementById('mainCanvas');
-  const cw = mainCanvas?.width || window.innerWidth || vw;
-  const ch = mainCanvas?.height || window.innerHeight || vh;
+  const cw = (mainCanvas && mainCanvas.clientWidth > 0 ? mainCanvas.width : liveDims.width) || vw;
+  const ch = (mainCanvas && mainCanvas.clientHeight > 0 ? mainCanvas.height : liveDims.height) || vh;
 
   const videoAspect = vw / Math.max(1, vh);
   const canvasAspect = cw / Math.max(1, ch);
@@ -106,9 +110,34 @@ export function clampFloatingPanelToParent(panelEl) {
   const ph = parent.clientHeight;
   if (pw <= 0 || ph <= 0) return;
 
-  // Ensure panel dimensions fit inside parent
   const maxW = Math.max(200, pw - 16);
   const maxH = Math.max(150, ph - 16);
+
+  // If the user hasn't manually positioned or resized this panel (e.g., #pipZoomWindow),
+  // preserve its CSS right-edge anchoring across Android portrait/landscape layout transitions.
+  if (panelEl.id === 'pipZoomWindow' && panelEl.dataset.userPositioned !== '1') {
+    panelEl.style.left = '';
+    panelEl.style.right = '';
+    if (panelEl.dataset.userResized !== '1') {
+      panelEl.style.width = '';
+      panelEl.style.height = '';
+    }
+    if (panelEl.offsetWidth > maxW) {
+      panelEl.style.width = `${maxW}px`;
+    }
+    if (panelEl.offsetHeight > maxH) {
+      panelEl.style.height = `${maxH}px`;
+    }
+    const maxTop = Math.max(8, ph - panelEl.offsetHeight - 8);
+    if (panelEl.offsetTop > maxTop) {
+      panelEl.style.top = `${maxTop}px`;
+    } else if (panelEl.dataset.userPositioned !== '1') {
+      panelEl.style.top = '';
+    }
+    return;
+  }
+
+  // Ensure manually positioned/resized panel dimensions fit inside parent
   if (panelEl.offsetWidth > maxW) {
     panelEl.style.width = `${maxW}px`;
   }
@@ -189,12 +218,20 @@ export function makeElementDraggable(containerEl, handleEl, onPositionChange) {
       startY = e.clientY;
     }
     const parent = containerEl.parentElement;
-    const maxX = Math.max(0, parent.clientWidth - containerEl.offsetWidth);
-    const maxY = Math.max(0, parent.clientHeight - containerEl.offsetHeight);
+    const isCrosshair = containerEl.id === 'zoomTargetCrosshair';
+    const minX = isCrosshair ? -Math.floor(containerEl.offsetWidth / 2) + 8 : 0;
+    const minY = isCrosshair ? -Math.floor(containerEl.offsetHeight / 2) + 8 : 0;
+    const maxX = isCrosshair
+      ? parent.clientWidth - Math.ceil(containerEl.offsetWidth / 2) - 8
+      : Math.max(0, parent.clientWidth - containerEl.offsetWidth);
+    const maxY = isCrosshair
+      ? parent.clientHeight - Math.ceil(containerEl.offsetHeight / 2) - 8
+      : Math.max(0, parent.clientHeight - containerEl.offsetHeight);
 
-    const nx = Math.max(0, Math.min(maxX, origLeft + (e.clientX - startX)));
-    const ny = Math.max(0, Math.min(maxY, origTop + (e.clientY - startY)));
+    const nx = Math.max(minX, Math.min(maxX, origLeft + (e.clientX - startX)));
+    const ny = Math.max(minY, Math.min(maxY, origTop + (e.clientY - startY)));
 
+    containerEl.dataset.userPositioned = '1';
     containerEl.style.left = `${nx}px`;
     containerEl.style.top = `${ny}px`;
     containerEl.style.right = 'auto';
@@ -281,6 +318,8 @@ function initPipCornerResize(pipWindowEl, pipCanvas) {
         startX = e.clientX;
         startY = e.clientY;
       }
+      pipWindowEl.dataset.userPositioned = '1';
+      pipWindowEl.dataset.userResized = '1';
       pipWindowEl.style.left = `${startLeft}px`;
       pipWindowEl.style.right = 'auto';
       const parent = pipWindowEl.parentElement;
@@ -357,8 +396,13 @@ export function initZoomWindow() {
     const targetLeft = Math.round(appState.roiX * pw - cw / 2);
     const targetTop = Math.round(appState.roiY * ph - ch / 2);
 
-    const clampedLeft = Math.max(0, Math.min(pw - cw, targetLeft));
-    const clampedTop = Math.max(0, Math.min(ph - ch, targetTop));
+    const minLeft = -Math.floor(cw / 2) + 8;
+    const maxLeft = pw - Math.ceil(cw / 2) - 8;
+    const minTop = -Math.floor(ch / 2) + 8;
+    const maxTop = ph - Math.ceil(ch / 2) - 8;
+
+    const clampedLeft = Math.max(minLeft, Math.min(maxLeft, targetLeft));
+    const clampedTop = Math.max(minTop, Math.min(maxTop, targetTop));
 
     crosshairEl.style.left = `${clampedLeft}px`;
     crosshairEl.style.top = `${clampedTop}px`;
@@ -409,12 +453,18 @@ export function initZoomWindow() {
     saveSettings(appState);
   });
 
-  // Sync UI state
+  // Sync UI state (patch-gated to avoid unnecessary DOM writes on 2Hz telemetry ticks)
   subscribeState((state, patch) => {
-    pipWindowEl.classList.toggle('hidden', !state.pipEnabled);
-    const showCrosshair = state.pipEnabled && state.roiTargetVisible;
-    crosshairEl.classList.toggle('hidden', !showCrosshair);
-    pipZoomBadge.textContent = `${state.pipZoom.toFixed(1)}x`;
+    const isInit = !patch || Object.keys(patch).length === 0;
+    if (isInit || 'pipEnabled' in patch || 'roiTargetVisible' in patch) {
+      pipWindowEl.classList.toggle('hidden', !state.pipEnabled);
+      const showCrosshair = state.pipEnabled && state.roiTargetVisible;
+      crosshairEl.classList.toggle('hidden', !showCrosshair);
+    }
+    if (isInit || 'pipZoom' in patch) {
+      const safeZoom = Number.isFinite(Number(state.pipZoom)) ? Number(state.pipZoom) : 3.0;
+      pipZoomBadge.textContent = `${safeZoom.toFixed(1)}x`;
+    }
     if (
       patch &&
       (patch.roiX !== undefined ||
@@ -427,7 +477,6 @@ export function initZoomWindow() {
         patch.mainPanY !== undefined)
     ) {
       syncRoiCrosshairPosition();
-      // When returning to Live from another screen, #screenLive may still be unhiding during this dispatch
       if (state.currentScreen === 'live') {
         requestAnimationFrame(syncRoiCrosshairPosition);
       }

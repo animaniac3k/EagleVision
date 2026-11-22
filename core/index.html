@@ -59,19 +59,15 @@
     <!-- =================================================================== -->
     <main id="screenLive" class="screen-view">
       <div id="viewportContainer">
-        <video id="cameraVideoEl" playsinline muted style="display:none;"></video>
+        <video id="cameraVideoEl" playsinline muted style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
         <canvas id="mainCanvas"></canvas>
-        <canvas id="heatmapSetupCanvas"></canvas>
+        <canvas id="liveOverlayCanvas"></canvas>
 
         <!-- Superimposed Guide Overlay Layer -->
         <div id="overlayLayer" style="opacity: 0.75;">
           <svg id="svgOverlay" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
           <img id="customOverlayImg" class="hidden" alt="Custom Overlay" />
         </div>
-
-        <!-- Live Ignore Masks Layer (Visible & Editable during Heatmap Setup) -->
-        <div id="liveIgnoreLayer" class="live-ignore-layer hidden"></div>
-        <div id="liveDrawPreview" class="live-draw-preview hidden"></div>
 
         <!-- Draggable ROI Target Crosshair -->
         <div id="zoomTargetCrosshair" title="Drag to position Zoom Window target">
@@ -108,33 +104,57 @@
         <span id="reticleFfpText">RETICLE SUBTENSION: 100% (FFP SYNC)</span>
       </div>
 
-      <!-- Restore UI Pill (Shown only in Clean View / Declutter Mode) -->
-      <button id="btnRestoreUi" class="radar-btn radar-btn-pill btn-restore-ui hidden" title="Show Interface Controls">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
-        <span>Show UI</span>
-      </button>
-
-      <!-- TOP-LEFT: Quiet Setup + Clean View Pills -->
+      <!-- TOP-LEFT: Setup, Clean View, Rain/Carry Lock & 1-Tap Snapshot -->
       <nav class="floating-strip strip-top-left">
-        <button id="btnToggleOptions" class="radar-btn radar-btn-pill" title="Open Unified Setup (Camera, Voice, Display, Reticle, Controllers)">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <button id="btnToggleOptions" class="radar-btn radar-btn-pill btn-icon-only" title="Setup (Camera, Voice, Display, Reticle, Calibration, Controllers)" aria-label="Setup">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
-          <span>Setup</span>
         </button>
 
-        <button id="btnDeclutterUi" class="radar-btn radar-btn-pill" title="Clean View (Hide Controls)">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>
+        <button id="btnDeclutterUi" class="radar-btn radar-btn-pill btn-icon-only" title="Clean View (Hide Controls &amp; Reticle)" aria-label="Toggle Clean View">
+          <svg id="iconEyeOpen" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
           </svg>
-          <span class="dock-btn-lbl">Clean View</span>
+          <svg id="iconEyeSlash" class="hidden" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+            <line x1="2" y1="2" x2="22" y2="22" stroke-linecap="round"/>
+          </svg>
+        </button>
+
+        <button id="btnToggleTouchLock" class="radar-btn radar-btn-pill btn-icon-only hide-in-clean" title="Touch Lock (Rain / Carry Safe)" aria-label="Lock Touchscreen">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="5" y="11" width="14" height="10" rx="2"/>
+            <path stroke-linecap="round" d="M8 11V7a4 4 0 018 0v4"/>
+          </svg>
+        </button>
+
+        <button id="btnLiveSnapshot" class="radar-btn radar-btn-pill btn-icon-only hide-in-clean" title="Capture Annotated Live PNG Snapshot (Key: N)" aria-label="Take Live Snapshot">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
         </button>
       </nav>
+
+      <!-- TOP-CENTER: Live Source Status Pill -->
+      <div id="liveSourceStatusPill" class="live-source-pill hide-in-clean" aria-live="polite">
+        <span id="liveSourceDot" class="live-source-dot status-connecting"></span>
+        <span id="liveSourceLabel">CONNECTING...</span>
+      </div>
+
+      <!-- RAIN / CARRY TOUCH LOCK OVERLAY -->
+      <div id="touchLockOverlay" class="touch-lock-overlay hidden" role="dialog" aria-label="Touchscreen Locked">
+        <div class="touch-lock-card">
+          <div>
+            <div class="touch-lock-title">SCREEN LOCKED</div>
+            <div class="touch-lock-sub">Accidental rain &amp; glove touches ignored</div>
+          </div>
+          <button type="button" id="btnUnlockTouchScreen" class="radar-btn radar-btn-primary">Unlock</button>
+        </div>
+      </div>
 
       <!-- TOP-RIGHT: Saved Clips & Spatial Hits -->
       <nav class="floating-strip strip-top-right">
@@ -165,108 +185,6 @@
         <div class="hud-row"><span class="hud-key">ZOOM</span><span id="hudMainZoom" class="hud-val">1.0x</span></div>
         <div class="hud-row"><span class="hud-key">LOUPE</span><span id="hudPipZoom" class="hud-val">3.0x</span></div>
         <div class="hud-row"><span class="hud-key">BUFFER</span><span id="hudBufferText" class="hud-val">0.0s / 20s</span></div>
-      </aside>
-
-      <!-- MOVABLE LIVE HEATMAP CALIBRATION WINDOW (Hidden until Setup opened) -->
-      <aside id="heatmapTunePopover" class="heatmap-tune-popover hidden" role="dialog" aria-label="Heatmap Calibration">
-        <div id="heatmapPopoverHeader" class="heatmap-pop-header" title="Drag to move window">
-          <div class="heatmap-pop-title-group">
-            <span class="heatmap-pop-grip" aria-hidden="true">⋮⋮</span>
-            <span class="heatmap-pop-dot"></span>
-            <span class="heatmap-pop-title">Heatmap Setup</span>
-            <span id="heatmapLiveGatePill" class="heatmap-gate-pill gate-idle">READY</span>
-          </div>
-          <div class="heatmap-pop-header-actions">
-            <button type="button" id="btnPopoverRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background Reference">Re-Zero</button>
-            <button type="button" id="btnCloseHeatmapSetup" class="radar-btn radar-btn-sm radar-btn-primary" title="Hide Setup Controls">Done</button>
-          </div>
-        </div>
-
-        <!-- 1. Sensitivity + Accurate Live Noise-Floor Visualization -->
-        <div class="heatmap-pop-section">
-          <div class="slider-header">
-            <span>Sensitivity</span>
-            <span id="liveValHeatmapSens" class="slider-val">60% · Δ&gt;36</span>
-          </div>
-          <input id="liveSliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
-
-          <div class="heatmap-noise-meter" title="Live ambient scene noise floor vs. detection threshold gate">
-            <div class="heatmap-noise-bar-track">
-              <div id="heatmapNoiseMeterFill" class="heatmap-noise-fill" style="width: 0%;"></div>
-              <div id="heatmapNoisePeakTick" class="heatmap-noise-peak" style="left: 0%;"></div>
-              <div id="heatmapNoiseGateMarker" class="heatmap-noise-gate" style="left: 42%;"></div>
-            </div>
-            <div class="heatmap-noise-readout-row">
-              <span id="heatmapNoiseTelemetryText">Noise Δ0 · Peak Δ0</span>
-              <span id="heatmapNoiseMarginText">Headroom +36</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Min Hit Size & Max Hit Area (Visualized 1:1 on Live Screen) -->
-        <div class="heatmap-pop-grid">
-          <div class="heatmap-pop-section">
-            <div class="slider-header">
-              <span style="color:#67e8f9;">Min Hit Size</span>
-              <span id="liveValHeatmapMinCells" class="slider-val">2 cells</span>
-            </div>
-            <input id="liveSliderHeatmapMinCells" type="range" min="1" max="20" step="1" value="2" class="radar-slider" />
-          </div>
-
-          <div class="heatmap-pop-section">
-            <div class="slider-header">
-              <span style="color:#fbbf24;">Max Hit Area</span>
-              <span id="liveValHeatmapMaxArea" class="slider-val">720 cells</span>
-            </div>
-            <input id="liveSliderHeatmapMaxArea" type="range" min="0" max="100" step="1" value="58" class="radar-slider" />
-          </div>
-        </div>
-
-        <!-- 3. Shake Gate & Marker Duration -->
-        <div class="heatmap-pop-section">
-          <div class="slider-header">
-            <span style="color:#fda4af;">Shake Gate (Camera Move)</span>
-            <span id="liveValHeatmapShakeGate" class="slider-val">18%</span>
-          </div>
-          <input id="liveSliderHeatmapShakeGate" type="range" min="5" max="50" step="1" value="18" class="radar-slider" />
-        </div>
-
-        <div class="heatmap-pop-section">
-          <div class="slider-header">
-            <span>Marker Duration</span>
-            <div class="duration-custom-controls">
-              <input id="inputHeatmapDuration" type="number" min="1" max="99999" step="1" value="30" class="radar-num-input" title="Custom duration in seconds" />
-              <span id="valHeatmapDuration" class="slider-val" style="min-width:18px;">s</span>
-            </div>
-          </div>
-          <div class="duration-preset-row">
-            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="5">5s</button>
-            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="15">15s</button>
-            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn radar-btn-active" data-dur="30">30s</button>
-            <button type="button" class="radar-btn radar-btn-sm duration-preset-btn" data-dur="60">60s</button>
-            <button type="button" id="btnHeatmapInfinite" class="radar-btn radar-btn-sm duration-preset-btn" title="Infinite Persistence">∞</button>
-          </div>
-          <input id="sliderHeatmapDuration" type="range" min="1" max="125" step="1" value="30" class="radar-slider" />
-        </div>
-
-        <!-- 4. Auto-Save Clip on Hit -->
-        <div class="heatmap-pop-toggle-row">
-          <div class="heatmap-pop-toggle-text">
-            <span class="heatmap-pop-toggle-title">Auto-Save Clip on Hit</span>
-            <span class="heatmap-pop-toggle-sub">Saves RAM buffer on valid hit (15s+ cooldown)</span>
-          </div>
-          <button type="button" id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
-        </div>
-
-        <!-- 5. Ignore Masks (Draw / Move / Resize / Toggle / Clear directly on Live View) -->
-        <div class="heatmap-pop-masks-row">
-          <button type="button" id="btnLiveMaskDraw" class="radar-btn radar-btn-sm" title="Drag across Live camera feed to exclude wind/foliage zones">✎ Draw Mask</button>
-          <button type="button" id="btnLiveMasksVisible" class="radar-btn radar-btn-sm" title="Show / Hide Ignore Masks while masking remains active">👁 Masks (0)</button>
-          <button type="button" id="btnLiveClearMasks" class="radar-btn radar-btn-sm radar-btn-danger hidden" title="Remove all ignore mask zones">Clear All</button>
-        </div>
-        <div id="liveMaskDrawHint" class="heatmap-mask-hint hidden">
-          Drag on the feed to draw a mask. Drag any mask or corner to move/resize, × to delete.
-        </div>
       </aside>
 
       <!-- MOVABLE LIVE REPLAY BUFFER SETTINGS WINDOW (Hidden until Setup opened) -->
@@ -314,8 +232,8 @@
             <span id="memBudgetLabel">EST: 28 MB / 512 MB MAX</span>
           </div>
           <div class="memory-bar-track">
-            <div id="memBarEstFill" class="memory-bar-est" style="width: 12%;"></div>
-            <div id="memBarUsedFill" class="memory-bar-used" style="width: 0%;"></div>
+            <div id="memBarEstFill" class="memory-bar-est"></div>
+            <div id="memBarUsedFill" class="memory-bar-used"></div>
           </div>
         </div>
       </aside>
@@ -323,7 +241,7 @@
       <!-- BOTTOM CONTROL STRIP -->
       <footer class="strip-bottom">
         <!-- Bottom-Left: Quick-Tool Chip -->
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="quick-tool-wrap">
           <div id="quickToolPill" class="quick-tool-pill hidden" title="Quick Tool (Tap to toggle)">
             <span id="quickToolBadge" class="quick-tool-badge">HEATMAP</span>
             <span id="quickToolStatus" class="quick-tool-status status-off">OFF</span>
@@ -346,22 +264,18 @@
             </div>
 
             <div class="heatmap-dock-group">
-              <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Micro-Change Heatmap (Long-press to calibrate)">
-                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              <button id="btnToggleHeatmap" class="radar-btn" title="Toggle Hit Detection ON/OFF (Long-press or Right-click to Calibrate)">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+                  <path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
                 </svg>
-                <span class="dock-btn-lbl">Heatmap</span>
-                <span id="heatmapHitBadge" class="dock-hit-badge hidden">0</span>
+                <span class="dock-btn-lbl">Hits</span>
               </button>
-              <button id="btnLiveRezero" class="radar-btn dock-btn-dimmed" disabled title="Re-Zero Background Reference (Clear Heatmap)" aria-label="Re-Zero Background Reference">
-                <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/>
-                  <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/>
+              <button id="btnLiveClearHits" class="radar-btn dock-btn-dimmed" title="Clear Hits &amp; Re-Zero Background (2-tap confirm when hits logged)" aria-label="Clear Hits and Re-Zero">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                 </svg>
-              </button>
-              <button id="btnHeatmapTune" type="button" class="radar-btn heatmap-tune-caret" title="Calibrate Sensitivity, Hit Size &amp; Ignore Masks on Live View" aria-expanded="false" aria-controls="heatmapTunePopover">
-                <span id="heatmapTuneSensChip">60%</span>
-                <span class="heatmap-caret-glyph">▴</span>
               </button>
             </div>
 
@@ -446,7 +360,7 @@
           </div>
           <div id="hitsEmptyBanner" class="hits-empty-banner">
             <strong>No motion detections logged yet</strong>
-            <span>Turn on Heatmap on the Live view to capture numbered motion hits.</span>
+            <span>Turn on Hits on the Live view to capture numbered motion hits.</span>
           </div>
         </div>
       </div>
@@ -505,10 +419,22 @@
         </div>
 
         <div id="hitsTopRightPill" class="gallery-info-pill hidden">
-          <button id="btnToggleHitsReticle" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Reticle on Hits Map">Reticle: ON</button>
-          <button id="btnToggleHitsVisible" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Hit Pins to See Target Underneath">Hits: ON</button>
-          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background &amp; Clear Logged Hits">Re-Zero</button>
-          <button id="btnHitsClear" class="radar-btn radar-btn-sm radar-btn-danger" title="Clear All Logged Hits">Clear</button>
+          <button id="btnToggleHitsReticle" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Reticle (Synced Across Screens)">Reticle: ON</button>
+          <button id="btnToggleHitsVisible" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Recorded Hit Pins on Map (Independent of Live Detector)">Pins: ON</button>
+          <button id="btnOpenCalibration" type="button" class="radar-btn radar-btn-sm" title="Open Hit Detection Calibration (Heatmap Debug View)">⚙ Calib</button>
+          <button id="btnToggleHitsTimestamps" type="button" class="radar-btn radar-btn-sm btn-icon-only" title="Timestamp on Hits: OFF (Synced with Calibration)" aria-label="Toggle Hit Timestamps" aria-pressed="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"/>
+              <polyline points="12 7 12 12 15.5 14"/>
+            </svg>
+          </button>
+          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background &amp; Clear Logged Hits (2-tap confirm)">Re-Zero</button>
+          <button id="btnHitsClear" class="radar-btn radar-btn-sm btn-icon-only radar-btn-danger" title="Clear All Logged Hits (2-tap confirm)" aria-label="Clear All Logged Hits">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -561,6 +487,7 @@
           </div>
 
           <div class="hits-actions-group">
+            <button id="btnHitAimLoupe" class="radar-btn radar-btn-sm radar-btn-primary" title="Aim Live Digital Loupe onto Selected Hit">⌖ Aim Loupe</button>
             <button id="btnHitSnapshot" class="radar-btn radar-btn-sm" title="Save Annotated Detections PNG Snapshot">📷</button>
           </div>
         </div>
@@ -581,11 +508,12 @@
           <button type="button" class="setup-nav-tab" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" id="btnOpenReticleScreen" class="setup-nav-tab">Reticle</button>
+          <button type="button" class="setup-nav-tab setup-jump-calibration">Calibration</button>
           <button type="button" id="btnOpenControllerScreen" class="setup-nav-tab">Controllers</button>
         </nav>
 
         <div class="setup-header-actions">
-          <span class="setup-version-badge">v0.1.13</span>
+          <span class="setup-version-badge">v0.62.0</span>
         </div>
       </header>
 
@@ -635,11 +563,11 @@
                   <summary>Advanced network &amp; iOS gateway</summary>
                   <div class="setup-disclosure-body">
                     <div style="display:flex; flex-direction:column; gap:4px;">
-                      <label style="font-size:12px; color:var(--radar-text-muted);">RTSP Gateway Host (for iOS / remote)</label>
+                      <label for="inputRtspGatewayHost" style="font-size:12px; color:var(--radar-text-muted);">RTSP Gateway Host (for iOS / remote)</label>
                       <input id="inputRtspGatewayHost" type="text" class="radar-text-input" placeholder="e.g. http://192.168.0.50:8080" />
                     </div>
                     <div style="display:flex; flex-direction:column; gap:4px;">
-                      <label style="font-size:12px; color:var(--radar-text-muted);">Direct RTSP Stream URL</label>
+                      <label for="inputBresserRtspUrl" style="font-size:12px; color:var(--radar-text-muted);">Direct RTSP Stream URL</label>
                       <div style="display:flex; gap:6px;">
                         <input id="inputBresserRtspUrl" type="text" class="radar-text-input" style="flex:1;" value="rtsp://192.168.0.1/live/tcp/ch0" />
                         <button type="button" id="btnConnectBresserEndpoint" class="radar-btn radar-btn-sm" style="height:38px;">Connect</button>
@@ -728,11 +656,11 @@
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                   <div>
-                    <label style="display:block; font-size:12px; color:var(--radar-text-muted); margin-bottom:4px;">Alert Prefix</label>
+                    <label for="inputVoiceAlertKeyword" style="display:block; font-size:12px; color:var(--radar-text-muted); margin-bottom:4px;">Alert Prefix</label>
                     <input id="inputVoiceAlertKeyword" type="text" value="Detection" class="radar-text-input" placeholder="Detection" />
                   </div>
                   <div>
-                    <label style="display:block; font-size:12px; color:var(--radar-text-muted); margin-bottom:4px;">Distance Unit</label>
+                    <label for="inputVoiceUnitKeyword" style="display:block; font-size:12px; color:var(--radar-text-muted); margin-bottom:4px;">Distance Unit</label>
                     <input id="inputVoiceUnitKeyword" type="text" value="clicks" class="radar-text-input" placeholder="clicks" />
                   </div>
                 </div>
@@ -808,6 +736,52 @@
               </div>
               <input id="sliderUiOpacity" type="range" min="15" max="100" step="5" value="100" class="radar-slider" />
             </div>
+
+            <div class="heatmap-pop-toggle-row">
+              <div class="heatmap-pop-toggle-text">
+                <span class="heatmap-pop-toggle-title">Stream Telemetry HUD</span>
+                <span class="heatmap-pop-toggle-sub">Show live FPS, resolution &amp; RAM overlay on Live view</span>
+              </div>
+              <button type="button" id="btnToggleHud" class="radar-btn radar-btn-sm">OFF</button>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Display &amp; Video Timestamp</span>
+              <button type="button" id="btnToggleDisplayTimestamp" class="radar-btn radar-btn-sm radar-btn-active">ON</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Position</span>
+                <span id="valTimestampPos" class="slider-val">Bottom Right</span>
+              </div>
+              <div class="ts-pos-grid" role="group" aria-label="Timestamp Position">
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn" data-pos="top-left">↖ TL</button>
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn" data-pos="top-center">↑ Top</button>
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn" data-pos="top-right">↗ TR</button>
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn" data-pos="bottom-left">↙ BL</button>
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn" data-pos="bottom-center">↓ Bot</button>
+                <button type="button" class="radar-btn radar-btn-sm ts-pos-btn radar-btn-active" data-pos="bottom-right">↘ BR</button>
+              </div>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Timestamp Opacity</span>
+                <span id="valTimestampOpacity" class="slider-val">60%</span>
+              </div>
+              <input id="sliderTimestampOpacity" type="range" min="15" max="100" step="5" value="60" class="radar-slider" />
+            </div>
+
+            <div class="heatmap-pop-toggle-row">
+              <div class="heatmap-pop-toggle-text">
+                <span class="heatmap-pop-toggle-title">Adaptive Brightness</span>
+                <span class="heatmap-pop-toggle-sub">Auto-adjusts contrast to background colors</span>
+              </div>
+              <button type="button" id="btnToggleTimestampAdaptive" class="radar-btn radar-btn-sm radar-btn-active">AUTO</button>
+            </div>
           </div>
         </div>
       </div>
@@ -827,13 +801,14 @@
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" class="setup-nav-tab active">Reticle</button>
+          <button type="button" class="setup-nav-tab setup-jump-calibration">Calibration</button>
           <button type="button" id="btnReticleToController" class="setup-nav-tab">Controllers</button>
         </nav>
 
         <div class="setup-header-actions">
           <button id="btnReticleToSettings" class="radar-btn radar-btn-sm hidden" aria-hidden="true">Settings</button>
           <button id="btnResetReticle" class="radar-btn radar-btn-sm" title="Reset Reticle Preset">↺ Reset</button>
-          <span class="setup-version-badge">v0.1.13</span>
+          <span class="setup-version-badge">v0.62.0</span>
         </div>
       </header>
 
@@ -1028,12 +1003,13 @@
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Voice</button>
           <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="display">Display &amp; Theme</button>
           <button type="button" id="btnControllerToReticle" class="setup-nav-tab">Reticle</button>
+          <button type="button" class="setup-nav-tab setup-jump-calibration">Calibration</button>
           <button type="button" class="setup-nav-tab active">Controllers</button>
         </nav>
 
         <div class="setup-header-actions">
           <button id="btnControllerBackToSettings" class="radar-btn radar-btn-sm hidden" aria-hidden="true">Settings</button>
-          <span class="setup-version-badge">v0.1.13</span>
+          <span class="setup-version-badge">v0.62.0</span>
         </div>
       </header>
 
@@ -1206,7 +1182,11 @@
               <div class="settings-card">
                 <div class="settings-card-header">
                   <span class="settings-label">Bluetooth Ring &amp; Remote</span>
-                  <span id="remoteStatusText" style="font-size:12px; color:#10b981; font-family:var(--font-mono);">LISTENING</span>
+                  <button type="button" id="btnToggleRingEnabled" class="radar-btn radar-btn-sm">BT Ring: OFF (Isolated)</button>
+                </div>
+
+                <div id="ringIsolationNotice" class="ring-isolation-notice">
+                  Bluetooth Ring is ISOLATED (OFF) so 8BitDo Micro and keyboard shortcuts are never hijacked. Enable above when pairing a Ring.
                 </div>
 
                 <div class="remote-device-box" id="remoteSvgContainer">
@@ -1291,7 +1271,7 @@
                 <div class="remote-mode-stepper">
                   <div id="remoteModeGuideText" class="remote-mode-guide-text">
                     Live: ▲▼◀▶ Pan · ● Zoom Cycle (1x → 1.5x → 2x → 2.5x → 3x → 1x) · BTN 2 / BTN 1 Instant Replay
-                    <br>Replay: ● Play/Pause · ◀▶ ±1 Frame · ▲ Restart · BTN 2 / ▼ Exit to Live
+                    <br>Replay: ● Play/Pause · ◀▶ ±1 Frame · ▲ 0.5x Slow-Mo · BTN 2 / ▼ Exit to Live
                   </div>
                 </div>
               </div>
@@ -1457,6 +1437,175 @@
             <button id="btnConfirmProfileModal" class="radar-btn radar-btn-sm radar-btn-primary">Save Profile</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- SCREEN 6: HIT DETECTION CALIBRATION (HEATMAP DEBUG VIEW)            -->
+    <!-- =================================================================== -->
+    <section id="screenCalibration" class="screen-view hidden">
+      <header class="setup-screen-header">
+        <button id="btnCalibBackToLive" class="radar-btn radar-btn-pill" title="Return to Live Camera Stream">
+          <span>← Live</span>
+        </button>
+
+        <nav class="setup-nav-tabs" aria-label="Setup sections">
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="camera">Camera</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="detection">Voice</button>
+          <button type="button" class="setup-nav-tab setup-jump-settings" data-setup-tab="display">Display &amp; Theme</button>
+          <button type="button" id="btnCalibToReticle" class="setup-nav-tab">Reticle</button>
+          <button type="button" class="setup-nav-tab active">Calibration</button>
+          <button type="button" id="btnCalibToController" class="setup-nav-tab">Controllers</button>
+        </nav>
+
+        <div class="setup-header-actions">
+          <button type="button" id="btnCalibRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background Reference">↺ Re-Zero</button>
+          <span class="setup-version-badge">v0.62.0</span>
+        </div>
+      </header>
+
+      <div class="reticle-workspace">
+        <!-- Left: Live Thermal Heatmap Debug Viewport (Uncropped 1:1 sensor view) -->
+        <div id="calibStageArea" class="calib-stage-area">
+          <div class="calib-stage-topbar">
+            <div class="calib-debug-pill">
+              <span class="heatmap-pop-dot"></span>
+              <span class="calib-debug-label">Heatmap Debug View</span>
+              <span id="heatmapLiveGatePill" class="heatmap-gate-pill gate-idle">READY</span>
+            </div>
+          </div>
+
+          <div id="calibStageFrame" class="calib-stage-frame">
+            <canvas id="calibMainCanvas"></canvas>
+            <canvas id="calibSetupCanvas"></canvas>
+            <div id="calibIgnoreLayer" class="live-ignore-layer hidden"></div>
+            <div id="calibDrawPreview" class="live-draw-preview hidden"></div>
+          </div>
+        </div>
+
+        <!-- Right: Streamlined "Less is More" Calibration Inspector -->
+        <aside class="reticle-sidebar-drawer">
+          <!-- 1. Sensitivity + 1-Tap Auto-Tune + 3 Environment Presets + Live Noise-Floor Visualization -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Sensitivity</span>
+              <button type="button" id="btnCalibAutoTune" class="radar-btn radar-btn-sm radar-btn-primary calib-autotune-btn" title="Sample ambient scene noise for 1.3s and set Sensitivity automatically">✦ Auto-Tune</button>
+            </div>
+
+            <div class="calib-preset-row" role="group" aria-label="Environment Presets">
+              <button type="button" class="radar-btn radar-btn-sm calib-env-preset" data-preset="indoor">Indoor</button>
+              <button type="button" class="radar-btn radar-btn-sm calib-env-preset" data-preset="calm">Calm Range</button>
+              <button type="button" class="radar-btn radar-btn-sm calib-env-preset" data-preset="windy">Wind / Mirage</button>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span>Detection Threshold</span>
+                <span id="liveValHeatmapSens" class="slider-val">60% · Δ&gt;36</span>
+              </div>
+              <input id="liveSliderHeatmapSens" type="range" min="10" max="95" step="5" value="60" class="radar-slider" />
+
+              <div class="heatmap-noise-meter" title="Live ambient scene noise floor vs. detection threshold gate">
+                <div class="heatmap-noise-bar-track">
+                  <div id="heatmapNoiseMeterFill" class="heatmap-noise-fill"></div>
+                  <div id="heatmapNoisePeakTick" class="heatmap-noise-peak" style="left: 0%;"></div>
+                  <div id="heatmapNoiseGateMarker" class="heatmap-noise-gate" style="left: 42%;"></div>
+                </div>
+                <div class="heatmap-noise-readout-row">
+                  <span id="heatmapNoiseTelemetryText">Noise Δ0 · Peak Δ0</span>
+                  <span id="heatmapNoiseMarginText">Headroom +36</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Target Hit Size (Visualized 1:1 on Calibration Stage) -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Target Hit Size</span>
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span style="color:#67e8f9;">Min Hit Size</span>
+                <span id="liveValHeatmapMinCells" class="slider-val">2 cells</span>
+              </div>
+              <input id="liveSliderHeatmapMinCells" type="range" min="1" max="20" step="1" value="2" class="radar-slider" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-header">
+                <span style="color:#fbbf24;">Max Hit Area</span>
+                <span id="liveValHeatmapMaxArea" class="slider-val">720 cells</span>
+              </div>
+              <input id="liveSliderHeatmapMaxArea" type="range" min="0" max="100" step="1" value="58" class="radar-slider" />
+            </div>
+          </div>
+
+          <!-- 4. Ignore Zones (Draw / Move / Resize / Clear on Debug Feed) -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <span class="settings-label">Ignore Zones</span>
+            </div>
+            <div class="heatmap-pop-masks-row" style="border-top:none; padding-top:0;">
+              <button type="button" id="btnLiveMaskDraw" class="radar-btn radar-btn-sm" title="Drag across camera feed to exclude wind/foliage zones">✎ Draw Mask</button>
+              <button type="button" id="btnLiveMasksVisible" class="radar-btn radar-btn-sm" title="Show / Hide Ignore Masks while masking remains active">👁 Masks (0)</button>
+              <button type="button" id="btnLiveClearMasks" class="radar-btn radar-btn-sm radar-btn-danger hidden" title="Remove all ignore mask zones">Clear All</button>
+            </div>
+            <div id="liveMaskDrawHint" class="heatmap-mask-hint hidden">
+              Drag on the feed to draw a mask. Drag any mask or corner to move/resize, × to delete.
+            </div>
+          </div>
+
+          <!-- 4. Hit Timestamps -->
+          <div class="settings-card">
+            <div class="heatmap-pop-toggle-row" style="border-top:none; padding-top:0;">
+              <div class="heatmap-pop-toggle-text">
+                <span class="heatmap-pop-toggle-title">Timestamp on Hits</span>
+                <span class="heatmap-pop-toggle-sub">Show capture time on live hit markers, archive map &amp; log</span>
+              </div>
+              <button type="button" id="btnToggleHitTimestamps" class="radar-btn radar-btn-sm">OFF</button>
+            </div>
+          </div>
+
+          <!-- 5. Advanced (Collapsed by default for "Less is More" field calibration) -->
+          <div class="settings-card">
+            <details class="setup-disclosure" style="border-top:none; padding-top:0; margin-top:0;">
+              <summary>Advanced (Shake Gate, Trail &amp; Auto-Save)</summary>
+              <div class="setup-disclosure-body">
+                <div class="slider-group">
+                  <div class="slider-header">
+                    <span style="color:#fda4af;">Shake Gate (Camera Move)</span>
+                    <span id="liveValHeatmapShakeGate" class="slider-val">18%</span>
+                  </div>
+                  <input id="liveSliderHeatmapShakeGate" type="range" min="5" max="50" step="1" value="18" class="radar-slider" />
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-header">
+                    <span>Heatmap Debug Trail</span>
+                    <span id="valHeatmapDuration" class="slider-val">30s</span>
+                  </div>
+                  <div class="duration-preset-row">
+                    <button type="button" class="radar-btn radar-btn-sm calib-dur-preset duration-preset-btn" data-dur="5">5s</button>
+                    <button type="button" class="radar-btn radar-btn-sm calib-dur-preset duration-preset-btn" data-dur="15">15s</button>
+                    <button type="button" class="radar-btn radar-btn-sm calib-dur-preset duration-preset-btn radar-btn-active" data-dur="30">30s</button>
+                    <button type="button" class="radar-btn radar-btn-sm calib-dur-preset duration-preset-btn" data-dur="60">60s</button>
+                  </div>
+                  <input id="sliderHeatmapDuration" type="range" min="2" max="60" step="1" value="30" class="radar-slider" />
+                </div>
+
+                <div class="heatmap-pop-toggle-row">
+                  <div class="heatmap-pop-toggle-text">
+                    <span class="heatmap-pop-toggle-title">Auto-Save Clip on Hit</span>
+                    <span class="heatmap-pop-toggle-sub">Saves RAM buffer on valid hit (15s+ cooldown)</span>
+                  </div>
+                  <button type="button" id="btnToggleHeatmapAutoSave" class="radar-btn radar-btn-sm">AUTO-SAVE: OFF</button>
+                </div>
+              </div>
+            </details>
+          </div>
+        </aside>
       </div>
     </section>
 

@@ -14,6 +14,7 @@ import { initSidebarAndTopControls } from './ui/sidebarControls.js';
 import { initVideoBrowser } from './ui/videoBrowser.js';
 import { initDetectionsScreen } from './ui/detectionsScreen.js';
 import { initReticleScreen } from './ui/reticleScreen.js';
+import { initCalibrationScreen } from './ui/calibrationScreen.js';
 import { initControllerScreen } from './ui/controllerScreen.js';
 import { initRingController } from './ui/ringController.js';
 import { initGamepadController } from './input/gamepadController.js';
@@ -32,11 +33,13 @@ async function bootstrapApp() {
 
   const videoEl = document.getElementById('cameraVideoEl');
 
-  // 2. Start 60fps Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
+  // 2. Start Dual-Canvas Compositor (Main Feed + PiP Zoom Window)
   const mainCanvas = initCompositor(videoEl);
 
-  // Preload embedded studio female voice sprite for instantaneous callouts
-  preloadVoiceAudio();
+  // Lazy-decode studio female voice sprite only if voice callouts are already enabled (saves 19-38MB RAM at boot)
+  if (appState.heatmapSpeechEnabled) {
+    preloadVoiceAudio();
+  }
 
   // 3. Initialize ALL UI screens, controllers & event listeners IMMEDIATELY (synchronously)
   // so all buttons, sliders, screens and shortcuts are interactive from the first millisecond
@@ -45,6 +48,7 @@ async function bootstrapApp() {
   initHudController();
   initInstantReplay();
   initReticleScreen();
+  initCalibrationScreen();
   initControllerScreen();
   initRingController();
   initGamepadController();
@@ -55,18 +59,27 @@ async function bootstrapApp() {
   // 4. Handle direct screen and testing query parameters if specified (after listeners are wired)
   const params = new URLSearchParams(window.location.search);
   const targetScreen = params.get('screen');
-  if (['controller', 'reticle', 'settings', 'gallery'].includes(targetScreen)) {
+  if (['controller', 'reticle', 'calibration', 'settings', 'gallery'].includes(targetScreen)) {
     updateState({ currentScreen: targetScreen });
   }
   if (params.get('reticleClicks') || params.get('reticleCenter')) {
     const patch = {};
     if (params.get('reticleClicks')) {
-      patch.clickCount = Math.min(30, Math.max(2, parseInt(params.get('reticleClicks'), 10)));
+      const parsedClicks = parseInt(params.get('reticleClicks'), 10);
+      if (Number.isFinite(parsedClicks)) {
+        patch.clickCount = Math.min(30, Math.max(2, parsedClicks));
+      }
     }
     if (params.get('reticleCenter')) {
-      patch.centerStyle = params.get('reticleCenter');
+      const validStyles = ['empty', 'dot', 'cross', 'chevron'];
+      const requestedStyle = params.get('reticleCenter');
+      if (validStyles.includes(requestedStyle)) {
+        patch.centerStyle = requestedStyle;
+      }
     }
-    updateState({ reticleConfig: Object.assign({}, appState.reticleConfig, patch) });
+    if (Object.keys(patch).length > 0) {
+      updateState({ reticleConfig: Object.assign({}, appState.reticleConfig, patch) });
+    }
   }
 
   // 4. Initialize Camera Stream (USB Camera or Test Signal fallback) asynchronously in background
@@ -79,9 +92,21 @@ async function bootstrapApp() {
     console.warn('Camera stream error, fallback active:', err);
   });
 
-  // 5. Request Screen WakeLock on Chromebook / Android so display doesn't dim
+  // 5. Request Screen WakeLock on Chromebook / Android & re-acquire after visibility changes
   if ('wakeLock' in navigator) {
-    navigator.wakeLock.request('screen').catch(() => {});
+    let wakeLockSentinel = null;
+    const requestWakeLock = () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.wakeLock.request('screen').then((sentinel) => {
+        wakeLockSentinel = sentinel;
+      }).catch(() => {});
+    };
+    requestWakeLock();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && (!wakeLockSentinel || wakeLockSentinel.released)) {
+        requestWakeLock();
+      }
+    });
   }
 
   // 6. Populate Setup version badges & register PWA Service Worker
@@ -94,7 +119,9 @@ async function bootstrapApp() {
     const hadController = Boolean(navigator.serviceWorker.controller);
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (hadController && !reloading) {
+      // Never wipe active live field hits or rolling RAM replay buffer mid-session
+      const hasSessionData = (appState.detectionHits && appState.detectionHits.length > 0) || (appState.bufferedSeconds || 0) >= 2;
+      if (hadController && !reloading && !hasSessionData) {
         reloading = true;
         window.location.reload();
       }

@@ -13,11 +13,13 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Locale
 
 /**
  * Lightweight, low-latency RTSP client supporting TCP interleaved RTP (RFC 2326),
- * automatic UDP RTP fallback, Basic/Digest authentication, and SDP H.264/H.265/JPEG parsing.
+ * automatic UDP RTP fallback with even/odd port pair, Basic/Digest (RFC 2617 qop=auth)
+ * authentication, and SDP H.264/H.265/JPEG parsing.
  */
 class RtspClient(
     private val rawUrl: String,
@@ -27,6 +29,7 @@ class RtspClient(
         private const val TAG = "RtspClient"
         private const val CONNECT_TIMEOUT_MS = 3500
         private const val READ_TIMEOUT_MS = 4000
+        private const val MAX_CONTENT_LENGTH = 512 * 1024
     }
 
     data class SdpVideoTrack(
@@ -40,12 +43,19 @@ class RtspClient(
         val statusCode: Int,
         val statusMessage: String,
         val headers: Map<String, String>,
+        val authHeaders: List<String>,
         val body: String
     )
 
+    @Volatile
     private var socket: Socket? = null
+    @Volatile
     private var udpSocket: DatagramSocket? = null
+    @Volatile
+    private var rtcpUdpSocket: DatagramSocket? = null
+    @Volatile
     private var input: DataInputStream? = null
+    @Volatile
     private var output: OutputStream? = null
     private val outputLock = Any()
 
@@ -59,7 +69,12 @@ class RtspClient(
     private var password: String? = null
     private var authRealm: String? = null
     private var authNonce: String? = null
+    private var authOpaque: String? = null
+    private var authQop: String? = null
+    private var authNc = 0
     private var authUseDigest = false
+    private var authBasicOffered = false
+    private val secureRandom = SecureRandom()
 
     private lateinit var cleanUrl: String
     private lateinit var host: String
@@ -114,16 +129,15 @@ class RtspClient(
 
         if (setupResp == null || setupResp.statusCode == 461) {
             usingTcp = false
-            val udp = DatagramSocket(0).apply {
-                soTimeout = READ_TIMEOUT_MS
-                receiveBufferSize = 512 * 1024
-            }
-            udpSocket = udp
-            val rtpPort = udp.localPort
+            val (rtpSock, rtcpSock) = allocateUdpPortPair()
+            udpSocket = rtpSock
+            rtcpUdpSocket = rtcpSock
+            val rtpPort = rtpSock.localPort
+            val rtcpPort = rtcpSock?.localPort ?: (rtpPort + 1)
             setupResp = sendRequestWithAuth(
                 "SETUP",
                 track.controlUrl,
-                mapOf("Transport" to "RTP/AVP;unicast;client_port=$rtpPort-${rtpPort + 1}")
+                mapOf("Transport" to "RTP/AVP;unicast;client_port=$rtpPort-$rtcpPort")
             )
         }
 
@@ -143,10 +157,9 @@ class RtspClient(
         sessionId?.let { playHeaders["Session"] = it }
         val playResp = sendRequestWithAuth("PLAY", contentBase.trimEnd('/'), playHeaders)
         if (playResp.statusCode !in 200..299) {
-            // Some cameras prefer track.controlUrl for PLAY instead of contentBase
             val retryResp = sendRequestWithAuth("PLAY", track.controlUrl, playHeaders)
             if (retryResp.statusCode !in 200..299) {
-                throw IllegalStateException("RTSP PLAY failed: ${playResp.statusCode} ${playResp.statusMessage}")
+                throw IllegalStateException("RTSP PLAY failed: ${retryResp.statusCode} ${retryResp.statusMessage}")
             }
         }
 
@@ -157,13 +170,13 @@ class RtspClient(
         var lastKeepaliveMs = System.currentTimeMillis()
 
         if (usingTcp) {
-            val inp = input!!
+            val inp = input ?: throw EOFException("RTSP input closed")
             var packetBuf = ByteArray(65536)
             while (!stopped) {
                 val now = System.currentTimeMillis()
                 if (now - lastKeepaliveMs >= keepaliveIntervalMs && sessionId != null) {
                     lastKeepaliveMs = now
-                    sendKeepaliveAsync()
+                    sendKeepaliveAsync(drainTcpResponse = false)
                 }
 
                 val firstByte = inp.read()
@@ -189,14 +202,14 @@ class RtspClient(
                 }
             }
         } else {
-            val udp = udpSocket!!
+            val udp = udpSocket ?: throw IllegalStateException("UDP socket unavailable")
             val buf = ByteArray(65536)
             val dp = DatagramPacket(buf, buf.size)
             while (!stopped) {
                 val now = System.currentTimeMillis()
                 if (now - lastKeepaliveMs >= keepaliveIntervalMs && sessionId != null) {
                     lastKeepaliveMs = now
-                    sendKeepaliveAsync()
+                    sendKeepaliveAsync(drainTcpResponse = true)
                 }
                 udp.receive(dp)
                 if (dp.length > 0) {
@@ -206,8 +219,39 @@ class RtspClient(
         }
     }
 
+    private fun allocateUdpPortPair(): Pair<DatagramSocket, DatagramSocket?> {
+        // RFC 3550: RTP uses an even port and RTCP uses the next higher odd port
+        for (attempt in 0 until 16) {
+            val basePort = 30000 + (secureRandom.nextInt(15000) * 2)
+            var rtpSock: DatagramSocket? = null
+            var rtcpSock: DatagramSocket? = null
+            try {
+                rtpSock = DatagramSocket(basePort).apply {
+                    soTimeout = READ_TIMEOUT_MS
+                    receiveBufferSize = 512 * 1024
+                }
+                rtcpSock = DatagramSocket(basePort + 1).apply {
+                    soTimeout = 1000
+                }
+                return Pair(rtpSock, rtcpSock)
+            } catch (_: Exception) {
+                try { rtpSock?.close() } catch (_: Exception) {}
+                try { rtcpSock?.close() } catch (_: Exception) {}
+            }
+        }
+        val fallback = DatagramSocket(0).apply {
+            soTimeout = READ_TIMEOUT_MS
+            receiveBufferSize = 512 * 1024
+        }
+        return Pair(fallback, null)
+    }
+
     private fun consumeInlineRtspMessage(firstByte: Int, inp: DataInputStream) {
-        if (firstByte != 'R'.code) return
+        if (firstByte == '\r'.code || firstByte == '\n'.code) return
+        if (firstByte != 'R'.code) {
+            // Skip stray non-interleaved text byte; next read will resync on '$' or 'R'
+            return
+        }
         val firstLine = readAsciiLine(firstByte, inp)
         if (!firstLine.startsWith("RTSP/", ignoreCase = true)) {
             return
@@ -222,7 +266,8 @@ class RtspClient(
             if (colon > 0) {
                 val name = line.substring(0, colon).trim().lowercase(Locale.US)
                 if (name == "content-length") {
-                    contentLength = line.substring(colon + 1).trim().toIntOrNull() ?: 0
+                    contentLength = (line.substring(colon + 1).trim().toIntOrNull() ?: 0)
+                        .coerceIn(0, MAX_CONTENT_LENGTH)
                 }
             }
         }
@@ -232,12 +277,14 @@ class RtspClient(
         }
     }
 
-    private fun sendKeepaliveAsync() {
+    private fun sendKeepaliveAsync(drainTcpResponse: Boolean) {
         val sid = sessionId ?: return
         Thread {
             if (stopped) return@Thread
             try {
-                sendRequestRaw("OPTIONS", cleanUrl, mapOf("Session" to sid), readResponse = false)
+                val headers = mutableMapOf("Session" to sid)
+                buildAuthHeader("OPTIONS", cleanUrl)?.let { headers["Authorization"] = it }
+                sendRequestRaw("OPTIONS", cleanUrl, headers, readResponse = drainTcpResponse)
             } catch (_: Exception) {
             }
         }.apply {
@@ -257,7 +304,7 @@ class RtspClient(
 
         var resp = sendRequestRaw(method, url, headers, readResponse = true)!!
         if (resp.statusCode == 401 && !username.isNullOrEmpty()) {
-            parseWwwAuthenticate(resp.headers["www-authenticate"])
+            parseWwwAuthenticate(resp.authHeaders)
             val retryHeaders = extraHeaders.toMutableMap()
             sessionId?.let { retryHeaders.putIfAbsent("Session", it) }
             buildAuthHeader(method, url)?.let { retryHeaders["Authorization"] = it }
@@ -307,6 +354,7 @@ class RtspClient(
         val statusMsg = parts.getOrNull(2) ?: ""
 
         val headers = mutableMapOf<String, String>()
+        val authHeaders = mutableListOf<String>()
         while (true) {
             val b = inp.read()
             if (b < 0) break
@@ -316,11 +364,18 @@ class RtspClient(
             if (colon > 0) {
                 val name = line.substring(0, colon).trim().lowercase(Locale.US)
                 val value = line.substring(colon + 1).trim()
+                if (name == "www-authenticate") {
+                    authHeaders.add(value)
+                }
                 headers[name] = value
             }
         }
 
-        val contentLen = headers["content-length"]?.toIntOrNull() ?: 0
+        val rawLen = headers["content-length"]?.toIntOrNull() ?: 0
+        if (rawLen > MAX_CONTENT_LENGTH) {
+            throw IllegalStateException("RTSP response body too large ($rawLen bytes)")
+        }
+        val contentLen = rawLen.coerceAtLeast(0)
         val body = if (contentLen > 0) {
             val bytes = ByteArray(contentLen)
             inp.readFully(bytes)
@@ -329,7 +384,7 @@ class RtspClient(
             ""
         }
 
-        return RtspResponse(statusCode, statusMsg, headers, body)
+        return RtspResponse(statusCode, statusMsg, headers, authHeaders, body)
     }
 
     private fun readAsciiLine(firstByte: Int, inp: DataInputStream): String {
@@ -339,7 +394,7 @@ class RtspClient(
         } else if (firstByte == '\n'.code) {
             return ""
         }
-        while (true) {
+        while (baos.size() < 8192) {
             val b = inp.read()
             if (b < 0 || b == '\n'.code) break
             if (b != '\r'.code) baos.write(b)
@@ -374,15 +429,29 @@ class RtspClient(
         cleanUrl = "rtsp://$host$portPart$rawPath"
     }
 
-    private fun parseWwwAuthenticate(header: String?) {
-        if (header.isNullOrBlank()) return
-        if (header.startsWith("Digest", ignoreCase = true)) {
+    private fun parseWwwAuthenticate(authHeaders: List<String>) {
+        if (authHeaders.isEmpty()) return
+        // Prefer Digest if both Digest and Basic challenges are offered
+        val digestHeader = authHeaders.firstOrNull { it.startsWith("Digest", ignoreCase = true) }
+        val basicHeader = authHeaders.firstOrNull { it.startsWith("Basic", ignoreCase = true) }
+
+        if (digestHeader != null) {
             authUseDigest = true
-            authRealm = extractQuotedParam(header, "realm")
-            authNonce = extractQuotedParam(header, "nonce")
-        } else if (header.startsWith("Basic", ignoreCase = true)) {
+            authBasicOffered = false
+            authRealm = extractQuotedParam(digestHeader, "realm")
+            authNonce = extractQuotedParam(digestHeader, "nonce")
+            authOpaque = extractQuotedParam(digestHeader, "opaque")
+            val qopRaw = extractQuotedParam(digestHeader, "qop")
+            authQop = if (qopRaw != null && qopRaw.split(',').any { it.trim().equals("auth", ignoreCase = true) }) {
+                "auth"
+            } else {
+                null
+            }
+            authNc = 0
+        } else if (basicHeader != null) {
             authUseDigest = false
-            authRealm = extractQuotedParam(header, "realm")
+            authBasicOffered = true
+            authRealm = extractQuotedParam(basicHeader, "realm")
         }
     }
 
@@ -392,10 +461,21 @@ class RtspClient(
         if (authUseDigest && authRealm != null && authNonce != null) {
             val ha1 = md5Hex("$user:$authRealm:$pass")
             val ha2 = md5Hex("$method:$url")
-            val response = md5Hex("$ha1:$authNonce:$ha2")
-            return "Digest username=\"$user\", realm=\"$authRealm\", nonce=\"$authNonce\", uri=\"$url\", response=\"$response\""
+            val opaquePart = if (!authOpaque.isNullOrEmpty()) ", opaque=\"$authOpaque\"" else ""
+            return if (authQop == "auth") {
+                authNc++
+                val ncHex = "%08x".format(authNc)
+                val cnonceBytes = ByteArray(8)
+                secureRandom.nextBytes(cnonceBytes)
+                val cnonce = cnonceBytes.joinToString("") { "%02x".format(it) }
+                val response = md5Hex("$ha1:$authNonce:$ncHex:$cnonce:auth:$ha2")
+                "Digest username=\"$user\", realm=\"$authRealm\", nonce=\"$authNonce\", uri=\"$url\", qop=auth, nc=$ncHex, cnonce=\"$cnonce\", response=\"$response\"$opaquePart"
+            } else {
+                val response = md5Hex("$ha1:$authNonce:$ha2")
+                "Digest username=\"$user\", realm=\"$authRealm\", nonce=\"$authNonce\", uri=\"$url\", response=\"$response\"$opaquePart"
+            }
         }
-        if (authRealm != null) {
+        if (authBasicOffered || authRealm != null) {
             val encoded = Base64.encodeToString("$user:$pass".toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             return "Basic $encoded"
         }
@@ -504,7 +584,11 @@ class RtspClient(
             val portPart = if (port != 554) ":$port" else ""
             return "rtsp://$host$portPart$control"
         }
-        return "${base.trimEnd('/')}/$control"
+        // Strip query string from base before appending relative track path
+        val qIdx = base.indexOf('?')
+        val baseNoQuery = if (qIdx >= 0) base.substring(0, qIdx) else base
+        val querySuffix = if (qIdx >= 0 && !control.contains('?')) base.substring(qIdx) else ""
+        return "${baseNoQuery.trimEnd('/')}/$control$querySuffix"
     }
 
     private fun extractConfigBytes(
@@ -566,22 +650,21 @@ class RtspClient(
     fun close() {
         stopped = true
         val sid = sessionId
-        if (sid != null && socket != null && !socket!!.isClosed) {
+        val sock = socket
+        if (sid != null && sock != null && !sock.isClosed && this::cleanUrl.isInitialized) {
             try {
-                sendRequestRaw("TEARDOWN", cleanUrl, mapOf("Session" to sid), readResponse = false)
+                val headers = mutableMapOf("Session" to sid)
+                buildAuthHeader("TEARDOWN", cleanUrl)?.let { headers["Authorization"] = it }
+                sendRequestRaw("TEARDOWN", cleanUrl, headers, readResponse = false)
             } catch (_: Exception) {
             }
         }
-        try {
-            socket?.close()
-        } catch (_: Exception) {
-        }
-        try {
-            udpSocket?.close()
-        } catch (_: Exception) {
-        }
+        try { sock?.close() } catch (_: Exception) {}
+        try { udpSocket?.close() } catch (_: Exception) {}
+        try { rtcpUdpSocket?.close() } catch (_: Exception) {}
         socket = null
         udpSocket = null
+        rtcpUdpSocket = null
         input = null
         output = null
     }

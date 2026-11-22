@@ -14,9 +14,12 @@ import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { buildGraduatedCrosshairSvg, RETICLE_VIEWBOX_W, RETICLE_VIEWBOX_H } from '../renderer/overlayManager.js';
 import { speakDetectionAnnouncement, computeClickCalloutOffset, buildDetectionCalloutPhrase } from '../renderer/compositor.js';
-import { applyThemeColor } from './sidebarControls.js';
+
+let reticleInitialized = false;
 
 export function initReticleScreen() {
+  if (reticleInitialized) return;
+  reticleInitialized = true;
   const screenReticle = document.getElementById('screenReticle');
   const screenLive = document.getElementById('screenLive');
   const screenSettings = document.getElementById('screenSettings');
@@ -112,7 +115,8 @@ export function initReticleScreen() {
       b.classList.toggle('radar-btn-active', b.dataset.ov === (appState.overlayType || 'crosshair'));
     });
     document.querySelectorAll('.theme-swatch-reticle').forEach(sw => {
-      const isSel = (sw.dataset.color || '').toLowerCase() === (appState.themeColor || '#f97316').toLowerCase();
+      const effectiveReticleColor = (cfg.reticleColor || appState.themeColor || '#f97316').toLowerCase();
+      const isSel = (sw.dataset.color || '').toLowerCase() === effectiveReticleColor;
       sw.classList.toggle('active', isSel);
     });
 
@@ -134,7 +138,7 @@ export function initReticleScreen() {
     if (sliderGap) {
       sliderGap.value = String(gapVal);
     }
-    if (inputGap) {
+    if (inputGap && document.activeElement !== inputGap) {
       inputGap.value = String(gapVal);
     }
     if (valGap) {
@@ -166,8 +170,9 @@ export function initReticleScreen() {
       valLabelSize.textContent = `${lSize} px`;
     }
     if (sliderMajor && valMajor) {
-      sliderMajor.value = String(cfg.majorInterval ?? 5);
-      valMajor.textContent = cfg.majorInterval === 0 ? 'NONE' : `EVERY ${cfg.majorInterval}`;
+      const majorVal = cfg.majorInterval ?? 5;
+      sliderMajor.value = String(majorVal);
+      valMajor.textContent = majorVal === 0 ? 'NONE' : `EVERY ${majorVal}`;
     }
     if (btnRings) {
       btnRings.textContent = cfg.concentricRings ? 'Rings: ON' : 'Rings: OFF';
@@ -183,7 +188,6 @@ export function initReticleScreen() {
     const nextCfg = Object.assign({}, appState.reticleConfig, patch);
     updateState({ reticleConfig: nextCfg });
     saveSettings(appState);
-    renderPreview();
   }
 
   // Exported Gamepad Control Definitions for Reticle Customizer
@@ -191,21 +195,22 @@ export function initReticleScreen() {
     { key: 'overlayEnabled', label: 'Overlay Guide', isToggle: true, isRoot: true, elementId: 'btnToggleOverlay' },
     { key: 'overlayOpacity', label: 'Overlay Opacity', min: 10, max: 100, step: 5, isRoot: true, elementId: 'sliderOvOpacity' },
     { key: 'overlayScale', label: 'Reticle Scale', min: 25, max: 200, step: 5, isRoot: true, elementId: 'sliderOvScale' },
-    { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 30, step: 1, elementId: 'sliderReticleClicks' },
-    { key: 'clickSpacing', label: 'Click Spacing', min: 8, max: 100, step: 1, elementId: 'sliderReticleSpacing' },
-    { key: 'centerGap', label: 'Center Gap', min: 0, max: 280, step: 2, elementId: 'sliderReticleGap' },
+    { key: 'clickCount', label: 'Clicks Per Arm', min: 2, max: 30, step: 1, defaultVal: 10, elementId: 'sliderReticleClicks' },
+    { key: 'clickSpacing', label: 'Click Spacing', min: 4, max: 100, step: 1, defaultVal: 32, isFloat: true, elementId: 'sliderReticleSpacing' },
+    { key: 'centerGap', label: 'Center Gap', min: 0, max: 280, step: 2, defaultVal: 64, elementId: 'sliderReticleGap' },
     { key: 'centerStyle', label: 'Center Point', isOption: true, options: ['empty', 'dot', 'cross', 'chevron'], elementId: 'valReticleCenter' },
     { key: 'showLabels', label: 'Number Labels', isToggle: true, elementId: 'btnToggleReticleLabels' },
     { key: 'svdRangefinder', label: 'SVD Rangefinder', isToggle: true, elementId: 'btnToggleReticleSvd' },
-    { key: 'labelSize', label: 'Mark Number Size', min: 6, max: 24, step: 1, elementId: 'sliderReticleLabelSize' },
-    { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, elementId: 'sliderReticleMajor' },
+    { key: 'labelSize', label: 'Mark Number Size', min: 6, max: 24, step: 1, defaultVal: 10, elementId: 'sliderReticleLabelSize' },
+    { key: 'majorInterval', label: 'Major Tick Interval', min: 0, max: 10, step: 1, defaultVal: 5, elementId: 'sliderReticleMajor' },
     { key: 'concentricRings', label: 'Concentric Rings', isToggle: true, elementId: 'btnToggleReticleRings' },
-    { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, isFloat: true, elementId: 'sliderReticleStroke' }
+    { key: 'strokeWidth', label: 'Stroke Weight', min: 0.5, max: 5.0, step: 0.1, defaultVal: 1.8, isFloat: true, elementId: 'sliderReticleStroke' }
   ];
 
   let focusedIndex = 0;
   let menuFocusActive = false;
   let toastTimeout = null;
+  let toastHideTimer = null;
 
   function showReticleToast(text, activePillKey = null) {
     const toastEl = document.getElementById('reticleGamepadToast');
@@ -215,9 +220,10 @@ export function initReticleScreen() {
       toastEl.classList.remove('hidden');
       toastEl.style.opacity = '1';
       clearTimeout(toastTimeout);
+      clearTimeout(toastHideTimer);
       toastTimeout = setTimeout(() => {
         toastEl.style.opacity = '0';
-        setTimeout(() => toastEl.classList.add('hidden'), 250);
+        toastHideTimer = setTimeout(() => toastEl.classList.add('hidden'), 250);
       }, 1800);
     }
     if (activePillKey) {
@@ -296,7 +302,7 @@ export function initReticleScreen() {
         updateReticleConfig({ [ctrl.key]: nextOpt });
         return `${ctrl.label.toUpperCase()}: ${nextOpt.toUpperCase()}`;
       } else {
-        const cur = Number(cfg[ctrl.key] ?? (ctrl.key === 'majorInterval' ? 5 : (ctrl.key === 'centerGap' ? 64 : 10)));
+        const cur = Number(cfg[ctrl.key] ?? ctrl.defaultVal ?? 10);
         let nextVal = cur + delta * ctrl.step;
         nextVal = Math.max(ctrl.min, Math.min(ctrl.max, nextVal));
         if (ctrl.isFloat) {
@@ -336,7 +342,9 @@ export function initReticleScreen() {
     },
     quickAdjustSpacing: (delta) => {
       const cfg = appState.reticleConfig || {};
-      const next = Math.max(4, Math.min(100, (cfg.clickSpacing || 8) + delta));
+      const cur = Number(cfg.clickSpacing);
+      const base = Number.isFinite(cur) && cur >= 4 ? cur : 32;
+      const next = Math.max(4, Math.min(100, Math.round((base + delta) * 10) / 10));
       updateReticleConfig({ clickSpacing: next });
       return `CLICK SPACING: ${next}px`;
     },
@@ -401,8 +409,28 @@ export function initReticleScreen() {
     updateState({ currentScreen: 'settings' });
   });
 
-  // Reset reticle defaults
+  // Reset reticle defaults (2-tap safety confirmation so calibrated reticles aren't wiped accidentally)
+  let resetReticleArmed = false;
+  let resetReticleTimer = null;
+  function disarmResetReticle() {
+    resetReticleArmed = false;
+    clearTimeout(resetReticleTimer);
+    if (btnResetReticle) {
+      btnResetReticle.classList.remove('radar-btn-armed');
+      btnResetReticle.textContent = 'Reset Defaults';
+    }
+  }
   btnResetReticle?.addEventListener('click', () => {
+    if (!resetReticleArmed) {
+      resetReticleArmed = true;
+      btnResetReticle.classList.add('radar-btn-armed');
+      btnResetReticle.textContent = 'Confirm Reset?';
+      clearTimeout(resetReticleTimer);
+      resetReticleTimer = setTimeout(disarmResetReticle, 2800);
+      showReticleToast('TAP RESET AGAIN TO CONFIRM');
+      return;
+    }
+    disarmResetReticle();
     updateReticleConfig({
       clickCount: 10,
       clickSpacing: 32,
@@ -419,13 +447,13 @@ export function initReticleScreen() {
       strokeWidth: 1.8,
       reticleColor: ''
     });
+    showReticleToast('RETICLE RESET TO DEFAULTS');
   });
 
-  // Card 1: Direct Event Listeners (Guarantees instant, 100% reliable clicks)
+  // Card 1: Direct Event Listeners
   btnToggleOverlay?.addEventListener('click', () => {
     updateState({ overlayEnabled: !appState.overlayEnabled });
     saveSettings(appState);
-    renderPreview();
   });
 
   sliderOvOpacity?.addEventListener('input', (e) => {
@@ -433,7 +461,6 @@ export function initReticleScreen() {
     if (valOvOpacity) valOvOpacity.textContent = `${val}%`;
     updateState({ overlayOpacity: val });
     saveSettings(appState);
-    renderPreview();
   });
 
   sliderOvScale?.addEventListener('input', (e) => {
@@ -441,19 +468,22 @@ export function initReticleScreen() {
     if (valOvScale) valOvScale.textContent = `${val}%`;
     updateState({ overlayScale: val });
     saveSettings(appState);
-    renderPreview();
   });
 
   document.querySelectorAll('#screenReticle .ov-btn').forEach((b) => {
     b.addEventListener('click', () => {
       const type = b.dataset.ov;
       if (type === 'custom') {
+        if (appState.customOverlayUrl && appState.overlayType !== 'custom') {
+          updateState({ overlayType: 'custom', overlayEnabled: true });
+          saveSettings(appState);
+          return;
+        }
         document.getElementById('fileCustomOverlay')?.click();
         return;
       }
       updateState({ overlayType: 'crosshair', overlayEnabled: true });
       saveSettings(appState);
-      renderPreview();
     });
   });
 
@@ -461,34 +491,38 @@ export function initReticleScreen() {
   fileCustomOverlay?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (appState.customOverlayUrl) {
+    if (appState.customOverlayUrl && appState.customOverlayUrl.startsWith('blob:')) {
       URL.revokeObjectURL(appState.customOverlayUrl);
     }
-    const url = URL.createObjectURL(file);
-    updateState({
-      customOverlayUrl: url,
-      overlayType: 'custom',
-      overlayEnabled: true
-    });
-    saveSettings(appState);
-    renderPreview();
+    const applyCustomUrl = (url) => {
+      updateState({
+        customOverlayUrl: url,
+        overlayType: 'custom',
+        overlayEnabled: true
+      });
+      saveSettings(appState);
+    };
+    if (file.size <= 1_000_000) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          applyCustomUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      applyCustomUrl(URL.createObjectURL(file));
+    }
     e.target.value = '';
   });
 
-  // Color Theme Swatches on Reticle Screen
+  // Reticle-Specific Color Swatches (only changes reticleColor, never hijacks global UI theme)
   document.querySelectorAll('.theme-swatch-reticle').forEach((sw) => {
-    sw.addEventListener('click', () => {
+    sw.addEventListener('click', (e) => {
+      e.stopPropagation();
       const color = sw.dataset.color;
       if (!color) return;
-      applyThemeColor(color);
-      document.querySelectorAll('.theme-swatch').forEach((s) => {
-        s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === color.toLowerCase());
-      });
-      const colorPickerCustom = document.getElementById('colorPickerCustom');
-      if (colorPickerCustom) colorPickerCustom.value = color;
-      updateState({ themeColor: color });
-      saveSettings(appState);
-      renderPreview();
+      updateReticleConfig({ reticleColor: color });
     });
   });
 
@@ -518,9 +552,16 @@ export function initReticleScreen() {
   });
 
   inputGap?.addEventListener('input', (e) => {
-    const nextGap = Math.max(0, Math.min(280, Number(e.target.value) || 0));
+    if (e.target.value === '') return;
+    const parsed = Number(e.target.value);
+    if (!Number.isFinite(parsed)) return;
+    const nextGap = Math.max(0, Math.min(280, Math.round(parsed)));
     if (sliderGap) sliderGap.value = String(nextGap);
     updateReticleConfig({ centerGap: nextGap });
+  });
+  inputGap?.addEventListener('blur', () => {
+    const cur = Math.max(0, Math.min(280, Number(appState.reticleConfig?.centerGap ?? 64)));
+    inputGap.value = String(cur);
   });
 
   btnLabels?.addEventListener('click', () => {
@@ -564,8 +605,9 @@ export function initReticleScreen() {
     const dx = e.clientX - centerX;
     const dy = e.clientY - centerY;
 
-    // Compute click distance on the preview stage (scaled to 800x500 viewBox)
-    const baseScale = Math.min(targetRect.width / RETICLE_VIEWBOX_W, targetRect.height / RETICLE_VIEWBOX_H);
+    // Compute click distance on the preview stage (scaled to 800x500 viewBox and overlayScale)
+    const scaleMult = useSvg ? 1.0 : Math.max(0.1, (Number(appState.overlayScale) || 100) / 100);
+    const baseScale = Math.min(targetRect.width / RETICLE_VIEWBOX_W, targetRect.height / RETICLE_VIEWBOX_H) * scaleMult;
     const clickSpacingPx = Math.max(4, Number(appState.reticleConfig?.clickSpacing) || 32) * baseScale;
 
     const offset = computeClickCalloutOffset(dx, dy, clickSpacingPx, appState.detectionCalloutMode);
@@ -583,9 +625,22 @@ export function initReticleScreen() {
   });
 
   let wasOnReticle = false;
-  subscribeState(() => {
-    if (appState.currentScreen === 'reticle') {
-      renderPreview();
+  subscribeState((state, patch = {}) => {
+    if (state.currentScreen === 'reticle') {
+      const relevant =
+        !wasOnReticle ||
+        patch.currentScreen !== undefined ||
+        patch.overlayEnabled !== undefined ||
+        patch.overlayType !== undefined ||
+        patch.overlayOpacity !== undefined ||
+        patch.overlayScale !== undefined ||
+        patch.reticleFfpMode !== undefined ||
+        patch.customOverlayUrl !== undefined ||
+        patch.reticleConfig !== undefined ||
+        patch.themeColor !== undefined;
+      if (relevant) {
+        renderPreview();
+      }
       if (!wasOnReticle) {
         wasOnReticle = true;
         window.reticleGamepadAPI?.initFocus();

@@ -20,12 +20,22 @@ import {
   RETICLE_VIEWBOX_H
 } from './overlayManager.js';
 import { aimLoupeAtHit } from './zoomWindow.js';
-import { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio } from '../audio/voiceAudioEngine.js';
+import {
+  speakDetectionAnnouncement,
+  speakModeAnnouncement,
+  stopVoiceAnnouncement,
+  preloadVoiceAudio
+} from '../audio/voiceAudioEngine.js';
 import { recordEvent } from '../recorder/memoryRingBuffer.js';
 import { triggerAutoSaveHeatmapClip } from '../recorder/instantReplay.js';
 import { shouldHoldCanvasPan } from '../ui/ringController.js';
+import {
+  drawDisplayTimestampOnCanvas,
+  drawHitTimestampBadge,
+  sampleSourceRegionLuma
+} from './timestampOverlay.js';
 
-export { speakDetectionAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
+export { speakDetectionAnnouncement, speakModeAnnouncement, stopVoiceAnnouncement, preloadVoiceAudio };
 
 const HEAT_W = 160;
 const HEAT_H = 90;
@@ -174,7 +184,7 @@ export function clearHeatmapIgnoreZones() {
  */
 export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
   if (!baseCanvas || !baseCanvas.width || !baseCanvas.height) return false;
-  const { includeReticle = true, reticleZoom = null, matchLiveFfp = false, prefix = 'SPOTR', drawExtra = null } = options;
+  const { includeReticle = true, reticleZoom = null, matchLiveFfp = false, prefix = 'SPOTR', drawExtra = null, cssFilter = '' } = options;
 
   const outCanvas = document.createElement('canvas');
   outCanvas.width = baseCanvas.width;
@@ -182,7 +192,14 @@ export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
   const ctx = outCanvas.getContext('2d');
   if (!ctx) return false;
 
-  ctx.drawImage(baseCanvas, 0, 0, outCanvas.width, outCanvas.height);
+  if (cssFilter && cssFilter !== 'none') {
+    ctx.save();
+    ctx.filter = cssFilter;
+    ctx.drawImage(baseCanvas, 0, 0, outCanvas.width, outCanvas.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(baseCanvas, 0, 0, outCanvas.width, outCanvas.height);
+  }
 
   if (typeof drawExtra === 'function') {
     await drawExtra(ctx, outCanvas.width, outCanvas.height);
@@ -198,6 +215,7 @@ export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
       if (appState.overlayType === 'custom' && appState.customOverlayUrl) {
         await new Promise((resolve) => {
           const img = new Image();
+          img.crossOrigin = 'anonymous';
           img.onload = () => {
             const matchScale = (matchLiveFfp && appState.reticleFfpMode)
               ? computeFfpMatchScale({
@@ -291,18 +309,33 @@ export async function exportAnnotatedCanvasPng(baseCanvas, options = {}) {
  */
 export async function captureAnnotatedSnapshot() {
   const mainCanvas = document.getElementById('mainCanvas');
+  const liveOverlayCanvas = document.getElementById('liveOverlayCanvas');
   return exportAnnotatedCanvasPng(mainCanvas, {
-    includeReticle: Boolean(appState.overlayEnabled),
-    prefix: 'SPOTR_Live'
+    includeReticle: Boolean(appState.overlayEnabled && !appState.uiDecluttered),
+    prefix: 'SPOTR_Live',
+    cssFilter: buildCanvasFilterString(appState),
+    drawExtra: async (ctx, w, h) => {
+      if (liveOverlayCanvas && liveOverlayCanvas.width && liveOverlayCanvas.height) {
+        ctx.drawImage(liveOverlayCanvas, 0, 0, w, h);
+      }
+    }
   });
 }
 
 export function initCompositor(videoEl) {
   const mainCanvas = document.getElementById('mainCanvas');
+  const liveOverlayCanvas = document.getElementById('liveOverlayCanvas');
   const pipCanvas = document.getElementById('pipCanvas');
-  const setupCanvas = document.getElementById('heatmapSetupCanvas');
+  const calibMainCanvas = document.getElementById('calibMainCanvas');
+  const setupCanvas = document.getElementById('calibSetupCanvas');
+  const calibStageArea = document.getElementById('calibStageArea');
+  const calibStageFrame = document.getElementById('calibStageFrame');
   const mainCtx = mainCanvas.getContext('2d', { alpha: false, desynchronized: true }) || mainCanvas.getContext('2d');
+  const liveOverlayCtx = liveOverlayCanvas ? liveOverlayCanvas.getContext('2d') : null;
   const pipCtx = pipCanvas.getContext('2d', { alpha: false }) || pipCanvas.getContext('2d');
+  const calibMainCtx = calibMainCanvas
+    ? (calibMainCanvas.getContext('2d', { alpha: false, desynchronized: true }) || calibMainCanvas.getContext('2d'))
+    : null;
   const setupCtx = setupCanvas ? setupCanvas.getContext('2d') : null;
 
   // Offscreen buffers for Localized Micro-Change Heatmap
@@ -321,7 +354,7 @@ export function initCompositor(videoEl) {
   const currentLuma = new Float32Array(HEAT_CELLS);
   const heatAccum = new Float32Array(HEAT_CELLS);
   const ignoreMaskGrid = new Uint8Array(HEAT_CELLS);
-  const recentActiveAt = new Float32Array(HEAT_CELLS);
+  const recentActiveAt = new Float64Array(HEAT_CELLS);
   const islandVisited = new Uint8Array(HEAT_CELLS);
   const islandQueue = new Int32Array(HEAT_CELLS);
   const islandCells = new Int32Array(HEAT_CELLS);
@@ -445,7 +478,7 @@ export function initCompositor(videoEl) {
 
     let thumbDataUrl = '';
     try {
-      const scale = vw > 960 ? 960 / vw : 1;
+      const scale = vw > 640 ? 640 / vw : 1;
       const tw = Math.max(160, Math.round(vw * scale));
       const th = Math.max(90, Math.round(vh * scale));
       if (hitThumbCanvas.width !== tw || hitThumbCanvas.height !== th) {
@@ -454,7 +487,7 @@ export function initCompositor(videoEl) {
       }
       if (hitThumbCtx) {
         hitThumbCtx.drawImage(videoSource, 0, 0, tw, th);
-        thumbDataUrl = hitThumbCanvas.toDataURL('image/jpeg', 0.72);
+        thumbDataUrl = hitThumbCanvas.toDataURL('image/jpeg', 0.65);
       }
     } catch {
       thumbDataUrl = '';
@@ -493,7 +526,7 @@ export function initCompositor(videoEl) {
     triggerAutoSaveHeatmapClip(newHit.id);
   }
 
-  function updateHeatmap(videoSource, sx, sy, cropW, cropH, vw, vh, cw, ch) {
+  function updateHeatmap(videoSource, sx, sy, cropW, cropH, vw, vh, cw, ch, { logHits = true } = {}) {
     const nowMs = performance.now();
     const dtSec = Math.max(0.005, Math.min(0.25, (nowMs - lastHeatTimeMs) / 1000));
     lastHeatTimeMs = nowMs;
@@ -745,10 +778,12 @@ export function initCompositor(videoEl) {
         clusterMinY = bestHit.minY;
         clusterMaxX = bestHit.maxX;
         clusterMaxY = bestHit.maxY;
-        const centroidNormX = (bestHit.sumX / bestHit.weightSum + 0.5) / HEAT_W;
-        const centroidNormY = (bestHit.sumY / bestHit.weightSum + 0.5) / HEAT_H;
-        const metrics = computeDirectionMetrics(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
-        handleConsolidatedDetection(centroidNormX, centroidNormY, videoSource, vw, vh, metrics);
+        if (logHits) {
+          const centroidNormX = (bestHit.sumX / bestHit.weightSum + 0.5) / HEAT_W;
+          const centroidNormY = (bestHit.sumY / bestHit.weightSum + 0.5) / HEAT_H;
+          const metrics = computeDirectionMetrics(centroidNormX, centroidNormY, sx, sy, cropW, cropH, vw, vh, cw, ch);
+          handleConsolidatedDetection(centroidNormX, centroidNormY, videoSource, vw, vh, metrics);
+        }
       } else if (sawOversizeIsland) {
         gateStatus = 'too_large';
         if (oversizeBounds) {
@@ -816,28 +851,30 @@ export function initCompositor(videoEl) {
       }
     }
 
-    // Render high-contrast thermal/radar markings into heatOverlayCanvas
-    for (let i = 0; i < HEAT_CELLS; i++) {
-      const h = heatAccum[i];
-      const p = i * 4;
-      if (h < 20) {
-        out[p + 3] = 0; // Transparent where no change occurred
-      } else if (h < 100) {
-        // High-contrast electric yellow-green for subtle micro-changes
-        out[p] = 255;
-        out[p + 1] = 230;
-        out[p + 2] = 0;
-        out[p + 3] = Math.min(220, Math.round(h * 2.1));
-      } else {
-        // High-contrast hot crimson/orange-white core for strong localized changes
-        out[p] = 255;
-        out[p + 1] = Math.max(0, 255 - Math.round((h - 100) * 1.6));
-        out[p + 2] = h > 210 ? 255 : 40;
-        out[p + 3] = 235;
+    // Render high-contrast thermal/radar markings into heatOverlayCanvas ONLY on Calibration screen
+    // (heatOverlayCanvas is never composited on Live — skips 14,400 RGBA writes + GPU upload at 20Hz!)
+    if (appState.currentScreen === 'calibration') {
+      for (let i = 0; i < HEAT_CELLS; i++) {
+        const h = heatAccum[i];
+        const p = i * 4;
+        if (h < 20) {
+          out[p + 3] = 0; // Transparent where no change occurred
+        } else if (h < 100) {
+          // High-contrast electric yellow-green for subtle micro-changes
+          out[p] = 255;
+          out[p + 1] = 230;
+          out[p + 2] = 0;
+          out[p + 3] = Math.min(220, Math.round(h * 2.1));
+        } else {
+          // High-contrast hot crimson/orange-white core for strong localized changes
+          out[p] = 255;
+          out[p + 1] = Math.max(0, 255 - Math.round((h - 100) * 1.6));
+          out[p + 2] = h > 210 ? 255 : 40;
+          out[p + 3] = 235;
+        }
       }
+      heatOverlayCtx.putImageData(heatImgData, 0, 0);
     }
-
-    heatOverlayCtx.putImageData(heatImgData, 0, 0);
   }
 
   function drawSetupBadge(ctx, x, y, text, borderCol, textCol) {
@@ -866,7 +903,7 @@ export function initCompositor(videoEl) {
 
   function renderSetupFeedback(sx, sy, cropW, cropH, vw, vh, cw, ch) {
     if (!setupCtx || !setupCanvas) return;
-    if (!appState.heatmapSetupOpen) {
+    if (appState.currentScreen !== 'calibration') {
       if (!setupCanvasCleared) {
         setupCtx.clearRect(0, 0, setupCanvas.width, setupCanvas.height);
         setupCanvasCleared = true;
@@ -909,8 +946,9 @@ export function initCompositor(videoEl) {
     setupCtx.strokeRect(shakeLeft, shakeTop, shakeBoxW, shakeBoxH);
     setupCtx.restore();
 
-    const shakeLabelX = Math.max(16, Math.min(cw - 220, shakeLeft + shakeBoxW - 210));
-    const shakeLabelY = Math.max(58, Math.min(ch - 260, shakeTop - 24));
+    const maxBadgeY = Math.max(58, ch - 32);
+    const shakeLabelX = Math.max(12, Math.min(cw - 220, shakeLeft + shakeBoxW - 210));
+    const shakeLabelY = Math.max(48, Math.min(maxBadgeY, shakeTop - 24));
     drawSetupBadge(
       setupCtx,
       shakeLabelX,
@@ -954,8 +992,8 @@ export function initCompositor(videoEl) {
     setupCtx.restore();
 
     const maxCellsAllowed = Math.max(minHitCells + 1, Math.round(maxHitAreaFrac * activeCells));
-    const maxLabelX = Math.max(16, Math.min(cw - 240, maxLeft));
-    const maxLabelY = Math.max(66, Math.min(ch - 260, maxTop - 26));
+    const maxLabelX = Math.max(12, Math.min(cw - 240, maxLeft));
+    const maxLabelY = Math.max(54, Math.min(maxBadgeY, maxTop - 26));
     drawSetupBadge(
       setupCtx,
       maxLabelX,
@@ -975,8 +1013,8 @@ export function initCompositor(videoEl) {
 
     const insetX = maxBoxW >= blockW + 20 ? 10 : Math.max(2, (maxBoxW - blockW) / 2);
     const insetY = maxBoxH >= blockH + 20 ? 10 : Math.max(2, (maxBoxH - blockH) / 2);
-    const minAnchorX = Math.max(16, Math.min(cw - blockW - 16, maxLeft + insetX));
-    const minAnchorY = Math.max(92, Math.min(ch - blockH - 220, maxTop + insetY));
+    const minAnchorX = Math.max(12, Math.min(cw - blockW - 12, maxLeft + insetX));
+    const minAnchorY = Math.max(76, Math.min(Math.max(76, ch - blockH - 28), maxTop + insetY));
 
     setupCtx.save();
     for (let idx = 0; idx < minHitCells; idx++) {
@@ -998,7 +1036,7 @@ export function initCompositor(videoEl) {
       : Math.max(16, Math.min(cw - 160, maxLeft));
     const minBadgeY = badgeFitsInside
       ? minAnchorY + Math.max(0, (blockH - 20) / 2)
-      : Math.max(92, Math.min(ch - 225, maxTop + maxBoxH + 8));
+      : Math.max(76, Math.min(maxBadgeY, maxTop + maxBoxH + 8));
 
     drawSetupBadge(
       setupCtx,
@@ -1078,31 +1116,132 @@ export function initCompositor(videoEl) {
     }
   }
 
-  function syncCanvasSize() {
-    const rect = mainCanvas.parentElement.getBoundingClientRect();
-    const w = Math.max(320, Math.round(rect.width));
-    const h = Math.max(240, Math.round(rect.height));
-    if (mainCanvas.width !== w || mainCanvas.height !== h) {
-      mainCanvas.width = w;
-      mainCanvas.height = h;
-    }
-    if (setupCanvas && (setupCanvas.width !== w || setupCanvas.height !== h)) {
-      setupCanvas.width = w;
-      setupCanvas.height = h;
-    }
+  function drawLiveHitPins(ctx, sx, sy, cropW, cropH, vw, vh, cw, ch, isPip = false) {
+    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+    if (!hits.length) return;
+    const nowPerf = performance.now();
+    ctx.save();
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      const px = ((hit.normX * vw - sx) / cropW) * cw;
+      const py = ((hit.normY * vh - sy) / cropH) * ch;
+      if (px < -24 || px > cw + 24 || py < -24 || py > ch + 24) continue;
 
-    const pipRect = pipCanvas.parentElement.getBoundingClientRect();
-    if (pipRect.width > 0 && pipRect.height > 0) {
-      const pw = Math.round(pipRect.width);
-      const ph = Math.round(pipRect.height);
+      const isLatest = i === hits.length - 1;
+      const ageMs = hit.perfMs ? nowPerf - hit.perfMs : 9999;
+      if (isLatest && ageMs >= 0 && ageMs < 1300) {
+        const t = ageMs / 1300;
+        const pulseR = (isPip ? 11 : 13) + t * (isPip ? 12 : 16);
+        ctx.beginPath();
+        ctx.arc(px, py, pulseR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(249, 115, 22, ${(1 - t) * 0.85})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      const r = isPip ? (isLatest ? 11 : 9) : (isLatest ? 13 : 10.5);
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fillStyle = isLatest ? '#f97316' : 'rgba(245, 158, 11, 0.86)';
+      ctx.fill();
+      ctx.lineWidth = isLatest ? 2.2 : 1.6;
+      ctx.strokeStyle = isLatest ? '#ffffff' : '#0b0f17';
+      ctx.stroke();
+
+      ctx.fillStyle = '#090d13';
+      ctx.font = `800 ${isPip ? (isLatest ? 11 : 9.5) : (isLatest ? 12 : 10.5)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i + 1), px, py + 0.5);
+
+      if (!isPip && appState.showHitTimestamps && hit.timestampMs) {
+        drawHitTimestampBadge(ctx, px, py, r, hit.timestampMs, cw, ch);
+      }
+    }
+    ctx.restore();
+  }
+
+  function syncCalibStageSize(vw = appState.streamWidth || 1920, vh = appState.streamHeight || 1080) {
+    if (!calibStageArea || !calibStageFrame || !calibMainCanvas) return;
+    const availW = Math.max(240, calibStageArea.clientWidth - 24);
+    const availH = Math.max(180, calibStageArea.clientHeight - 24);
+    const aspect = vw > 0 && vh > 0 ? vw / vh : 16 / 9;
+    let boxW = availW;
+    let boxH = boxW / aspect;
+    if (boxH > availH) {
+      boxH = availH;
+      boxW = boxH * aspect;
+    }
+    const rw = Math.max(240, Math.round(boxW));
+    const rh = Math.max(160, Math.round(boxH));
+    if (calibStageFrame.style.width !== `${rw}px` || calibStageFrame.style.height !== `${rh}px`) {
+      calibStageFrame.style.width = `${rw}px`;
+      calibStageFrame.style.height = `${rh}px`;
+    }
+    if (calibMainCanvas.width !== rw || calibMainCanvas.height !== rh) {
+      calibMainCanvas.width = rw;
+      calibMainCanvas.height = rh;
+    }
+    if (setupCanvas && (setupCanvas.width !== rw || setupCanvas.height !== rh)) {
+      setupCanvas.width = rw;
+      setupCanvas.height = rh;
+    }
+  }
+
+  let lastLiveOverlayKey = '';
+  let lastTsLumaSampleMs = 0;
+  let cachedTsBgLuma = 30;
+
+  function syncPipCanvasSize() {
+    const pipParent = pipCanvas.parentElement;
+    if (pipParent && pipParent.clientWidth > 0 && pipParent.clientHeight > 0) {
+      const pw = Math.max(160, Math.round(pipParent.clientWidth));
+      const ph = Math.max(100, Math.round(pipParent.clientHeight));
       if (pipCanvas.width !== pw || pipCanvas.height !== ph) {
         pipCanvas.width = pw;
         pipCanvas.height = ph;
       }
     }
   }
+
+  function syncCanvasSize() {
+    const rect = mainCanvas.parentElement.getBoundingClientRect();
+    // Never clobber mainCanvas to 320x240 when #screenLive is hidden during resize/orientation change
+    if (rect.width > 0 && rect.height > 0) {
+      const w = Math.max(320, Math.round(rect.width));
+      const h = Math.max(240, Math.round(rect.height));
+      if (mainCanvas.width !== w || mainCanvas.height !== h) {
+        mainCanvas.width = w;
+        mainCanvas.height = h;
+      }
+      if (liveOverlayCanvas && (liveOverlayCanvas.width !== w || liveOverlayCanvas.height !== h)) {
+        liveOverlayCanvas.width = w;
+        liveOverlayCanvas.height = h;
+        lastLiveOverlayKey = '';
+      }
+    }
+    if (appState.currentScreen === 'calibration') {
+      syncCalibStageSize();
+    }
+    syncPipCanvasSize();
+  }
   window.addEventListener('resize', syncCanvasSize);
+  if (typeof ResizeObserver === 'function') {
+    const pipParentEl = pipCanvas.parentElement;
+    if (pipParentEl) {
+      new ResizeObserver(() => syncPipCanvasSize()).observe(pipParentEl);
+    }
+    if (calibStageArea) {
+      new ResizeObserver(() => {
+        if (appState.currentScreen === 'calibration') {
+          syncCalibStageSize();
+        }
+      }).observe(calibStageArea);
+    }
+  }
   syncCanvasSize();
+
+  let lastCalibAspectKey = '';
 
   let lastFilterCss = '';
   subscribeState((state, patch = {}) => {
@@ -1111,11 +1250,15 @@ export function initCompositor(videoEl) {
       lastFilterCss = filterCss;
       mainCanvas.style.filter = filterCss;
       pipCanvas.style.filter = filterCss;
+      if (calibMainCanvas) calibMainCanvas.style.filter = filterCss;
     }
-    if (patch.currentScreen === 'live' && state.currentScreen === 'live') {
+    if (
+      (patch.currentScreen === 'live' && state.currentScreen === 'live') ||
+      (patch.currentScreen === 'calibration' && state.currentScreen === 'calibration')
+    ) {
       requestAnimationFrame(syncCanvasSize);
     }
-    if (!state.heatmapEnabled && !state.heatmapSpeechEnabled && !state.heatmapSetupOpen) {
+    if (!state.heatmapEnabled && !state.heatmapSpeechEnabled && state.currentScreen !== 'calibration') {
       refInitialized = false;
       recentActiveAt.fill(0);
       oversizeSinceMs = 0;
@@ -1157,12 +1300,16 @@ export function initCompositor(videoEl) {
       panStartX = e.clientX;
       panStartY = e.clientY;
     }
-    const dx = (e.clientX - panStartX) / mainCanvas.width;
-    const dy = (e.clientY - panStartY) / mainCanvas.height;
-    const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
+    const dx = (e.clientX - panStartX) / Math.max(1, mainCanvas.clientWidth || mainCanvas.width);
+    const dy = (e.clientY - panStartY) / Math.max(1, mainCanvas.clientHeight || mainCanvas.height);
+    const { vw, vh, cropW, cropH } = latestProjection;
+    const fracX = vw > 0 ? cropW / vw : 1 / Math.max(1, appState.mainZoom);
+    const fracY = vh > 0 ? cropH / vh : 1 / Math.max(1, appState.mainZoom);
+    const maxPanX = Math.max(0, (1 - fracX) / 2);
+    const maxPanY = Math.max(0, (1 - fracY) / 2);
     updateState({
-      mainPanX: Math.max(-maxPan, Math.min(maxPan, startOffsetX - dx / appState.mainZoom)),
-      mainPanY: Math.max(-maxPan, Math.min(maxPan, startOffsetY - dy / appState.mainZoom))
+      mainPanX: Math.max(-maxPanX, Math.min(maxPanX, startOffsetX - dx * fracX)),
+      mainPanY: Math.max(-maxPanY, Math.min(maxPanY, startOffsetY - dy * fracY))
     });
   });
 
@@ -1177,132 +1324,204 @@ export function initCompositor(videoEl) {
   mainCanvas.addEventListener('lostpointercapture', stopPan);
 
   let lastRenderKey = '';
+  let renderRafId = null;
+
+  function scheduleRenderLoop() {
+    if (renderRafId !== null) return;
+    if (document.hidden) return;
+    if (appState.currentScreen !== 'live' && appState.currentScreen !== 'calibration') return;
+    renderRafId = requestAnimationFrame(renderLoop);
+  }
+
+  subscribeState((state, patch = {}) => {
+    if ('currentScreen' in patch) {
+      if (state.currentScreen === 'live' || state.currentScreen === 'calibration') {
+        lastRenderKey = '';
+        scheduleRenderLoop();
+      } else if (renderRafId !== null) {
+        cancelAnimationFrame(renderRafId);
+        renderRafId = null;
+        lastRenderKey = '';
+      }
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (renderRafId !== null) {
+        cancelAnimationFrame(renderRafId);
+        renderRafId = null;
+      }
+    } else {
+      scheduleRenderLoop();
+    }
+  });
 
   function renderLoop() {
-    if (appState.currentScreen !== 'live') {
+    renderRafId = null;
+    if (document.hidden) return;
+    const screen = appState.currentScreen;
+    if (screen !== 'live' && screen !== 'calibration') {
       lastRenderKey = '';
-    } else {
-      const isRtsp = Boolean(appState.isRtspStream);
-      const rtspCanv = isRtsp ? getRtspCanvas() : null;
-      const source = isRtsp ? rtspCanv : videoEl;
-      const sourceReady = isRtsp
-        ? Boolean(rtspCanv && rtspCanv.width > 0 && rtspCanv.height > 0)
-        : Boolean(videoEl && videoEl.readyState >= 2);
+      return;
+    }
 
-      if (sourceReady) {
-        const vw = (isRtsp ? source.width : videoEl.videoWidth) || appState.streamWidth || 1920;
-        const vh = (isRtsp ? source.height : videoEl.videoHeight) || appState.streamHeight || 1080;
-        const cw = mainCanvas.width;
-        const ch = mainCanvas.height;
-        const pw = pipCanvas.width || 340;
-        const ph = pipCanvas.height || 210;
+    const isRtsp = Boolean(appState.isRtspStream);
+    const rtspCanv = isRtsp ? getRtspCanvas() : null;
+    const source = isRtsp ? rtspCanv : videoEl;
+    const sourceReady = isRtsp
+      ? Boolean(rtspCanv && rtspCanv.width > 0 && rtspCanv.height > 0)
+      : Boolean(videoEl && videoEl.readyState >= 2);
 
-        const detectorActive = Boolean(appState.heatmapEnabled || appState.heatmapSpeechEnabled || appState.heatmapSetupOpen);
-        const showHeatmapOverlay = Boolean(appState.heatmapEnabled || appState.heatmapSetupOpen);
-        if (isRtsp) {
-          const heatTick = detectorActive ? Math.floor(performance.now() / 48) : 0;
-          const renderKey = `${getRtspFrameSeq()}|${vw}x${vh}|${cw}x${ch}|${pw}x${ph}|${appState.mainZoom}|${appState.mainPanX}|${appState.mainPanY}|${appState.pipEnabled}|${appState.pipZoom}|${appState.roiX}|${appState.roiY}|${appState.heatmapEnabled}|${appState.heatmapSpeechEnabled}|${appState.heatmapSetupOpen}|${appState.heatmapSensitivity}|${appState.heatmapMinCells}|${appState.heatmapMaxAreaPct}|${appState.heatmapShakeGatePct}|${(appState.heatmapIgnoreMasks || []).length}|${heatTick}`;
+    if (sourceReady) {
+      const vw = (isRtsp ? source.width : videoEl.videoWidth) || appState.streamWidth || 1920;
+      const vh = (isRtsp ? source.height : videoEl.videoHeight) || appState.streamHeight || 1080;
+
+      if (screen === 'calibration') {
+        const aspectKey = `${vw}x${vh}`;
+        if (aspectKey !== lastCalibAspectKey || !calibMainCanvas?.width) {
+          lastCalibAspectKey = aspectKey;
+          syncCalibStageSize(vw, vh);
+        }
+        const calW = calibMainCanvas ? calibMainCanvas.width : 0;
+        const calH = calibMainCanvas ? calibMainCanvas.height : 0;
+        if (calibMainCtx && calW > 0 && calH > 0) {
+          const heatTick = Math.floor(performance.now() / 48);
+          const frameToken = isRtsp ? getRtspFrameSeq() : (videoEl ? videoEl.currentTime.toFixed(4) : 0);
+          const renderKey = `cal|${frameToken}|${vw}x${vh}|${calW}x${calH}|${appState.heatmapSensitivity}|${appState.heatmapMinCells}|${appState.heatmapMaxAreaPct}|${appState.heatmapShakeGatePct}|${(appState.heatmapIgnoreMasks || []).length}|${heatTick}`;
           if (renderKey === lastRenderKey) {
-            requestAnimationFrame(renderLoop);
+            scheduleRenderLoop();
             return;
           }
           lastRenderKey = renderKey;
-        } else {
-          lastRenderKey = '';
-        }
 
-        const videoAspect = vw / vh;
-        const canvasAspect = cw / ch;
-        let baseW = vw;
-        let baseH = vh;
-        if (canvasAspect > videoAspect) {
-          baseH = vw / canvasAspect;
-        } else {
-          baseW = vh * canvasAspect;
-        }
-
-        const zoom = appState.mainZoom;
-        const cropW = baseW / zoom;
-        const cropH = baseH / zoom;
-        const centerX = vw * (0.5 + appState.mainPanX);
-        const centerY = vh * (0.5 + appState.mainPanY);
-        const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
-        const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
-
-        latestProjection = { vw, vh, cw, ch, sx, sy, cropW, cropH };
-
-        if (detectorActive) {
           const nowMs = performance.now();
-          if (nowMs - lastHeatComputeMs >= 48) { // Decouple heavy pixel analysis to ~20Hz to eliminate GPU readback stalls
-            updateHeatmap(source, sx, sy, cropW, cropH, vw, vh, cw, ch);
+          if (nowMs - lastHeatComputeMs >= 48) {
+            updateHeatmap(source, 0, 0, vw, vh, vw, vh, calW, calH, { logHits: false });
             lastHeatComputeMs = nowMs;
           }
+
+          calibMainCtx.drawImage(source, 0, 0, vw, vh, 0, 0, calW, calH);
+          calibMainCtx.drawImage(heatOverlayCanvas, 0, 0, HEAT_W, HEAT_H, 0, 0, calW, calH);
+          renderSetupFeedback(0, 0, vw, vh, vw, vh, calW, calH);
         }
-
-        // 1. Render Main Canvas
-        mainCtx.drawImage(source, sx, sy, cropW, cropH, 0, 0, cw, ch);
-        if (showHeatmapOverlay) {
-          mainCtx.drawImage(
-            heatOverlayCanvas,
-            (sx / vw) * HEAT_W,
-            (sy / vh) * HEAT_H,
-            (cropW / vw) * HEAT_W,
-            (cropH / vh) * HEAT_H,
-            0,
-            0,
-            cw,
-            ch
-          );
-        }
-
-        // 1b. Render Transient Heatmap Setup Feedback (Min/Max Boxes & Active Cluster Status)
-        renderSetupFeedback(sx, sy, cropW, cropH, vw, vh, cw, ch);
-
-        // 2. Render Magnified PiP Zoom Window
-        if (appState.pipEnabled) {
-          const pipParent = pipCanvas.parentElement;
-          if (pipParent && pipParent.clientWidth > 0 && pipParent.clientHeight > 0) {
-            const targetPw = Math.max(160, Math.round(pipParent.clientWidth));
-            const targetPh = Math.max(100, Math.round(pipParent.clientHeight));
-            if (pipCanvas.width !== targetPw || pipCanvas.height !== targetPh) {
-              pipCanvas.width = targetPw;
-              pipCanvas.height = targetPh;
-            }
-          }
-          const drawPw = pipCanvas.width || 340;
-          const drawPh = pipCanvas.height || 210;
-          const targetSourceX = sx + appState.roiX * cropW;
-          const targetSourceY = sy + appState.roiY * cropH;
-
-          const pipCropW = (cropW * (drawPw / cw)) / appState.pipZoom;
-          const pipCropH = (cropH * (drawPh / ch)) / appState.pipZoom;
-
-          const psx = Math.max(0, Math.min(vw - pipCropW, targetSourceX - pipCropW / 2));
-          const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
-
-          pipCtx.drawImage(source, psx, psy, pipCropW, pipCropH, 0, 0, drawPw, drawPh);
-          if (showHeatmapOverlay) {
-            pipCtx.drawImage(
-              heatOverlayCanvas,
-              (psx / vw) * HEAT_W,
-              (psy / vh) * HEAT_H,
-              (pipCropW / vw) * HEAT_W,
-              (pipCropH / vh) * HEAT_H,
-              0,
-              0,
-              drawPw,
-              drawPh
-            );
-          }
-        }
-
-        recordRenderedFrame(videoEl);
+        scheduleRenderLoop();
+        return;
       }
+
+      const cw = mainCanvas.width;
+      const ch = mainCanvas.height;
+      const pw = pipCanvas.width || 340;
+      const ph = pipCanvas.height || 210;
+
+      const detectorActive = Boolean(appState.heatmapEnabled || appState.heatmapSpeechEnabled);
+      const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+      const latestPerf = hits.length ? (hits[hits.length - 1].perfMs || 0) : 0;
+      const pulseTick = appState.heatmapEnabled && latestPerf && (performance.now() - latestPerf < 1400)
+        ? Math.floor(performance.now() / 33)
+        : 0;
+
+      // Deduplicate redundant blits for both RTSP and 15-30fps USB <video> feeds on 60-120Hz panels
+      const heatTick = detectorActive ? Math.floor(performance.now() / 48) : 0;
+      const clockTick = appState.showDisplayTimestamp ? Math.floor(Date.now() / 1000) : 0;
+      const frameToken = isRtsp ? getRtspFrameSeq() : (videoEl ? videoEl.currentTime.toFixed(4) : 0);
+      const renderKey = `${frameToken}|${vw}x${vh}|${cw}x${ch}|${pw}x${ph}|${appState.mainZoom}|${appState.mainPanX}|${appState.mainPanY}|${appState.pipEnabled}|${appState.pipZoom}|${appState.roiX}|${appState.roiY}|${appState.heatmapEnabled}|${appState.heatmapSpeechEnabled}|${appState.heatmapSensitivity}|${appState.heatmapMinCells}|${appState.heatmapMaxAreaPct}|${appState.heatmapShakeGatePct}|${(appState.heatmapIgnoreMasks || []).length}|${hits.length}|${Boolean(appState.showHitTimestamps)}|${Boolean(appState.showDisplayTimestamp)}|${appState.timestampPosition}|${appState.timestampOpacity}|${Boolean(appState.timestampAdaptive)}|${Boolean(appState.uiDecluttered)}|${clockTick}|${pulseTick}|${heatTick}`;
+      if (renderKey === lastRenderKey) {
+        scheduleRenderLoop();
+        return;
+      }
+      lastRenderKey = renderKey;
+
+      const videoAspect = vw / vh;
+      const canvasAspect = cw / ch;
+      let baseW = vw;
+      let baseH = vh;
+      if (canvasAspect > videoAspect) {
+        baseH = vw / canvasAspect;
+      } else {
+        baseW = vh * canvasAspect;
+      }
+
+      const zoom = appState.mainZoom;
+      const cropW = baseW / zoom;
+      const cropH = baseH / zoom;
+      const centerX = vw * (0.5 + appState.mainPanX);
+      const centerY = vh * (0.5 + appState.mainPanY);
+      const sx = Math.max(0, Math.min(vw - cropW, centerX - cropW / 2));
+      const sy = Math.max(0, Math.min(vh - cropH, centerY - cropH / 2));
+
+      latestProjection = { vw, vh, cw, ch, sx, sy, cropW, cropH };
+
+      if (detectorActive) {
+        const nowMs = performance.now();
+        if (nowMs - lastHeatComputeMs >= 48) { // Decouple heavy pixel analysis to ~20Hz to eliminate GPU readback stalls
+          updateHeatmap(source, sx, sy, cropW, cropH, vw, vh, cw, ch, { logHits: true });
+          lastHeatComputeMs = nowMs;
+        }
+      }
+
+      // 1. Render Clean Main Canvas (Video Only) + Synchronized Live Overlay Canvas (Zero Flicker)
+      mainCtx.drawImage(source, sx, sy, cropW, cropH, 0, 0, cw, ch);
+      if (liveOverlayCtx && liveOverlayCanvas) {
+        const tsShow = appState.showDisplayTimestamp !== false;
+        const tsPos = appState.timestampPosition || 'bottom-right';
+        const tsOpacity = Math.max(0.15, Math.min(1, Number(appState.timestampOpacity ?? 60) / 100));
+        const tsAdaptive = appState.timestampAdaptive !== false;
+        const nowPerfTs = performance.now();
+        if (tsShow && tsAdaptive && nowPerfTs - lastTsLumaSampleMs >= 450) {
+          cachedTsBgLuma = sampleSourceRegionLuma(source, tsPos, sx, sy, cropW, cropH);
+          lastTsLumaSampleMs = nowPerfTs;
+        }
+        const clockSec = tsShow ? Math.floor(Date.now() / 1000) : 0;
+        const lastHitId = hits.length ? hits[hits.length - 1].id : 0;
+        const lastHitTs = hits.length ? hits[hits.length - 1].timestampMs : 0;
+        const tsBright = tsAdaptive && cachedTsBgLuma > 145 ? 1 : 0;
+        const overlayKey = `${cw}x${ch}|${sx.toFixed(1)}|${sy.toFixed(1)}|${cropW.toFixed(1)}|${cropH.toFixed(1)}|${Boolean(appState.heatmapEnabled)}|${hits.length}|${lastHitId}|${lastHitTs}|${Boolean(appState.showHitTimestamps)}|${tsShow}|${tsPos}|${tsOpacity}|${tsBright}|${Boolean(appState.uiDecluttered)}|${pulseTick}|${clockSec}`;
+        if (overlayKey !== lastLiveOverlayKey) {
+          lastLiveOverlayKey = overlayKey;
+          liveOverlayCtx.clearRect(0, 0, cw, ch);
+          if (appState.heatmapEnabled) {
+            drawLiveHitPins(liveOverlayCtx, sx, sy, cropW, cropH, vw, vh, cw, ch, false);
+          }
+          if (tsShow) {
+            drawDisplayTimestampOnCanvas(liveOverlayCtx, cw, ch, Date.now(), {
+              position: tsPos,
+              opacity: tsOpacity,
+              adaptive: tsAdaptive,
+              bgLuma: cachedTsBgLuma,
+              isLive: true,
+              decluttered: Boolean(appState.uiDecluttered)
+            });
+          }
+        }
+      }
+
+      // 2. Render Magnified PiP Zoom Window
+      if (appState.pipEnabled) {
+        const drawPw = pipCanvas.width || 340;
+        const drawPh = pipCanvas.height || 210;
+        const targetSourceX = sx + appState.roiX * cropW;
+        const targetSourceY = sy + appState.roiY * cropH;
+
+        const safePipZoom = Math.max(1.5, Number(appState.pipZoom) || 3.0);
+        const pipCropW = Math.min(vw, (cropW * (drawPw / cw)) / safePipZoom);
+        const pipCropH = Math.min(vh, (cropH * (drawPh / ch)) / safePipZoom);
+
+        const psx = Math.max(0, Math.min(vw - pipCropW, targetSourceX - pipCropW / 2));
+        const psy = Math.max(0, Math.min(vh - pipCropH, targetSourceY - pipCropH / 2));
+
+        pipCtx.drawImage(source, psx, psy, pipCropW, pipCropH, 0, 0, drawPw, drawPh);
+        if (appState.heatmapEnabled) {
+          drawLiveHitPins(pipCtx, psx, psy, pipCropW, pipCropH, vw, vh, drawPw, drawPh, true);
+        }
+      }
+
+      recordRenderedFrame(videoEl);
     }
 
-    requestAnimationFrame(renderLoop);
+    scheduleRenderLoop();
   }
 
-  requestAnimationFrame(renderLoop);
+  scheduleRenderLoop();
   return mainCanvas;
 }

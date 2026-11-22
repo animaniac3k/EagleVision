@@ -46,7 +46,8 @@ export function renderCctvTrack({
 
   const soundPeaks = Array.isArray(timeline?.soundPeaks) ? timeline.soundPeaks : [];
   const rawEvents = Array.isArray(timeline?.events) ? timeline.events : [];
-  const dur = Math.max(0.1, Number(durationSec) || 20);
+  const rawDur = Number(durationSec);
+  const dur = Number.isFinite(rawDur) && rawDur > 0 ? Math.max(0.1, rawDur) : 20;
 
   // Group events within the same 1.0s window into a single distinct event
   const clusteredEvents = groupEventsWithinSecond(rawEvents, 1.0);

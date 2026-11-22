@@ -13,6 +13,7 @@ import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.Locale
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -30,6 +31,7 @@ class MediaCodecJpegDecoder(
         private const val TAG = "MediaCodecJpegDecoder"
         private const val INPUT_TIMEOUT_US = 8_000L
         private const val OUTPUT_TIMEOUT_US = 1_000L
+        private const val MAX_CONSECUTIVE_NULL_IMAGES = 10
     }
 
     private data class PendingNv21(val data: ByteArray, val width: Int, val height: Int)
@@ -53,8 +55,10 @@ class MediaCodecJpegDecoder(
     private var hasKeyFrame = false
     private var droppedBeforeKeyframe = 0
     private var decodedAnyFrame = false
+    private var consecutiveNullImages = 0
 
     private val pendingConfigNals = ByteArrayOutputStream(512)
+    private var seenVps = false
     private var seenSps = false
     private var seenPps = false
 
@@ -72,17 +76,19 @@ class MediaCodecJpegDecoder(
     private var released = false
     @Volatile
     var encodePaused = false
+    private var wasPaused = false
 
     fun start(width: Int = 1920, height: Int = 1080) {
         initialWidth = width
         initialHeight = height
-        startJpegEncoderThread()
         try {
             startCodec(forceSoftware = false)
         } catch (e: Exception) {
             Log.w(TAG, "Hardware decoder start failed (${e.message}); trying software fallback")
             startCodec(forceSoftware = true)
         }
+        // Only start encoder thread after codec initialization succeeds
+        startJpegEncoderThread()
     }
 
     private fun startJpegEncoderThread() {
@@ -123,6 +129,7 @@ class MediaCodecJpegDecoder(
 
     private fun startCodec(forceSoftware: Boolean) {
         releaseCodecOnly()
+        consecutiveNullImages = 0
 
         val swName = if (forceSoftware) findSoftwareDecoderName(mimeType) else null
         if (forceSoftware && swName == null) {
@@ -147,30 +154,36 @@ class MediaCodecJpegDecoder(
             }
         }
 
-        var mc = if (swName != null) {
-            MediaCodec.createByCodecName(swName)
-        } else {
-            MediaCodec.createDecoderByType(mimeType)
-        }
-
+        var mc: MediaCodec? = null
         try {
-            mc.configure(buildFormat(true), null, null, 0)
-        } catch (e: Exception) {
-            Log.w(TAG, "Retrying ${mc.name} configure without KEY_LOW_LATENCY: ${e.message}")
-            mc.release()
             mc = if (swName != null) {
                 MediaCodec.createByCodecName(swName)
             } else {
                 MediaCodec.createDecoderByType(mimeType)
             }
-            mc.configure(buildFormat(false), null, null, 0)
-        }
 
-        mc.start()
-        codec = mc
-        activeDecoderName = mc.name
-        configSentToCodec = savedConfigBytes != null
-        Log.i(TAG, "Started decoder ${mc.name} ($mimeType, sw=$forceSoftware, hasSdpConfig=$hasConfig)")
+            try {
+                mc.configure(buildFormat(true), null, null, 0)
+            } catch (e: Exception) {
+                Log.w(TAG, "Retrying ${mc.name} configure without KEY_LOW_LATENCY: ${e.message}")
+                try { mc.release() } catch (_: Exception) {}
+                mc = if (swName != null) {
+                    MediaCodec.createByCodecName(swName)
+                } else {
+                    MediaCodec.createDecoderByType(mimeType)
+                }
+                mc.configure(buildFormat(false), null, null, 0)
+            }
+
+            mc.start()
+            codec = mc
+            activeDecoderName = mc.name
+            configSentToCodec = savedConfigBytes != null
+            Log.i(TAG, "Started decoder ${mc.name} ($mimeType, sw=$forceSoftware, hasSdpConfig=$hasConfig)")
+        } catch (e: Exception) {
+            try { mc?.release() } catch (_: Exception) {}
+            throw e
+        }
     }
 
     fun feedUnit(unit: RtpVideoDepacketizer.EmittedUnit) {
@@ -179,6 +192,23 @@ class MediaCodecJpegDecoder(
         if (unit.isConfig) {
             handleConfigNal(unit.data)
             return
+        }
+
+        if (encodePaused) {
+            // Skip decoding P-frames while paused off-Live; require fresh IDR on resume
+            wasPaused = true
+            return
+        }
+
+        if (wasPaused) {
+            wasPaused = false
+            hasKeyFrame = false
+            droppedBeforeKeyframe = 0
+            try {
+                codec?.flush()
+                configSentToCodec = false
+            } catch (_: Exception) {
+            }
         }
 
         if (pendingConfigNals.size() > 0) {
@@ -199,6 +229,26 @@ class MediaCodecJpegDecoder(
 
         try {
             feedSliceInternal(unit)
+        } catch (e: MediaCodec.CodecException) {
+            if (!usingSoftwareCodec && !decodedAnyFrame) {
+                Log.w(TAG, "Hardware decoder CodecException (${e.diagnosticInfo}); falling back to software decoder")
+                switchToSoftwareDecoderAndRetry(unit)
+            } else if (e.isTransient || e.isRecoverable) {
+                Log.w(TAG, "Recoverable MediaCodec error; flushing and waiting for next keyframe")
+                try {
+                    codec?.flush()
+                    configSentToCodec = false
+                    hasKeyFrame = false
+                    droppedBeforeKeyframe = 0
+                } catch (_: Exception) {
+                    startCodec(forceSoftware = usingSoftwareCodec)
+                }
+            } else if (!usingSoftwareCodec) {
+                Log.w(TAG, "Non-recoverable HW CodecException mid-stream; falling back to software decoder")
+                switchToSoftwareDecoderAndRetry(unit)
+            } else {
+                throw e
+            }
         } catch (e: IllegalStateException) {
             if (!usingSoftwareCodec && !decodedAnyFrame) {
                 Log.w(TAG, "Hardware decoder failed (${e.javaClass.simpleName}: ${e.message}); falling back to software decoder", e)
@@ -224,14 +274,31 @@ class MediaCodecJpegDecoder(
                 }
             } else {
                 val nalType = ((annexBNal[4].toInt() and 0xFF) ushr 1) and 0x3F
-                if (nalType == 32 || nalType == 33) seenSps = true
-                if (nalType == 34) seenPps = true
+                if (nalType == 32) {
+                    if (seenSps && seenPps) {
+                        pendingConfigNals.reset()
+                        seenSps = false
+                        seenPps = false
+                    }
+                    seenVps = true
+                } else if (nalType == 33) {
+                    if (seenSps && seenPps && !seenVps) {
+                        pendingConfigNals.reset()
+                        seenPps = false
+                    }
+                    seenSps = true
+                } else if (nalType == 34) {
+                    seenPps = true
+                }
             }
         }
 
         pendingConfigNals.write(annexBNal)
         if (seenSps && seenPps) {
             flushAccumulatedConfig()
+            seenVps = false
+            seenSps = false
+            seenPps = false
         }
     }
 
@@ -245,9 +312,10 @@ class MediaCodecJpegDecoder(
 
         val mc = codec ?: return
         try {
-            queueInput(mc, combined, MediaCodec.BUFFER_FLAG_CODEC_CONFIG)
-            configSentToCodec = true
-            drainOutputs(mc)
+            if (queueInput(mc, combined, MediaCodec.BUFFER_FLAG_CODEC_CONFIG)) {
+                configSentToCodec = true
+                drainOutputs(mc)
+            }
         } catch (e: IllegalStateException) {
             if (!usingSoftwareCodec && !decodedAnyFrame) {
                 Log.w(TAG, "Hardware decoder failed on config (${e.message}); switching to software decoder")
@@ -261,8 +329,9 @@ class MediaCodecJpegDecoder(
     private fun feedSliceInternal(unit: RtpVideoDepacketizer.EmittedUnit) {
         val mc = codec ?: return
         if (!configSentToCodec && savedConfigBytes != null) {
-            queueInput(mc, savedConfigBytes!!, MediaCodec.BUFFER_FLAG_CODEC_CONFIG)
-            configSentToCodec = true
+            if (queueInput(mc, savedConfigBytes!!, MediaCodec.BUFFER_FLAG_CODEC_CONFIG)) {
+                configSentToCodec = true
+            }
         }
         val flags = if (unit.isKeyFrame) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
         queueInput(mc, unit.data, flags)
@@ -276,22 +345,26 @@ class MediaCodecJpegDecoder(
         }
     }
 
-    private fun queueInput(mc: MediaCodec, data: ByteArray, flags: Int) {
+    private fun queueInput(mc: MediaCodec, data: ByteArray, flags: Int): Boolean {
         var inIndex = mc.dequeueInputBuffer(INPUT_TIMEOUT_US)
         if (inIndex < 0) {
             drainOutputs(mc)
             inIndex = mc.dequeueInputBuffer(INPUT_TIMEOUT_US)
-            if (inIndex < 0) return
+            if (inIndex < 0) return false
         }
 
-        val inBuf = mc.getInputBuffer(inIndex) ?: return
+        val inBuf = mc.getInputBuffer(inIndex) ?: return false
         inBuf.clear()
         if (data.size <= inBuf.remaining()) {
             inBuf.put(data)
             ptsUs += 33_333L
             mc.queueInputBuffer(inIndex, 0, data.size, ptsUs, flags)
+            return true
         } else {
-            mc.queueInputBuffer(inIndex, 0, 0, 0L, 0)
+            // Return buffer unused without corrupting bitstream; wait for next keyframe if frame was truncated
+            mc.queueInputBuffer(inIndex, 0, 0, ptsUs, 0)
+            Log.w(TAG, "Dropped oversize NAL unit (${data.size} > ${inBuf.capacity()} bytes)")
+            return false
         }
     }
 
@@ -329,19 +402,30 @@ class MediaCodecJpegDecoder(
         }
 
         if (latestOutIndex >= 0) {
+            var triggerSwFallback = false
             try {
                 if (!encodePaused) {
                     val image = mc.getOutputImage(latestOutIndex)
                     if (image != null) {
+                        consecutiveNullImages = 0
                         try {
                             submitImageForJpeg(image)
                         } finally {
                             image.close()
                         }
+                    } else {
+                        consecutiveNullImages++
+                        if (!usingSoftwareCodec && !decodedAnyFrame && consecutiveNullImages >= MAX_CONSECUTIVE_NULL_IMAGES) {
+                            triggerSwFallback = true
+                        }
                     }
                 }
             } finally {
                 mc.releaseOutputBuffer(latestOutIndex, false)
+            }
+            if (triggerSwFallback) {
+                Log.w(TAG, "Hardware decoder returned null Image $consecutiveNullImages times; falling back to software decoder")
+                startCodec(forceSoftware = true)
             }
         }
     }
@@ -393,7 +477,8 @@ class MediaCodecJpegDecoder(
             yBuf.get(dst, 0, w * h)
             dstPos = w * h
         } else {
-            if (yRowScratch.size < yRowStride) yRowScratch = ByteArray(yRowStride)
+            val yNeedScratch = max(yRowStride, w * yPixStride)
+            if (yRowScratch.size < yNeedScratch) yRowScratch = ByteArray(yNeedScratch)
             for (row in 0 until h) {
                 val srcOffset = (crop.top + row) * yRowStride + crop.left * yPixStride
                 if (yPixStride == 1 && srcOffset + w <= yLimit) {
@@ -405,9 +490,11 @@ class MediaCodecJpegDecoder(
                     if (readLen > 0) {
                         yBuf.position(srcOffset)
                         yBuf.get(yRowScratch, 0, readLen)
-                        for (col in 0 until w) {
+                        val maxCols = min(w, (readLen - 1) / yPixStride + 1)
+                        for (col in 0 until maxCols) {
                             dst[dstPos++] = yRowScratch[col * yPixStride]
                         }
+                        if (maxCols < w) dstPos += (w - maxCols)
                     } else {
                         dstPos += w
                     }
@@ -428,8 +515,47 @@ class MediaCodecJpegDecoder(
         val vPixStride = vPlane.pixelStride
         val vLimit = vBuf.limit()
 
-        if (uRowScratch.size < uRowStride) uRowScratch = ByteArray(uRowStride)
-        if (vRowScratch.size < vRowStride) vRowScratch = ByteArray(vRowStride)
+        // Semi-planar NV21 fast path: V and U interleaved with pixelStride == 2, V at even offsets, U at V+1
+        // Verify V[0]..V[2*uvW-2] actually holds interleaved VU by probing whether uBuf and vBuf share stride
+        // and the second byte of vBuf equals first byte of uBuf on row 0.
+        if (vPixStride == 2 && uPixStride == 2 && vRowStride == uRowStride) {
+            val row0V = uvTop * vRowStride + uvLeft * 2
+            val row0U = uvTop * uRowStride + uvLeft * 2
+            val isInterleavedVu = (row0V + 1 < vLimit && row0U < uLimit && vBuf.get(row0V + 1) == uBuf.get(row0U))
+            if (isInterleavedVu) {
+                val rowBytes = uvW * 2
+                if (crop.left == 0 && crop.top == 0 && vRowStride == rowBytes && uvH * rowBytes - 1 < vLimit) {
+                    val bulkLen = min(vLimit, uvH * rowBytes)
+                    vBuf.position(0)
+                    vBuf.get(dst, dstPos, bulkLen)
+                    if (bulkLen < uvH * rowBytes && row0U + bulkLen - 1 < uLimit) {
+                        dst[dstPos + uvH * rowBytes - 1] = uBuf.get(uLimit - 1)
+                    }
+                    return
+                }
+                for (row in 0 until uvH) {
+                    val vOff = (uvTop + row) * vRowStride + uvLeft * 2
+                    val avail = min(vLimit - vOff, rowBytes)
+                    if (avail <= 0) break
+                    vBuf.position(vOff)
+                    vBuf.get(dst, dstPos, avail)
+                    if (avail == rowBytes - 1) {
+                        // Last U byte sits 1 byte past vBuf's limit on some Android MediaCodec implementations
+                        val uLast = (uvTop + row) * uRowStride + (uvLeft + uvW - 1) * 2
+                        if (uLast in 0 until uLimit) {
+                            dst[dstPos + rowBytes - 1] = uBuf.get(uLast)
+                        }
+                    }
+                    dstPos += rowBytes
+                }
+                return
+            }
+        }
+
+        val uNeed = max(uRowStride, uvW * uPixStride)
+        val vNeed = max(vRowStride, uvW * vPixStride)
+        if (uRowScratch.size < uNeed) uRowScratch = ByteArray(uNeed)
+        if (vRowScratch.size < vNeed) vRowScratch = ByteArray(vNeed)
 
         for (row in 0 until uvH) {
             val vOffset = (uvTop + row) * vRowStride + uvLeft * vPixStride
@@ -446,7 +572,8 @@ class MediaCodecJpegDecoder(
             uBuf.get(uRowScratch, 0, uReadLen)
 
             if (vPixStride == 1 && uPixStride == 1) {
-                for (col in 0 until uvW) {
+                val cols = min(uvW, min(vReadLen, uReadLen))
+                for (col in 0 until cols) {
                     dst[dstPos++] = vRowScratch[col]
                     dst[dstPos++] = uRowScratch[col]
                 }
@@ -454,6 +581,7 @@ class MediaCodecJpegDecoder(
                 var vIdx = 0
                 var uIdx = 0
                 for (col in 0 until uvW) {
+                    if (vIdx >= vReadLen || uIdx >= uReadLen) break
                     dst[dstPos++] = vRowScratch[vIdx]
                     dst[dstPos++] = uRowScratch[uIdx]
                     vIdx += vPixStride

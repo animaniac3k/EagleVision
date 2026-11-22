@@ -5,7 +5,7 @@
  * directly in the unified Screen 2 Playback view (unsaved until the user
  * chooses Save Clip). Background auto-save on hit remains off by default.
  */
-import { appState } from '../state.js';
+import { appState, subscribeState } from '../state.js';
 import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { saveVideoClip } from '../storage/videoStore.js';
 import { refreshGalleryClips, openLiveBufferInPlayer } from '../ui/videoBrowser.js';
@@ -15,17 +15,32 @@ let autoSaveTimer = null;
 let lastSavedEndTs = -Infinity;
 let lastSavedMaxHitId = 0;
 
+export function resetAutoSaveWatermark() {
+  lastSavedMaxHitId = 0;
+  lastSavedEndTs = -Infinity;
+}
+
+export function cancelPendingAutoSave() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+}
+
 function getLatestHitId() {
   const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
   return hits.length ? hits[hits.length - 1].id : 0;
 }
 
 function buildWallTimeline(snap) {
-  const monoToWall = Date.now() - performance.now();
+  const startWall = Number.isFinite(snap.startWallMs)
+    ? snap.startWallMs
+    : Math.round(snap.startTs + (Date.now() - performance.now()));
+  const durMs = Math.max(0, Math.round((snap.durationSec || 0) * 1000));
   return {
     ...(snap.timeline || { soundPeaks: [], events: [] }),
-    wallStartMs: Math.round(snap.startTs + monoToWall),
-    wallEndMs: Math.round(snap.endTs + monoToWall)
+    wallStartMs: startWall,
+    wallEndMs: Number.isFinite(snap.endWallMs) ? snap.endWallMs : startWall + durMs
   };
 }
 
@@ -41,14 +56,10 @@ async function saveSnapIfDistinct(snap, triggerHitId = null) {
     return false;
   }
 
-  lastSavedEndTs = snap.endTs;
-  if (maxHitId > lastSavedMaxHitId) {
-    lastSavedMaxHitId = maxHitId;
-  }
-
   await saveVideoClip({
     jpegFrames: snap.jpegFrames,
     frameTimestamps: snap.frameTimestamps,
+    startWallMs: snap.startWallMs,
     fps: snap.fps,
     durationSec: snap.durationSec,
     sizeBytes: snap.sizeBytes,
@@ -56,6 +67,12 @@ async function saveSnapIfDistinct(snap, triggerHitId = null) {
     height: snap.height,
     timeline: buildWallTimeline(snap)
   });
+
+  // Update deduplication watermarks only AFTER persistence succeeds
+  lastSavedEndTs = snap.endTs;
+  if (maxHitId > lastSavedMaxHitId) {
+    lastSavedMaxHitId = maxHitId;
+  }
   await refreshGalleryClips();
   return true;
 }
@@ -65,6 +82,10 @@ async function saveSnapIfDistinct(snap, triggerHitId = null) {
  */
 export function triggerAutoSaveHeatmapClip(triggerHitId = null) {
   if (!appState.heatmapAutoSave || !appState.bufferEnabled) return;
+  // Handle Clear Hits resetting nextHitSeq back to 1
+  if (typeof triggerHitId === 'number' && triggerHitId < lastSavedMaxHitId && getLatestHitId() <= triggerHitId) {
+    lastSavedMaxHitId = 0;
+  }
   if (typeof triggerHitId === 'number' && triggerHitId <= lastSavedMaxHitId) return;
   const now = performance.now();
   const cooldownMs = Math.max(15000, Math.round((appState.bufferMaxSeconds || 20) * 850));
@@ -72,6 +93,7 @@ export function triggerAutoSaveHeatmapClip(triggerHitId = null) {
   lastAutoSaveMs = now;
   autoSaveTimer = setTimeout(async () => {
     autoSaveTimer = null;
+    if (!appState.heatmapAutoSave || !appState.bufferEnabled) return;
     try {
       const snap = await snapshotMemoryBuffer();
       await saveSnapIfDistinct(snap, triggerHitId);
@@ -82,6 +104,15 @@ export function triggerAutoSaveHeatmapClip(triggerHitId = null) {
 }
 
 export function initInstantReplay() {
+  subscribeState((state, patch) => {
+    if (patch && 'detectionHits' in patch && (!state.detectionHits || state.detectionHits.length === 0)) {
+      resetAutoSaveWatermark();
+    }
+    if (patch && (('heatmapAutoSave' in patch && !state.heatmapAutoSave) || ('bufferEnabled' in patch && !state.bufferEnabled))) {
+      cancelPendingAutoSave();
+    }
+  });
+
   const btnReplay = document.getElementById('btnReplay20s');
   btnReplay?.addEventListener('click', async () => {
     if (appState.currentScreen === 'gallery') {

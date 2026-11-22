@@ -44,6 +44,7 @@ let openingLiveBuffer = false;
 
 let activeClipWidth = 0;
 let activeClipHeight = 0;
+let activeClipWallStartMs = null;
 
 function stopPlayerLoop() {
   if (rafId) {
@@ -62,7 +63,7 @@ function syncPlaybackReticleOverlay() {
   }
   const stageEl = document.getElementById('galleryClipsStage');
   const btnReticle = document.getElementById('btnTogglePlaybackReticle');
-  const enabled = Boolean(appState.playbackReticleEnabled);
+  const enabled = appState.overlayEnabled !== false;
 
   if (btnReticle) {
     btnReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
@@ -205,14 +206,29 @@ function renderGalleryFrame() {
   }
 }
 
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function startPlayerLoopIfPlaying() {
+  if (!isPlaying || rafId) return;
+  lastTickMs = performance.now();
+  rafId = requestAnimationFrame(galleryTickLoop);
+}
+
 function galleryTickLoop(nowMs) {
+  rafId = null;
   const screenGallery = document.getElementById('screenGallery');
-  if (!screenGallery || screenGallery.classList.contains('hidden')) {
-    stopPlayerLoop();
+  if (!isPlaying || !screenGallery || screenGallery.classList.contains('hidden') || appState.galleryArchiveTab === 'hits') {
     return;
   }
 
-  if (isPlaying && galleryPlayer && galleryPlayer.getFrameCount() > 0) {
+  if (galleryPlayer && galleryPlayer.getFrameCount() > 0) {
     const dtSec = Math.max(0, (nowMs - lastTickMs) / 1000) * playbackSpeed;
     playheadSec += dtSec;
     if (playheadSec >= clipDuration) {
@@ -296,13 +312,15 @@ function renderClipList() {
   for (const clip of cachedClips) {
     const mb = (clip.sizeBytes / (1024 * 1024)).toFixed(1);
     const isSelected = clip.id === selectedClipId;
+    const safeId = escapeHtml(clip.id);
+    const safeName = escapeHtml(clip.name);
     parts.push(`
-      <div class="clip-card ${isSelected ? 'active' : ''}" data-clip-id="${clip.id}">
+      <div class="clip-card ${isSelected ? 'active' : ''}" data-clip-id="${safeId}">
         <div style="flex:1; min-width:0; padding-right:8px;">
-          <div class="clip-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${clip.name}</div>
+          <div class="clip-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${safeName}</div>
           <div class="clip-meta">${clip.width}×${clip.height} • ${clip.durationSec}s (${clip.fps || 15} FPS) • ${mb} MB</div>
         </div>
-        <button type="button" class="btn-quick-delete-clip" data-delete-id="${clip.id}" title="Delete ${clip.name}" aria-label="Delete ${clip.name}">
+        <button type="button" class="radar-btn btn-quick-delete-clip" data-delete-id="${safeId}" title="Delete ${safeName}" aria-label="Delete ${safeName}">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -315,32 +333,13 @@ function renderClipList() {
   }
 
   listEl.innerHTML = parts.join('');
+}
 
+function updateClipCardSelectionUI() {
+  const listEl = document.getElementById('clipsList');
+  if (!listEl) return;
   listEl.querySelectorAll('.clip-card[data-clip-id]').forEach((card) => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.btn-quick-delete-clip')) return;
-      const cid = card.dataset.clipId;
-      const found = cid === LIVE_BUFFER_ID ? activeBufferClip : cachedClips.find((c) => c.id === cid);
-      if (found) {
-        selectClip(found, true);
-        renderClipList();
-      }
-    });
-  });
-
-  listEl.querySelectorAll('.btn-quick-delete-clip').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const clipId = btn.dataset.deleteId;
-      handleTwoTapDelete(btn, async () => {
-        await deleteVideoClip(clipId);
-        const wasSelected = selectedClipId === clipId;
-        if (wasSelected) {
-          selectedClipId = null;
-        }
-        await refreshGalleryClips(wasSelected);
-      });
-    });
+    card.classList.toggle('active', card.dataset.clipId === selectedClipId);
   });
 }
 
@@ -350,6 +349,12 @@ async function selectClip(clip, autoPlay = true) {
   clearPlaybackTrackUI();
 
   selectedClipId = clip.id;
+  // Reset zoom & pan when switching clips so prior clip offset doesn't leak
+  galleryZoom = 1.0;
+  galleryPanX = 0;
+  galleryPanY = 0;
+  syncGalleryZoomUI();
+
   const titleEl = document.getElementById('activeClipTitle');
   const metaEl = document.getElementById('activeClipMeta');
   const canvasEl = document.getElementById('galleryPlayerCanvas');
@@ -386,12 +391,17 @@ async function selectClip(clip, autoPlay = true) {
     return;
   }
 
+  const timeline = fullClip.timeline || clip.timeline || { soundPeaks: [], events: [] };
+  activeClipWallStartMs = Number.isFinite(fullClip.startWallMs)
+    ? fullClip.startWallMs
+    : Number.isFinite(timeline.wallStartMs)
+      ? timeline.wallStartMs
+      : ((fullClip.createdAt || clip.createdAt || Date.now()) - Math.round((clipDuration || 0) * 1000));
+
   galleryPlayer?.load(fullClip.jpegFrames, clipDuration, fullClip.frameTimestamps || null);
 
-  // Render CCTV Waveform & Event Markers for this source
   const waveformEl = document.getElementById('galleryWaveform');
   const markersEl = document.getElementById('galleryMarkers');
-  const timeline = fullClip.timeline || clip.timeline || { soundPeaks: [], events: [] };
   galleryEventNavHelper = renderCctvTrack({
     waveformEl,
     markersEl,
@@ -406,7 +416,7 @@ async function selectClip(clip, autoPlay = true) {
   syncEventNavButtons();
 
   renderGalleryFrame();
-  rafId = requestAnimationFrame(galleryTickLoop);
+  startPlayerLoopIfPlaying();
 }
 
 /**
@@ -419,6 +429,7 @@ export async function openLiveBufferInPlayer(snap) {
     isBuffer: true,
     name: 'LIVE BUFFER',
     createdAt: Date.now(),
+    startWallMs: snap.startWallMs ?? snap.timeline?.wallStartMs ?? (Date.now() - Math.round((snap.durationSec || 0) * 1000)),
     jpegFrames: snap.jpegFrames,
     frameTimestamps: snap.frameTimestamps || null,
     fps: snap.fps || 15,
@@ -451,7 +462,12 @@ export function initVideoBrowser() {
   galleryPlayer = createJpegFramePlayer(canvasEl, () => ({
     zoom: galleryZoom,
     panX: galleryPanX,
-    panY: galleryPanY
+    panY: galleryPanY,
+    showTimestamp: appState.showDisplayTimestamp !== false,
+    baseWallMs: activeClipWallStartMs,
+    tsPosition: appState.timestampPosition || 'bottom-right',
+    tsOpacity: Math.max(0.15, Math.min(1, Number(appState.timestampOpacity ?? 60) / 100)),
+    tsAdaptive: appState.timestampAdaptive !== false
   }));
 
   const scrubber = document.getElementById('galleryScrubber');
@@ -561,9 +577,36 @@ export function initVideoBrowser() {
   btnCloseGalleryDrawer.addEventListener('click', () => setDrawerOpen(false));
   setDrawerOpen(Boolean(appState.galleryDrawerOpen));
 
+  // Event delegation on #clipsList avoids tearing down & re-binding listeners on every clip selection
+  const clipsListEl = document.getElementById('clipsList');
+  clipsListEl?.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('.btn-quick-delete-clip');
+    if (delBtn) {
+      e.stopPropagation();
+      const clipId = delBtn.dataset.deleteId;
+      handleTwoTapDelete(delBtn, async () => {
+        await deleteVideoClip(clipId);
+        const wasSelected = selectedClipId === clipId;
+        if (wasSelected) {
+          selectedClipId = null;
+        }
+        await refreshGalleryClips(wasSelected);
+      });
+      return;
+    }
+    const card = e.target.closest('.clip-card[data-clip-id]');
+    if (!card) return;
+    const cid = card.dataset.clipId;
+    const found = cid === LIVE_BUFFER_ID ? activeBufferClip : cachedClips.find((c) => c.id === cid);
+    if (found) {
+      selectClip(found, true);
+      updateClipCardSelectionUI();
+    }
+  });
+
   btnSwitchScreen.addEventListener('click', () => {
     if (selectedClipId === LIVE_BUFFER_ID) {
-      selectedClipId = cachedClips[0]?.id || LIVE_BUFFER_ID;
+      selectedClipId = cachedClips[0]?.id || (activeBufferClip ? LIVE_BUFFER_ID : null);
     }
     updateState({ currentScreen: 'gallery', galleryArchiveTab: 'clips' });
   });
@@ -572,12 +615,18 @@ export function initVideoBrowser() {
     isPlaying = false;
     stopPlayerLoop();
     galleryPlayer.unload();
+    // Release 50-300MB RAM buffer snapshot cleanly on exit so it isn't pinned alongside live buffer
+    activeBufferClip = null;
+    if (selectedClipId === LIVE_BUFFER_ID) selectedClipId = null;
+    galleryZoom = 1.0;
+    galleryPanX = 0;
+    galleryPanY = 0;
     clearPlaybackTrackUI();
     updateState({ currentScreen: 'live' });
   });
 
   btnTogglePlaybackReticle?.addEventListener('click', () => {
-    updateState({ playbackReticleEnabled: !appState.playbackReticleEnabled });
+    updateState({ overlayEnabled: !(appState.overlayEnabled !== false) });
     saveSettings(appState);
   });
 
@@ -590,6 +639,7 @@ export function initVideoBrowser() {
       const savedMeta = await saveVideoClip({
         jpegFrames: activeBufferClip.jpegFrames,
         frameTimestamps: activeBufferClip.frameTimestamps,
+        startWallMs: activeBufferClip.startWallMs,
         fps: activeBufferClip.fps,
         durationSec: activeBufferClip.durationSec,
         sizeBytes: activeBufferClip.sizeBytes,
@@ -617,37 +667,43 @@ export function initVideoBrowser() {
 
   subscribeState((state, patch) => {
     if (patch.currentScreen !== undefined && state.currentScreen !== 'gallery') {
-      if (isPlaying || galleryPlayer.getFrameCount() > 0 || galleryEventNavHelper) {
+      if (isPlaying || galleryPlayer.getFrameCount() > 0 || galleryEventNavHelper || activeBufferClip) {
         isPlaying = false;
         stopPlayerLoop();
         galleryPlayer.unload();
+        activeBufferClip = null;
+        if (selectedClipId === LIVE_BUFFER_ID) selectedClipId = null;
+        galleryZoom = 1.0;
+        galleryPanX = 0;
+        galleryPanY = 0;
         clearPlaybackTrackUI();
       }
     }
     if (
-      patch.playbackReticleEnabled !== undefined ||
-      patch.overlayType !== undefined ||
-      patch.overlayOpacity !== undefined ||
-      patch.overlayScale !== undefined ||
-      patch.reticleFfpMode !== undefined ||
-      patch.customOverlayUrl !== undefined ||
-      patch.reticleConfig !== undefined ||
-      patch.themeColor !== undefined
+      state.currentScreen === 'gallery' &&
+      state.galleryArchiveTab !== 'hits' &&
+      (patch.overlayEnabled !== undefined ||
+        patch.overlayType !== undefined ||
+        patch.overlayOpacity !== undefined ||
+        patch.overlayScale !== undefined ||
+        patch.reticleFfpMode !== undefined ||
+        patch.customOverlayUrl !== undefined ||
+        patch.reticleConfig !== undefined ||
+        patch.themeColor !== undefined)
     ) {
       syncPlaybackReticleOverlay();
     }
     if (state.currentScreen === 'gallery' && !openingLiveBuffer) {
       if (patch.galleryArchiveTab === 'clips') {
         syncGalleryZoomUI();
+        syncPlaybackReticleOverlay();
         renderGalleryFrame();
       }
       if (patch.galleryArchiveTab === 'hits') {
-        if (isPlaying) {
-          isPlaying = false;
-          stopPlayerLoop();
-          lastPlayBtnText = '';
-          renderGalleryFrame();
-        }
+        isPlaying = false;
+        stopPlayerLoop();
+        lastPlayBtnText = '';
+        renderGalleryFrame();
       } else if (
         patch.currentScreen === 'gallery' ||
         (patch.galleryArchiveTab === 'clips' && !galleryPlayer.getFrameCount())
@@ -669,6 +725,11 @@ export function initVideoBrowser() {
     isPlaying = !isPlaying;
     lastTickMs = performance.now();
     renderGalleryFrame();
+    if (isPlaying) {
+      startPlayerLoopIfPlaying();
+    } else {
+      stopPlayerLoop();
+    }
   });
 
   btnSlowMo.addEventListener('click', () => {
@@ -681,6 +742,7 @@ export function initVideoBrowser() {
     const totalFrames = galleryPlayer.getFrameCount();
     if (!totalFrames) return;
     isPlaying = false;
+    stopPlayerLoop();
     const currentIdx = galleryPlayer.getCurrentIndex() >= 0
       ? galleryPlayer.getCurrentIndex()
       : Math.max(0, galleryPlayer.getIndexForTime(playheadSec));
@@ -725,6 +787,10 @@ export function initVideoBrowser() {
   });
 
   scrubber.addEventListener('input', (e) => {
+    if (isPlaying) {
+      isPlaying = false;
+      stopPlayerLoop();
+    }
     playheadSec = parseFloat(e.target.value) || 0;
     lastTickMs = performance.now();
     renderGalleryFrame();
@@ -733,7 +799,7 @@ export function initVideoBrowser() {
   const btnGallerySnapshot = document.getElementById('btnGallerySnapshot');
   btnGallerySnapshot?.addEventListener('click', async () => {
     await exportAnnotatedCanvasPng(canvasEl, {
-      includeReticle: Boolean(appState.playbackReticleEnabled),
+      includeReticle: appState.overlayEnabled !== false,
       reticleZoom: galleryZoom,
       matchLiveFfp: true,
       prefix: 'SPOTR_Clip'

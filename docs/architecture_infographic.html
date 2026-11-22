@@ -3,276 +3,408 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (v0.1.11) — Architecture &amp; Data Flow Infographic</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <title>SPOTR (v0.62.0) — Architecture &amp; Data Flow Infographic</title>
   <style>
+    :root {
+      --bg: #050a0f;
+      --card: #0c141d;
+      --card-hi: #101b27;
+      --border: #1e3a4c;
+      --accent: #f97316;
+      --teal: #2dd4bf;
+      --sky: #38bdf8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #03090c;
-      color: #ccfbf1;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-    .grid-bg {
+      background-color: var(--bg);
       background-image:
-        linear-gradient(rgba(45, 212, 191, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(45, 212, 191, 0.04) 1px, transparent 1px);
+        linear-gradient(rgba(45, 212, 191, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45, 212, 191, 0.035) 1px, transparent 1px);
       background-size: 32px 32px;
+      color: var(--text);
+      font-family: var(--sans);
+      padding: 24px;
+      line-height: 1.45;
     }
-    .node-card {
-      background: rgba(7, 22, 27, 0.94);
-      border: 1px solid #1b4d57;
-      border-radius: 6px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.65);
+    .wrap { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
     }
-    .node-card-strong {
-      border-color: #2dd4bf;
-      box-shadow: 0 0 16px rgba(45, 212, 191, 0.2);
-    }
-    .node-header {
-      background: #0b2229;
-      border-bottom: 1px solid #1b4d57;
-      padding: 8px 14px;
-      font-family: ui-monospace, monospace;
-      font-weight: 700;
-      font-size: 14px;
-      color: #ccfbf1;
+    .card-strong { border-color: var(--teal); }
+    .card-orange { border-color: var(--accent); }
+
+    .banner {
+      padding: 20px 24px;
       display: flex;
-      justify-content: space-between;
+      flex-wrap: wrap;
       align-items: center;
+      justify-content: space-between;
+      gap: 16px;
     }
-    .badge {
-      background: #2dd4bf;
-      color: #041316;
-      padding: 2px 8px;
-      border-radius: 3px;
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    h1 { font-family: var(--mono); font-size: 24px; font-weight: 900; margin-top: 4px; letter-spacing: 0.04em; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .kpi-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .kpi {
+      background: var(--card-hi);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: var(--mono);
+    }
+    .kpi-label { font-size: 10px; color: var(--teal); font-weight: 700; text-transform: uppercase; }
+    .kpi-val { font-size: 13px; color: var(--text); font-weight: 800; margin-top: 2px; }
+
+    .section-title {
+      font-family: var(--mono);
       font-size: 12px;
       font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--teal);
+      margin-bottom: 10px;
+    }
+
+    .screens-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+    }
+    .screen-chip {
+      background: var(--card-hi);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: var(--mono);
+    }
+    .screen-chip.primary { border-color: var(--accent); }
+    .screen-chip h3 { font-size: 11.5px; color: var(--teal); margin-bottom: 5px; }
+    .screen-chip.primary h3 { color: var(--accent); }
+    .screen-chip p { font-family: var(--sans); font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+    .cols-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .col { display: flex; flex-direction: column; gap: 16px; }
+
+    .node-hdr {
+      background: var(--card-hi);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+    .badge {
+      background: var(--teal);
+      color: #041316;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .badge-orange { background: var(--accent); color: #090d12; }
+    .badge-amber { background: var(--amber); color: #090d12; }
+    .node-body { padding: 14px; font-size: 12.5px; color: #cbd5e1; display: flex; flex-direction: column; gap: 10px; }
+    .node-body ul { padding-left: 16px; display: flex; flex-direction: column; gap: 5px; }
+    .node-body strong { color: var(--text); }
+    .node-body code {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--teal);
+      background: rgba(45, 212, 191, 0.08);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .subbox {
+      background: #081018;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .subbox-title { font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--sky); }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .state-cell {
+      background: #081018;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      color: #cbd5e1;
+    }
+
+    .footer-bar {
+      padding: 16px 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      font-size: 12.5px;
+      color: #cbd5e1;
+    }
+    .footer-bar strong { color: var(--teal); font-family: var(--mono); font-size: 12px; display: block; margin-bottom: 4px; }
+
+    @media (max-width: 1100px) {
+      .screens-grid { grid-template-columns: repeat(3, 1fr); }
+      .cols-3 { grid-template-columns: 1fr; }
+      .footer-bar { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .screens-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
-<body class="p-6 grid-bg min-h-screen">
-
-  <div class="max-w-7xl mx-auto space-y-6">
-    <!-- Top Banner -->
-    <header class="node-card node-card-strong p-5 flex flex-wrap items-center justify-between gap-4">
+<body>
+  <div class="wrap">
+    <header class="card card-orange banner">
       <div>
-        <div class="text-xs font-mono uppercase tracking-widest text-[#2dd4bf] font-bold">SYSTEM ARCHITECTURE INFOGRAPHIC • v0.1.11</div>
-        <h1 class="text-2xl font-mono font-bold text-[#ccfbf1] mt-1">SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
-        <p class="text-sm text-[#99f6e4] mt-1">Progressive Web App • ChromeOS (Lenovo Duet 3), Android &amp; Portable Laptop • OpenCV RTSP Gateway &amp; WebHID Virtual Mouse</p>
+        <div class="eyebrow">System Architecture Infographic • Release v0.62.0 (Android vCode 62)</div>
+        <h1>SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
+        <p class="subtitle">Offline-First PWA &amp; Native Android/ChromeOS App • Lenovo Duet 3 Slow-Hardware Tuned • Gloved Field UI • Isolated Hardware Inputs</p>
       </div>
-      <div class="flex gap-3 font-mono text-xs">
-        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">HARDWARE INPUT</div>
-          <div class="text-base font-bold text-[#2dd4bf]">WEBHID BT + VIRTUAL MOUSE</div>
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-label">Rendering Engine</div>
+          <div class="kpi-val">60 FPS Zero-Blur Matte</div>
         </div>
-        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">VOICE SYNTHESIS</div>
-          <div class="text-base font-bold text-[#ccfbf1]">STUDIO SPRITE + WEB SPEECH</div>
+        <div class="kpi">
+          <div class="kpi-label">Hardware Inputs</div>
+          <div class="kpi-val">DS4/5 • 8BitDo • Isolated Ring</div>
         </div>
-        <div class="px-3 py-2 rounded bg-[#091a20] border border-[#1b4d57]">
-          <div class="text-[#5eead4]">RAM BUFFER</div>
-          <div class="text-base font-bold text-[#2dd4bf]">20s-60s (USB &amp; RTSP)</div>
+        <div class="kpi">
+          <div class="kpi-label">Gateways</div>
+          <div class="kpi-val">Python OpenCV + Android MediaCodec</div>
         </div>
       </div>
     </header>
 
-    <!-- 5-Screen Navigation Overview Banner -->
-    <div class="node-card p-4">
-      <div class="text-xs font-mono text-[#5eead4] uppercase tracking-wider mb-2 font-bold">APPLICATION SCREENS (currentScreen in js/state.js)</div>
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 font-mono text-xs">
-        <div class="p-2.5 rounded bg-[#091a20] border border-[#2dd4bf]">
-          <span class="text-[#2dd4bf] font-bold">1. LIVE FEED (#screenLive)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">60fps viewport, FFP reticle drawer, PiP zoom loupe, 1-tap declutter &amp; virtual mouse.</p>
+    <section class="card" style="padding: 16px 18px;">
+      <div class="section-title">6-Screen Application Topology (appState.currentScreen)</div>
+      <div class="screens-grid">
+        <div class="screen-chip primary">
+          <h3>1. Live (#screenLive)</h3>
+          <p>Dual-canvas 60 FPS scope, FFP reticle, PiP loupe, streamlined 48px dock, Source Pill, Touch Lock &amp; 1-tap Snapshot.</p>
         </div>
-        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-          <span class="text-[#2dd4bf] font-bold">2. PLAYBACK &amp; HITS (#screenGallery)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Unified RAM buffer + saved clips, per-tab reticle toggles, Hits peek, safe Masks &amp; .webm export.</p>
+        <div class="screen-chip">
+          <h3>2. Archive (#screenGallery)</h3>
+          <p>Unified LIVE BUFFER (RAM) + saved clips (.webm export) &amp; Spatial Hits Map (decoupled Pins, Aim Loupe, Calibrate).</p>
         </div>
-        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-          <span class="text-[#2dd4bf] font-bold">3. SETTINGS (#screenSettings)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Dual camera source, live RAM meter, voice sliders, image filters &amp; version badge.</p>
+        <div class="screen-chip">
+          <h3>3. Setup (#screenSettings)</h3>
+          <p>USB/RTSP camera sources, Voice tuning, 6 theme swatches + custom picker, Timestamps &amp; Telemetry HUD toggle.</p>
         </div>
-        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-          <span class="text-[#2dd4bf] font-bold">4. RETICLE (#screenReticle)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Parametric crosshair customizer, 4 center styles, dual-stick sculpting &amp; voice audition stage.</p>
+        <div class="screen-chip">
+          <h3>4. Reticle (#screenReticle)</h3>
+          <p>Parametric crosshair studio, 4 center styles, independent reticle colors, persisted custom overlay &amp; 2-tap Reset.</p>
         </div>
-        <div class="p-2.5 rounded bg-[#091a20] border border-[#1b4d57]">
-          <span class="text-[#2dd4bf] font-bold">5. CONTROLLER (#screenController)</span>
-          <p class="text-[#99f6e4] text-[11px] mt-1">Gamepad &amp; 7-Btn Bluetooth Ring 1-to-1 setup, 70% pan speed &amp; HID zone telemetry.</p>
+        <div class="screen-chip">
+          <h3>5. Input (#screenController)</h3>
+          <p>DualShock 4/5 WebHID, 8BitDo Micro K-Mode, isolated Bluetooth Ring toggle (OFF by default) &amp; JSON profiles.</p>
+        </div>
+        <div class="screen-chip">
+          <h3>6. Calib (#screenCalibration)</h3>
+          <p>1:1 thermal debug canvas, 3 Environment Presets (Indoor / Calm / Wind), Auto-Tune, noise meter &amp; Ignore Zones.</p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- 3-Column Core Architecture Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="cols-3">
+      <!-- Column 1 -->
+      <div class="col">
+        <div class="section-title">1. Inputs, Ingestion &amp; State</div>
 
-      <!-- COLUMN 1: Input, Controllers & State -->
-      <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">1. Hardware HID &amp; Reactive State</div>
-
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>WEBHID BT &amp; VIRTUAL MOUSE</span>
-            <span class="badge">gamepadController.js</span>
+        <article class="card card-strong">
+          <div class="node-hdr">
+            <span>ISOLATED HARDWARE INPUTS</span>
+            <span class="badge">gamepad + ring</span>
           </div>
-          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">Driverless DualShock 4 / DualSense Integration</strong></div>
-            <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
-              <li><strong class="text-[#ccfbf1]">Touchpad:</strong> Capacitive multi-touch Virtual Mouse cursor</li>
-              <li><strong class="text-[#ccfbf1]">L2 Trigger:</strong> Left Mouse Click &amp; Drag</li>
-              <li><strong class="text-[#ccfbf1]">R2 Trigger:</strong> Right Mouse Click (Context Menu)</li>
-              <li><strong class="text-[#ccfbf1]">Left Stick:</strong> Pinpoint ROI crosshair (0.16 deadzone + 1.8 power curve)</li>
-              <li><strong class="text-[#ccfbf1]">Right Stick:</strong> Smooth stream pan when zoomed in (&gt;1.0x)</li>
-              <li><strong class="text-[#ccfbf1]">Reticle Mode:</strong> L-Stick navigates menu; R-Stick sculpts Gap &amp; Weight</li>
-              <li><strong class="text-[#ccfbf1]">D-Pad:</strong> Subtension adjustments &amp; cyclic quick tools</li>
-              <li><strong class="text-[#ccfbf1]">Share / Options:</strong> Instant Replay &amp; Settings modal</li>
+          <div class="node-body">
+            <ul>
+              <li><strong>DualShock 4 / DualSense (WebHID):</strong> Demand-driven polling (0% CPU when idle), touchpad virtual mouse, L2/R2 drag/click, dt-normalized sticks.</li>
+              <li><strong>8BitDo Micro (K-Mode):</strong> 16-button zero-sleep HID keyboard profile with screen-scoped shortcuts.</li>
+              <li><strong>Bluetooth Ring (Isolated):</strong> Disabled by default (<code>ringEnabled: false</code>) so it never hijacks 8BitDo Micro or keyboard navigation.</li>
+              <li><strong>Rain / Carry Touch Lock:</strong> Top-left shield blocks accidental rain/sling touches; 1-second hold to unlock.</li>
             </ul>
           </div>
-        </div>
+        </article>
 
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>CENTRAL REACTIVE STORE</span>
-            <span class="badge">js/state.js</span>
+        <article class="card">
+          <div class="node-hdr">
+            <span>MULTI-SOURCE CAMERA ENGINE</span>
+            <span class="badge badge-orange">streamManager</span>
           </div>
-          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
-            <div class="text-[#2dd4bf] font-bold">Unidirectional Pub/Sub Store</div>
-            <div class="grid grid-cols-2 gap-1.5 pt-1">
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• currentScreen (1..5)<br/>• cameraSource (usb/rtsp)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• reticleConfig<br/>• reticleFfpMode (ON/OFF)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• mainZoom / Pan<br/>• heatmapSpeechEnabled</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• voicePitch &amp; Rate<br/>• themeColor (6 HSL)</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• heatmapSens &amp; Dur<br/>• bufferMaxSec / FPS</div>
-              <div class="p-2 rounded bg-[#091a20] border border-[#1b4d57]">• uiOpacity (15-100%)<br/>• ringKeyMap / Pan (70%)</div>
+          <div class="node-body">
+            <ul>
+              <li><strong>UVC USB Cameras:</strong> Browser <code>getUserMedia</code> + native Android <code>libuvc</code> (<code>UsbUvcSessionManager.kt</code>).</li>
+              <li><strong>Bresser Wi-Fi (192.168.0.1):</strong> Validated local wake proxy (<code>/api/rtsp/wake</code>) + <code>ch0</code> (1080p) / <code>ch1</code> (540p) with Android 10+ camera Wi-Fi binding.</li>
+              <li><strong>Resilient Recovery:</strong> 4-step exponential backoff reconnect + live Top-Center Source Status Pill.</li>
+              <li><strong>Gateway Pause Sync:</strong> Automatically pauses JPEG/H.264 decode off Live &amp; Calibration.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="node-hdr">
+            <span>REACTIVE STORE &amp; SETTINGS</span>
+            <span class="badge">state + store</span>
+          </div>
+          <div class="node-body">
+            <div class="state-grid">
+              <div class="state-cell">• currentScreen (1..6)<br/>• streamStatus</div>
+              <div class="state-cell">• reticleConfig + FFP<br/>• overlayEnabled</div>
+              <div class="state-cell">• mainZoom / Pan<br/>• pipEnabled / AA</div>
+              <div class="state-cell">• hitsMapShowPins<br/>• heatmapIgnoreMasks</div>
+              <div class="state-cell">• ringEnabled (false)<br/>• themeColor (6+custom)</div>
+              <div class="state-cell">• bufferMaxSec / FPS<br/>• displayTimestamps</div>
             </div>
-            <div class="pt-1 text-[#5eead4]">↔ Synced to <strong class="text-[#ccfbf1]">settingsStore.js</strong> (localStorage)</div>
+            <div>Debounced (250ms) + range-clamped persistence in <code>localStorage</code> with <code>pagehide</code> flush.</div>
           </div>
-        </div>
-
-        <div class="node-card">
-          <div class="node-header">
-            <span>DUAL CAMERA INGESTION</span>
-            <span class="badge">streamManager + server.py</span>
-          </div>
-          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
-            <div><strong class="text-[#ccfbf1]">UVC USB &amp; OpenCV RTSP Gateway</strong></div>
-            <ul class="list-disc list-inside text-xs space-y-1 text-[#5eead4] pl-1">
-              <li><strong class="text-[#ccfbf1]">UVC Scopes:</strong> Driverless <code class="text-[#ccfbf1]">getUserMedia</code> 1080p/4K @ 60fps</li>
-              <li><strong class="text-[#ccfbf1]">Bresser Wi-Fi Camera:</strong> UDP wake proxy (<code class="text-[#ccfbf1]">/api/rtsp/wake</code> to port 65534) + 1080p (<code class="text-[#ccfbf1]">ch0</code>) and 540p (<code class="text-[#ccfbf1]">ch1</code>) streams</li>
-              <li><strong class="text-[#ccfbf1]">Push Event Pipeline:</strong> Threading condition frame push delivers frames with &lt;1ms latency</li>
-              <li>Synthetic test pattern fallback when no device connected</li>
-            </ul>
-          </div>
-        </div>
+        </article>
       </div>
 
-      <!-- COLUMN 2: Compositor, Heatmap, Reticle & Studio Voice -->
-      <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">2. Compositor, Heatmap &amp; Voice Engine</div>
+      <!-- Column 2 -->
+      <div class="col">
+        <div class="section-title">2. Compositor, CV &amp; Voice</div>
 
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>CANVAS 2D + HEATMAP + AUDIO</span>
+        <article class="card card-strong">
+          <div class="node-hdr">
+            <span>DUAL-CANVAS COMPOSITOR</span>
             <span class="badge">compositor.js</span>
           </div>
-          <div class="p-4 text-xs space-y-3 font-mono">
-            <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">A. Primary Stream (#mainCanvas) + Consolidated Detector</div>
-              <div class="text-[#99f6e4]">• Hardware-promoted canvas (<code class="text-[#ccfbf1]">alpha: false, desync</code>)</div>
-              <div class="text-[#99f6e4]">• 20Hz detector: <strong class="text-[#ccfbf1]">5% (1/20th) Max Hit Area</strong> + &gt;18% Shake Gate</div>
-              <div class="text-[#99f6e4]">• 1:1 synced Hit Pin + Voice + Event + Optional Auto-Save (OFF)</div>
-              <div class="text-[#99f6e4]">• GPU CSS filter matrix (brightness, contrast, sat, invert)</div>
+          <div class="node-body">
+            <div class="subbox">
+              <div class="subbox-title">A. Frame-Deduped 60 FPS Video + Overlay</div>
+              <div>• Skips redundant USB <code>&lt;video&gt;</code> blits via <code>currentTime</code>.</div>
+              <div>• Stops rAF completely off Live/Calibration or when tab hidden.</div>
+              <div>• Zero-flicker <code>#liveOverlayCanvas</code> for Hit Pins &amp; adaptive timestamps.</div>
+              <div>• 1-tap Live PNG snapshot bakes CSS filters, reticle, pins &amp; timestamps.</div>
             </div>
-
-            <div class="p-3 rounded bg-[#091a20] border border-[#2dd4bf]/50 space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">B. Directional Voice Callouts (Studio Sprite)</div>
-              <div class="text-[#99f6e4]">• High-fidelity Web Audio sprite (<code class="text-[#5eead4]">voice-sprite.mp3</code>)</div>
-              <div class="text-[#99f6e4]">• Local Web Speech API automatic fallback</div>
-              <div class="text-[#99f6e4]">• Speaks clock-face ($1..12$ o'clock) &amp; reticle clicks</div>
-              <div class="text-[#99f6e4]">• Dynamic speech: <code class="text-[#5eead4]">"Detection! 11 o'clock, 3 clicks"</code></div>
+            <div class="subbox">
+              <div class="subbox-title">B. 20Hz Consolidated Micro-Change Detector</div>
+              <div>• 160×90 luminance grid with <code>Float64Array</code> tracking &amp; Ignore Masks.</div>
+              <div>• Global Shake Gate (&gt;18%) + Max Hit Area (default 5%) + Min Cells.</div>
+              <div>• 3 Calibration Presets: <strong>Indoor</strong>, <strong>Calm Range</strong>, <strong>Wind / Mirage</strong>.</div>
+              <div>• 14,400-cell thermal debug <code>putImageData</code> runs only on Calibration.</div>
             </div>
-
-            <div class="p-3 rounded bg-[#091a20] border border-[#1b4d57] space-y-1">
-              <div class="text-sm font-bold text-[#2dd4bf]">C. Digital Zoom Loupe (#pipCanvas) + Aim Loupe</div>
-              <div class="text-[#99f6e4]">• Crops region centered on <code class="text-[#ccfbf1]">(roiX, roiY)</code></div>
-              <div class="text-[#99f6e4]">• Main-dock <strong class="text-[#ccfbf1]">Aim Loupe</strong> snaps to latest hit (1.5x–12.0x)</div>
+            <div class="subbox">
+              <div class="subbox-title">C. Lazy Studio Voice Engine (voiceAudioEngine.js)</div>
+              <div>• Decodes <code>voice-sprite.mp3</code> lazily (saves 19–38 MB RAM when muted).</div>
+              <div>• Cycles <code>OFF → POI → POA</code> with Cartesian + clock-face callouts (e.g. <em>"2 left, 3 up"</em> / <em>"11 o'clock, 3 clicks"</em>).</div>
+              <div>• Generation cancel tokens prevent overlapping speech queues.</div>
             </div>
           </div>
-        </div>
+        </article>
 
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>PARAMETRIC RETICLE &amp; FFP</span>
-            <span class="badge">overlayManager.js</span>
+        <article class="card">
+          <div class="node-hdr">
+            <span>PARAMETRIC RETICLE &amp; LOUPE</span>
+            <span class="badge badge-orange">overlay + zoom</span>
           </div>
-          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">First Focal Plane (FFP):</strong> Subtensions scale with digital zoom</div>
-            <div>• <strong class="text-[#ccfbf1]">4 Center Symbols:</strong> Empty, Precision Dot, Mini-Cross, Chevron</div>
-            <div>• Configurable: clicks per arm (2-30), spacing, center gap, major intervals, tick labels &amp; concentric rings</div>
-            <div>• <strong class="text-[#ccfbf1]">6 Tactical Color Themes:</strong> Emerald, Amber, Ruby, Night Blue, Amethyst, White</div>
-            <div>• Quick Drawer on live feed for instantaneous field adjustments</div>
+          <div class="node-body">
+            <ul>
+              <li><strong>First Focal Plane (FFP):</strong> Scales crosshair subtensions 1:1 with digital zoom.</li>
+              <li><strong>Independent Reticle Swatches:</strong> Change crosshair color without altering app accent theme.</li>
+              <li><strong>Persisted Custom Reticle:</strong> Uploads stored as DataURL (&lt;= 1 MB) across restarts.</li>
+              <li><strong>Digital Loupe (PiP):</strong> 1.5x–12.0x movable/resizable zoom window with <code>Loupe AA</code> auto-snap to hits.</li>
+            </ul>
           </div>
-        </div>
+        </article>
       </div>
 
-      <!-- COLUMN 3: Native-Res RAM Buffer, Replay & Fullscreen Player -->
-      <div class="lg:col-span-4 space-y-5">
-        <div class="text-sm font-mono font-bold text-[#2dd4bf] uppercase tracking-wider">3. RAM Buffer, Replay &amp; Archival</div>
+      <!-- Column 3 -->
+      <div class="col">
+        <div class="section-title">3. RAM Buffer, Archive &amp; Native Hosts</div>
 
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>DUAL RAM RING BUFFER</span>
-            <span class="badge">memoryRingBuffer.js</span>
+        <article class="card card-strong">
+          <div class="node-hdr">
+            <span>LIVE-ONLY RAM RING BUFFER</span>
+            <span class="badge">memoryRingBuffer</span>
           </div>
-          <div class="p-4 text-xs space-y-2 text-[#99f6e4] font-mono">
-            <div class="text-[#2dd4bf] font-bold">Zero-Disk Circular Video Buffer (5–60s @ 5–30 FPS)</div>
-            <div>• Dual ingestion: grabs from &lt;video&gt; or <code class="text-[#ccfbf1]">getRtspCanvas()</code></div>
-            <div>• In-memory JPEG ArrayBuffer queue at full camera resolution</div>
-            <div>• Live <strong class="text-[#ccfbf1]">RAM Budget Meter</strong> in Settings (USED vs. EST vs. FREE)</div>
-            <div>• Proactive memory guardrails prevent tab crash or OOM</div>
+          <div class="node-body">
+            <ul>
+              <li><strong>Zero Disk Wear:</strong> Circular in-memory JPEG queue (5–60s @ 5–30 FPS), active strictly on Live screen.</li>
+              <li><strong>Tablet RAM Guardrails:</strong> Adapts memory cap via <code>navigator.deviceMemory</code> (&lt;= 220 MB on 4 GB Duet 3).</li>
+              <li><strong>Generation-Safe Reset:</strong> Prevents async <code>toBlob</code> races when switching cameras or clearing buffers.</li>
+            </ul>
           </div>
-        </div>
+        </article>
 
-        <div class="node-card node-card-strong">
-          <div class="node-header">
-            <span>UNIFIED INSTANT REPLAY</span>
-            <span class="badge">instantReplay.js</span>
+        <article class="card">
+          <div class="node-hdr">
+            <span>UNIFIED PLAYBACK &amp; HITS MAP</span>
+            <span class="badge badge-amber">Screen 2</span>
           </div>
-          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• Triggered by <strong class="text-[#2dd4bf]">REPLAY</strong>, Ring BTN 2/1, or gamepad Share</div>
-            <div>• Pauses live RAM capture; opens <strong class="text-[#2dd4bf]">LIVE BUFFER</strong> unsaved</div>
-            <div>• Dedicated <strong class="text-[#2dd4bf]">0.5x Slow-Mo</strong> &amp; <strong class="text-[#2dd4bf]">-1 / +1</strong> stepping</div>
-            <div>• On-demand <strong class="text-[#2dd4bf]">Save Clip</strong> + <strong class="text-[#2dd4bf]">Reticle: OFF</strong> default</div>
+          <div class="node-body">
+            <ul>
+              <li><strong>Playback Tab:</strong> Opens <code>LIVE BUFFER (RAM)</code> unsaved; 0.5x slow-mo, -1/+1 frame step, 46px gloved scrubber, on-demand Save Clip &amp; <code>.webm</code> export (picker invoked before encoding).</li>
+              <li><strong>Memory Cleanup:</strong> Frees 50–300 MB <code>activeBufferClip</code> immediately upon returning to Live.</li>
+              <li><strong>Spatial Hits Map:</strong> Decoupled <code>Pins: ON/OFF</code>, <strong>Aim Loupe</strong>, <strong>Calibrate</strong>, 2-tap <strong>Re-Zero</strong> &amp; <strong>Clear</strong>, in-place age timers.</li>
+            </ul>
           </div>
-        </div>
+        </article>
 
-        <div class="node-card">
-          <div class="node-header">
-            <span>PLAYBACK &amp; HITS ARCHIVE (SCREEN 2)</span>
-            <span class="badge">videoBrowser + detections</span>
+        <article class="card">
+          <div class="node-hdr">
+            <span>NATIVE ANDROID &amp; WINDOWS HOSTS</span>
+            <span class="badge">Kotlin + Python</span>
           </div>
-          <div class="p-4 text-xs space-y-1.5 text-[#99f6e4] font-mono">
-            <div>• <strong class="text-[#ccfbf1]">Playback Tab:</strong> Saved clips + pinned Live Buffer + .webm export</div>
-            <div>• <strong class="text-[#2dd4bf]">Hits Tab:</strong> Reticle ON default, <strong class="text-[#2dd4bf]">Hits: ON/OFF</strong> peek</div>
-            <div>• <strong class="text-[#2dd4bf]">Safe Masks:</strong> 👁 show/hide + ✎ Edit Masks + confirmed Clear</div>
-            <div>• <strong class="text-[#2dd4bf]">Re-Zero:</strong> Re-anchors background &amp; clears hits/log</div>
+          <div class="node-body">
+            <ul>
+              <li><strong>Android APK (v0.62.0 / vCode 62):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
+              <li><strong>Windows/Desktop (server.py):</strong> <code>TCP_NODELAY</code> + coalesced MJPEG writes, localhost-by-default security (<code>--lan</code> opt-in for iOS/iPad), SSRF &amp; scheme validation.</li>
+            </ul>
           </div>
-        </div>
+        </article>
       </div>
-
     </div>
 
-    <!-- Bottom UI, Global Opacity & Controllers Bar -->
-    <div class="node-card node-card-strong p-4 font-mono text-xs space-y-2">
+    <footer class="card footer-bar">
       <div>
-        <span class="text-[#2dd4bf] font-bold">PWA ENGINE &amp; PORTABLE OFFLINE CAPABILITIES (manifest.json • sw.js • spotr-v0.1.15):</span>
-        <span class="text-[#99f6e4] ml-2">100% installable offline Progressive Web App (Cache-First + Stale-While-Revalidate + auto-reload on SW update). Pre-caches core assets, CSS, JS modules, audio sprites, and vector icons. Screen WakeLock API prevents display dimming during active reconnaissance.</span>
+        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.62.0)</strong>
+        Pre-caches all 40 core assets for 100% offline field use. Bypasses cross-origin camera requests (192.168.0.1) so camera wake probes never hang, and preserves active hits/buffers across SW updates.
       </div>
       <div>
-        <span class="text-[#2dd4bf] font-bold">PORTABLE WINDOWS LAUNCHER (start_spotr.bat • server.py):</span>
-        <span class="text-[#99f6e4] ml-2">One-click portable launcher auto-detects Python, starts OpenCV RTSP gateway with condition-push streaming, and launches the browser interface.</span>
+        <strong>GLOVED &amp; LOW-POWER FIELD ERGONOMICS</strong>
+        Zero GPU backdrop blur, 48px Live dock targets, 2-tap destructive confirmations (Re-Zero / Clear / Reset), Rain/Carry Touch Lock, and automatic background sleep keep tablets fast and cool on the range.
       </div>
-    </div>
+    </footer>
   </div>
-
 </body>
 </html>

@@ -110,9 +110,51 @@ function updateGamepadActionBanner(text) {
   if (banner) banner.textContent = text;
 }
 
+let idleCheckTimer = null;
+let lastLoopMs = performance.now();
+
+function hasConnectedGamepad() {
+  if (webHIDConnected) return true;
+  const getPads = navigator.getGamepads || navigator.webkitGetGamepads;
+  if (!getPads) return false;
+  const pads = getPads.call(navigator) || [];
+  for (let i = 0; i < pads.length; i++) {
+    if (pads[i]) return true;
+  }
+  return false;
+}
+
+function stopFrameLoop() {
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+}
+
+function ensureIdleWatcher() {
+  if (idleCheckTimer) return;
+  idleCheckTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (hasConnectedGamepad()) {
+      startFrameLoop();
+    }
+  }, 1000);
+}
+
 export function initGamepadController() {
-  startFrameLoop();
+  ensureIdleWatcher();
+  if (hasConnectedGamepad()) {
+    startFrameLoop();
+  }
   autoReconnectWebHID();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopFrameLoop();
+    } else if (hasConnectedGamepad()) {
+      startFrameLoop();
+    }
+  });
 
   if ('hid' in navigator) {
     navigator.hid.addEventListener('disconnect', (event) => {
@@ -121,12 +163,19 @@ export function initGamepadController() {
         activeHIDDevice = null;
         webHIDConnected = false;
         hasSentInit = false;
+        latestAxes = { lx: 0, ly: 0, rx: 0, ry: 0 };
+        prevButtonStates = {};
+        vmIsDragging = false;
+        vmL2Down = false;
+        vmLastPhysicalClick = false;
+        vmWasTouching = false;
         updateState({
           gamepadConnected: false,
           gamepadName: '',
           lastGamepadAction: 'DISCONNECTED'
         });
         updateGamepadUI(false, 'DISCONNECTED (PRESS ANY BUTTON)');
+        if (!hasConnectedGamepad()) stopFrameLoop();
       }
     });
   }
@@ -134,6 +183,7 @@ export function initGamepadController() {
   window.addEventListener('gamepadconnected', (e) => {
     const pad = e.gamepad;
     console.log(`[Gamepad API] Connected: "${pad.id}" (index: ${pad.index})`);
+    startFrameLoop();
     if (!webHIDConnected) {
       const formatted = formatControllerName(pad.id);
       updateState({
@@ -151,12 +201,15 @@ export function initGamepadController() {
       const getPads = navigator.getGamepads || navigator.webkitGetGamepads;
       const remaining = getPads ? Array.from(getPads.call(navigator) || []).filter(Boolean) : [];
       if (!remaining.length) {
+        latestAxes = { lx: 0, ly: 0, rx: 0, ry: 0 };
+        prevButtonStates = {};
         updateState({
           gamepadConnected: false,
           gamepadName: '',
           lastGamepadAction: 'DISCONNECTED'
         });
         updateGamepadUI(false, 'DISCONNECTED (PRESS ANY BUTTON)');
+        stopFrameLoop();
       }
     }
   });
@@ -343,9 +396,10 @@ function handleWebHIDInputReport(event) {
   webHIDLastReportTime = performance.now();
   lastReportId = reportId;
   lastReportLen = data.byteLength;
+  if (!rafId && !document.hidden) startFrameLoop();
 
-  // If controller is still streaming basic truncated report, prompt mode switch
-  if (data.byteLength < 64 && activeHIDDevice && (performance.now() - lastInitAttemptTime > 1800)) {
+  // Only prompt BT extended mode switch for genuine 9-10 byte basic BT reports (never 63-byte USB reports!)
+  if (reportId === 0x01 && data.byteLength <= 12 && activeHIDDevice && (performance.now() - lastInitAttemptTime > 1800)) {
     lastInitAttemptTime = performance.now();
     sendDualShock4BluetoothInit(activeHIDDevice);
   }
@@ -450,13 +504,10 @@ function parseDualShock4Touch(data, reportId) {
     return { active: false, x: 0, y: 0, trackingId: -1 };
   }
 
-  // Candidate contact offsets:
-  // For Bluetooth 77B packets, index 36 is the primary contact byte.
-  // For USB 64B packets, index 34 is the primary contact byte.
-  // Note: We NEVER test index 35 first because byte 35 in BT reports is the rolling timestamp counter!
-  const candidateOffsets = (data.byteLength >= 70 || reportId === 0x11 || reportId === 0x31)
-    ? [36, 40, 34, 37]
-    : [34, 38, 36, 37];
+  // Inspect ONLY true finger-contact offsets (never touches_count or coordinate bytes)
+  // Bluetooth Report 0x11/0x31: fingers 0 & 1 at bytes 36, 40. USB Report 0x01: bytes 34, 38.
+  const isBtExtended = data.byteLength >= 70 || reportId === 0x11 || reportId === 0x31;
+  const candidateOffsets = isBtExtended ? [36, 40] : [34, 38];
 
   for (let i = 0; i < candidateOffsets.length; i++) {
     const c = candidateOffsets[i];
@@ -852,19 +903,26 @@ export function cycleTheme(direction = 1) {
  */
 function startFrameLoop() {
   if (rafId) return;
+  lastLoopMs = performance.now();
 
   function loop() {
+    rafId = null;
+    if (document.hidden) return;
+    const now = performance.now();
+    const dtScale = Math.max(0.25, Math.min(3.0, (now - lastLoopMs) / 16.6667));
+    lastLoopMs = now;
     try {
-      const now = performance.now();
       const isWebHIDActive = webHIDConnected && (now - webHIDLastReportTime < 500);
 
       if (isWebHIDActive) {
         // Continuous stick motion driven by WebHID
-        applyStickMotion(latestAxes.lx, latestAxes.ly, latestAxes.rx, latestAxes.ry);
-        updateSettingsDiagnostics('webhid', 1);
+        applyStickMotion(latestAxes.lx, latestAxes.ly, latestAxes.rx, latestAxes.ry, dtScale);
       } else {
         // Fallback to HTML5 Gamepad API
-        pollGamepadAPI();
+        const foundPad = pollGamepadAPI(dtScale);
+        if (!foundPad && !webHIDConnected) {
+          return; // Stop rAF spin when no controller is connected; idle watcher will restart on connect
+        }
       }
     } catch (err) {
       console.warn('[Gamepad Frame Error]', err);
@@ -886,9 +944,9 @@ function applyStickCurve(v) {
 }
 
 /**
- * Applies smooth thumbstick movement frame by frame
+ * Applies smooth thumbstick movement frame by frame (dt-normalized for 20-120Hz displays)
  */
-function applyStickMotion(lx, ly, rx, ry) {
+function applyStickMotion(lx, ly, rx, ry, dtScale = 1.0) {
   const effLy = appState.leftStickInvertY ? -ly : ly;
   const effRy = appState.rightStickInvertY ? -ry : ry;
 
@@ -908,7 +966,7 @@ function applyStickMotion(lx, ly, rx, ry) {
   // Maximum speed reduced by ~50% (scaled by reticleAimSpeed, default 50%) to allow pinpoint positioning
   if (appState.currentScreen === 'live' && (lx !== 0 || effLy !== 0)) {
     const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
-    const currentRoiSpeed = BASE_ROI_SPEED * aimRatio;
+    const currentRoiSpeed = BASE_ROI_SPEED * aimRatio * dtScale;
     const clx = applyStickCurve(lx);
     const cly = applyStickCurve(effLy);
     let nx = Math.max(0.04, Math.min(0.96, appState.roiX + clx * currentRoiSpeed));
@@ -924,7 +982,7 @@ function applyStickMotion(lx, ly, rx, ry) {
   // Right Stick: Pans Main View when zoomed in (>1.0x) in live mode
   if (appState.currentScreen === 'live' && appState.mainZoom > 1.01 && (rx !== 0 || effRy !== 0)) {
     const aimRatio = (appState.reticleAimSpeed ?? 50) / 100;
-    const currentPanSpeed = BASE_PAN_SPEED * aimRatio;
+    const currentPanSpeed = BASE_PAN_SPEED * aimRatio * dtScale;
     const crx = applyStickCurve(rx);
     const cry = applyStickCurve(effRy);
     const maxPan = Math.max(0, (1 - 1 / appState.mainZoom) / 2);
@@ -993,22 +1051,19 @@ function applyStickMotion(lx, ly, rx, ry) {
 /**
  * Polls standard HTML5 Gamepad API (for USB controllers or XInput)
  */
-function pollGamepadAPI() {
+function pollGamepadAPI(dtScale = 1.0) {
   const getPads = navigator.getGamepads || navigator.webkitGetGamepads;
-  if (!getPads) return;
+  if (!getPads) return false;
 
   const rawPads = getPads.call(navigator) || [];
   let pad = null;
-  let count = 0;
   for (let i = 0; i < rawPads.length; i++) {
     const p = rawPads[i];
     if (p !== null && p !== undefined) {
-      count++;
-      if (!pad) pad = p;
+      pad = p;
+      break;
     }
   }
-
-  updateSettingsDiagnostics('gamepad_api', count);
 
   if (!pad) {
     consecutiveNullFrames++;
@@ -1020,7 +1075,7 @@ function pollGamepadAPI() {
       });
       updateGamepadUI(false, 'DISCONNECTED (PRESS ANY BUTTON)');
     }
-    return;
+    return false;
   }
 
   consecutiveNullFrames = 0;
@@ -1050,8 +1105,9 @@ function pollGamepadAPI() {
   const ry = applyDeadzone(rawRy, true);
   latestAxes = { lx, ly, rx, ry };
 
-  applyStickMotion(lx, ly, rx, ry);
+  applyStickMotion(lx, ly, rx, ry, dtScale);
   dispatchControllerInputs(actionState);
+  return true;
 }
 
 /**
@@ -1070,26 +1126,15 @@ function dispatchControllerInputs(actionState) {
     return;
   }
 
-  // 2. Live monitor in Settings screen
-  if (appState.currentScreen === 'settings') {
-    ROLES.forEach((r) => {
-      const badge = document.querySelector(`.gp-badge[data-gp="${r}"]`);
-      if (badge) {
-        badge.classList.toggle('gp-pressed', Boolean(actionState[r]));
-      }
-    });
-
-    const activeRoles = ROLES.filter((r) => actionState[r]).map((r) => r.toUpperCase()).join(' + ');
-    if (activeRoles) {
-      updateGamepadActionBanner(`ACTIVE: ${activeRoles}`);
-    }
-  }
-
-  // 2b. Live visual monitor on Controller Configurator screen
+  // 2. Live visual monitor on Controller Configurator screen (only diff changed buttons to avoid 250Hz DOM churn)
   if (appState.currentScreen === 'controller') {
-    ROLES.forEach((r) => {
-      window.controllerMappingAPI?.highlightGamepadInput(r, Boolean(actionState[r]));
-    });
+    for (let i = 0; i < ROLES.length; i++) {
+      const r = ROLES[i];
+      const isDown = Boolean(actionState[r]);
+      if (isDown !== Boolean(prevButtonStates[r])) {
+        window.controllerMappingAPI?.highlightGamepadInput(r, isDown);
+      }
+    }
   }
 
   // Edge-trigger helper
@@ -1112,8 +1157,10 @@ function dispatchControllerInputs(actionState) {
     }
   }
 
-  // Live action readout on Controller screen
-  if (appState.currentScreen === 'controller') {
+  const screen = appState.currentScreen;
+
+  // Controller screen: test buttons safely without falling through to mutate Live/Replay/Settings!
+  if (screen === 'controller') {
     for (const r of ROLES) {
       if (isJustPressed(r)) {
         const bindings = getActiveBindings();
@@ -1121,22 +1168,59 @@ function dispatchControllerInputs(actionState) {
         const actDef = entry ? ACTION_DEFINITIONS.find(a => a.id === entry[0]) : null;
         window.controllerMappingAPI?.updateLiveActionBanner(r, actDef ? actDef.name : 'UNASSIGNED');
         if (r === 'circle') {
-          document.getElementById('btnControllerBackToSettings')?.click();
-          prevButtonStates = Object.assign({}, actionState);
-          return;
+          document.getElementById('btnControllerBackToLive')?.click();
+          break;
         }
       }
     }
+    ROLES.forEach((r) => { prevButtonStates[r] = actionState[r]; });
+    return;
   }
 
-  const screen = appState.currentScreen;
+  // Settings & Calibration screens: allow virtual mouse L2/R2 and Circle/Options back-to-live only
+  if (screen === 'settings' || screen === 'calibration') {
+    if (isJustPressed('l2')) {
+      wakeVirtualMouse();
+      vmL2Down = true;
+      vmIsDragging = true;
+      startVirtualDrag(vmCursorX, vmCursorY);
+    } else if (!actionState['l2'] && vmL2Down) {
+      vmL2Down = false;
+      if (!vmLastPhysicalClick) {
+        vmIsDragging = false;
+        endVirtualDrag(vmCursorX, vmCursorY);
+      }
+    }
+    if (isJustPressed('r2')) {
+      wakeVirtualMouse();
+      triggerVirtualRightClick(vmCursorX, vmCursorY);
+    }
+    if (isJustPressed('circle') || isJustPressed('options')) {
+      const backBtnId = screen === 'calibration' ? 'btnCalibBackToLive' : 'btnSettingsBackToLive';
+      document.getElementById(backBtnId)?.click();
+    }
+    ROLES.forEach((r) => { prevButtonStates[r] = actionState[r]; });
+    return;
+  }
 
+  // Screen-context-aware binding lookup (prevents Gallery actions from shadowing Live actions)
   function getBoundAction(role) {
     try {
       const bindings = getActiveBindings();
+      const matches = [];
       for (const [actionId, binding] of Object.entries(bindings)) {
-        if (binding.gamepad === role) return actionId;
+        if (binding.gamepad === role) matches.push(actionId);
       }
+      if (!matches.length) return null;
+      if (matches.length === 1) return matches[0];
+      if (screen === 'gallery') {
+        const galMatch = matches.find((id) => ACTION_DEFINITIONS.find((a) => a.id === id)?.category === 'playback');
+        if (galMatch) return galMatch;
+      } else {
+        const liveMatch = matches.find((id) => ACTION_DEFINITIONS.find((a) => a.id === id)?.category !== 'playback');
+        if (liveMatch) return liveMatch;
+      }
+      return matches[0];
     } catch (_) {}
     return null;
   }
@@ -1177,6 +1261,9 @@ function dispatchControllerInputs(actionState) {
     } else if (screen === 'controller') {
       document.getElementById('btnControllerBackToLive')?.click();
       updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
+    } else if (screen === 'calibration') {
+      document.getElementById('btnCalibBackToLive')?.click();
+      updateState({ lastGamepadAction: 'BUTTON: CIRCLE (LIVE FEED)' });
     } else {
       updateState({
         uiDecluttered: !appState.uiDecluttered,
@@ -1215,7 +1302,7 @@ function dispatchControllerInputs(actionState) {
     } else {
       const act = getBoundAction('triangle') || 'toggle_heatmap';
       executeMappedAction(act);
-      updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (HEATMAP TOGGLE)' });
+      updateState({ lastGamepadAction: 'BUTTON: TRIANGLE (HITS TOGGLE)' });
     }
   }
 
@@ -1284,6 +1371,9 @@ function dispatchControllerInputs(actionState) {
       updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT SETTINGS)' });
     } else if (screen === 'reticle') {
       document.getElementById('btnReticleBackToLive')?.click();
+      updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT TO LIVE)' });
+    } else if (screen === 'calibration') {
+      document.getElementById('btnCalibBackToLive')?.click();
       updateState({ lastGamepadAction: 'BUTTON: OPTIONS (EXIT TO LIVE)' });
     } else {
       document.getElementById('btnToggleOptions')?.click();
@@ -1444,16 +1534,17 @@ function isButtonPressed(pad, btnIndex) {
   return Boolean(btn.pressed || btn.value > 0.45);
 }
 
-function checkDpadAxis(pad, dir) {
+function checkDpadAxis(pad, dir, isDInput) {
   if (!pad.axes) return false;
-  for (let a = 4; a < pad.axes.length; a++) {
-    const val = pad.axes[a];
-    if (val === undefined || Math.abs(val) > 1.05) continue;
-    if (dir === 'up' && ((val >= -1.05 && val <= -0.65) || (val >= 0.95 && val <= 1.05))) return true;
-    if (dir === 'right' && val >= -0.75 && val <= -0.15) return true;
-    if (dir === 'down' && val >= -0.20 && val <= 0.45) return true;
-    if (dir === 'left' && val >= 0.40 && val <= 0.95) return true;
-  }
+  // On DirectInput DS4, axes[4] is R2 trigger and axes[5] is Right Stick Y — POV hat is strictly axis 9!
+  // On non-standard pads with a POV hat at the tail, only inspect axis 9 (never axes 4..5).
+  if (!isDInput || pad.axes.length < 10) return false;
+  const val = pad.axes[9];
+  if (val === undefined || Math.abs(val) > 1.05) return false;
+  if (dir === 'up' && ((val >= -1.05 && val <= -0.65) || (val >= 0.95 && val <= 1.05))) return true;
+  if (dir === 'right' && val >= -0.75 && val <= -0.15) return true;
+  if (dir === 'down' && val >= -0.20 && val <= 0.45) return true;
+  if (dir === 'left' && val >= 0.40 && val <= 0.95) return true;
   return false;
 }
 
@@ -1486,17 +1577,17 @@ function getGamepadApiActionDown(pad, role) {
     case 'r3':
       return isButtonPressed(pad, 11);
     case 'dpad-up':
-      if (isButtonPressed(pad, 12)) return true;
-      return checkDpadAxis(pad, 'up');
+      if (!isDInput && isButtonPressed(pad, 12)) return true;
+      return checkDpadAxis(pad, 'up', isDInput);
     case 'dpad-down':
-      if (isButtonPressed(pad, 13)) return true;
-      return checkDpadAxis(pad, 'down');
+      if (!isDInput && isButtonPressed(pad, 13)) return true;
+      return checkDpadAxis(pad, 'down', isDInput);
     case 'dpad-left':
-      if (isButtonPressed(pad, 14)) return true;
-      return checkDpadAxis(pad, 'left');
+      if (!isDInput && isButtonPressed(pad, 14)) return true;
+      return checkDpadAxis(pad, 'left', isDInput);
     case 'dpad-right':
-      if (isButtonPressed(pad, 15)) return true;
-      return checkDpadAxis(pad, 'right');
+      if (!isDInput && isButtonPressed(pad, 15)) return true;
+      return checkDpadAxis(pad, 'right', isDInput);
     case 'ps':
       return isDInput ? isButtonPressed(pad, 12) : isButtonPressed(pad, 16);
     case 'touchpad':

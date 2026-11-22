@@ -11,12 +11,18 @@ import {
   clearDetectionHits,
   exportAnnotatedCanvasPng
 } from '../renderer/compositor.js';
+import { aimLoupeAtHit } from '../renderer/zoomWindow.js';
 import {
   renderReticleOverlayLayer,
   computeFfpMatchScale,
   computeReticleBaseScale,
   getLiveViewportDimensions
 } from '../renderer/overlayManager.js';
+import {
+  formatHitClockTime,
+  drawDisplayTimestampOnCanvas,
+  drawHitTimestampBadge
+} from '../renderer/timestampOverlay.js';
 import { saveSettings } from '../storage/settingsStore.js';
 
 let initialized = false;
@@ -42,7 +48,6 @@ export function initDetectionsScreen(subscribeState) {
 
   const btnOpenHitsTab = document.getElementById('btnOpenHitsTab');
   const hitCountBadge = document.getElementById('hitCountBadge');
-  const heatmapHitBadge = document.getElementById('heatmapHitBadge');
   const galleryHitsCountBadge = document.getElementById('galleryHitsCountBadge');
 
   const tabArchiveClips = document.getElementById('tabArchiveClips');
@@ -75,15 +80,16 @@ export function initDetectionsScreen(subscribeState) {
 
   const btnToggleHitsReticle = document.getElementById('btnToggleHitsReticle');
   const btnToggleHitsVisible = document.getElementById('btnToggleHitsVisible');
+  const btnToggleHitsTimestamps = document.getElementById('btnToggleHitsTimestamps');
   const btnHitsRezero = document.getElementById('btnHitsRezero');
   const btnHitsClear = document.getElementById('btnHitsClear');
 
   const btnHitPrev = document.getElementById('btnHitPrev');
   const btnHitNext = document.getElementById('btnHitNext');
   const hitSelectedSummary = document.getElementById('hitSelectedSummary');
+  const btnHitAimLoupe = document.getElementById('btnHitAimLoupe');
   const btnHitSnapshot = document.getElementById('btnHitSnapshot');
 
-  let hitsVisible = true;
   let hitsDrawerOpen = false;
   let ageTicker = null;
   let hitsZoom = 1.0;
@@ -92,10 +98,12 @@ export function initDetectionsScreen(subscribeState) {
   let hitsLayerW = 0;
   let hitsLayerH = 0;
   let hitsPanning = false;
+  let hitsPanPointerId = null;
   let hitsPanStartX = 0;
   let hitsPanStartY = 0;
   let hitsStartOffX = 0;
   let hitsStartOffY = 0;
+  let lastFittedAspectKey = '';
 
   function applyHitsTransform() {
     const isHitsActive = appState.currentScreen === 'gallery' && appState.galleryArchiveTab === 'hits';
@@ -207,7 +215,7 @@ export function initDetectionsScreen(subscribeState) {
       customImg._ffpLoadWired = true;
       customImg.addEventListener('load', () => syncHitsReticleOverlay());
     }
-    const enabled = appState.hitsReticleEnabled !== false;
+    const enabled = appState.overlayEnabled !== false;
     if (btnToggleHitsReticle) {
       btnToggleHitsReticle.textContent = enabled ? 'Reticle: ON' : 'Reticle: OFF';
       btnToggleHitsReticle.classList.toggle('radar-btn-active', enabled);
@@ -247,12 +255,29 @@ export function initDetectionsScreen(subscribeState) {
   }
 
   function syncHitsPinsVisibility() {
+    const showPins = appState.hitsMapShowPins !== false;
     if (hitsPinsLayer) {
-      hitsPinsLayer.classList.toggle('hidden', !hitsVisible);
+      hitsPinsLayer.classList.toggle('hidden', !showPins);
     }
     if (btnToggleHitsVisible) {
-      btnToggleHitsVisible.textContent = hitsVisible ? 'Hits: ON' : 'Hits: OFF';
-      btnToggleHitsVisible.classList.toggle('radar-btn-active', hitsVisible);
+      btnToggleHitsVisible.textContent = showPins ? 'Pins: ON' : 'Pins: OFF';
+      btnToggleHitsVisible.classList.toggle('radar-btn-active', showPins);
+    }
+    if (btnHitsClear) {
+      const hasHits = Array.isArray(appState.detectionHits) && appState.detectionHits.length > 0;
+      btnHitsClear.disabled = !hasHits;
+      btnHitsClear.classList.toggle('dock-btn-dimmed', !hasHits);
+    }
+  }
+
+  function syncHitsTimestampsBtn() {
+    const on = Boolean(appState.showHitTimestamps);
+    if (btnToggleHitsTimestamps) {
+      btnToggleHitsTimestamps.classList.toggle('radar-btn-active', on);
+      btnToggleHitsTimestamps.setAttribute('aria-pressed', String(on));
+      btnToggleHitsTimestamps.title = on
+        ? 'Timestamp on Hits: ON — Tap to hide (Synced with Calibration & Live)'
+        : 'Timestamp on Hits: OFF — Tap to show (Synced with Calibration & Live)';
     }
   }
 
@@ -261,11 +286,13 @@ export function initDetectionsScreen(subscribeState) {
     const count = hits.length;
     const countStr = String(count);
 
-    if (hitCountBadge) hitCountBadge.textContent = countStr;
-    if (galleryHitsCountBadge) galleryHitsCountBadge.textContent = countStr;
-    if (heatmapHitBadge) {
-      heatmapHitBadge.textContent = countStr;
-      heatmapHitBadge.classList.toggle('hidden', count === 0);
+    if (hitCountBadge) {
+      hitCountBadge.textContent = countStr;
+      hitCountBadge.classList.toggle('has-hits', count > 0);
+    }
+    if (galleryHitsCountBadge) {
+      galleryHitsCountBadge.textContent = countStr;
+      galleryHitsCountBadge.classList.toggle('has-hits', count > 0);
     }
 
     if (appState.currentScreen !== 'gallery' || appState.galleryArchiveTab !== 'hits') {
@@ -274,6 +301,11 @@ export function initDetectionsScreen(subscribeState) {
 
     const selectedHit = getSelectedHit(hits);
     const hasHits = Boolean(selectedHit);
+    const aspectKey = `${selectedHit?.frameW || appState.streamWidth || 16}x${selectedHit?.frameH || appState.streamHeight || 9}`;
+    if (aspectKey !== lastFittedAspectKey) {
+      lastFittedAspectKey = aspectKey;
+      fitHitsViewportBox();
+    }
 
     if (hitsEmptyBanner) hitsEmptyBanner.classList.toggle('hidden', hasHits);
     if (hitsRefImage) {
@@ -296,10 +328,11 @@ export function initDetectionsScreen(subscribeState) {
       }
     }
 
-    [btnHitPrev, btnHitNext, btnHitSnapshot].forEach((btn) => {
+    [btnHitPrev, btnHitNext, btnHitAimLoupe, btnHitSnapshot].forEach((btn) => {
       if (btn) btn.disabled = !hasHits;
     });
 
+    const showHitTime = Boolean(appState.showHitTimestamps);
     if (hitsPinsLayer) {
       hitsPinsLayer.innerHTML = '';
       hits.forEach((hit, idx) => {
@@ -307,9 +340,16 @@ export function initDetectionsScreen(subscribeState) {
         pin.type = 'button';
         const isSel = selectedHit && hit.id === selectedHit.id;
         pin.className = `hit-pin ${getAgeClass(hit.timestampMs)}${isSel ? ' selected' : ''}`;
+        pin.dataset.hitTs = String(hit.timestampMs || 0);
         pin.style.left = `${(hit.normX * 100).toFixed(2)}%`;
         pin.style.top = `${(hit.normY * 100).toFixed(2)}%`;
         pin.textContent = String(idx + 1);
+        if (showHitTime && hit.timestampMs) {
+          const timeBadge = document.createElement('span');
+          timeBadge.className = 'hit-pin-time';
+          timeBadge.textContent = formatHitClockTime(hit.timestampMs);
+          pin.appendChild(timeBadge);
+        }
 
         pin.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -319,6 +359,7 @@ export function initDetectionsScreen(subscribeState) {
       });
     }
     syncHitsPinsVisibility();
+    syncHitsTimestampsBtn();
     syncHitsReticleOverlay();
 
     if (hitsLogList) {
@@ -330,14 +371,25 @@ export function initDetectionsScreen(subscribeState) {
           const hit = hits[i];
           const num = i + 1;
           const isSel = selectedHit && hit.id === selectedHit.id;
+          const timeStr = showHitTime && hit.timestampMs ? `${formatHitClockTime(hit.timestampMs)} • ` : '';
           const row = document.createElement('div');
           row.className = `hits-log-row${isSel ? ' selected' : ''}`;
-          row.innerHTML = `
-            <div style="font-size:12px; font-family:var(--font-mono);">
-              <strong>#${num}</strong> • ${hit.dirLabel}
-            </div>
-            <span style="font-size:11px; color:var(--radar-text-muted); font-family:var(--font-mono);">${formatAgeShort(hit.timestampMs)}</span>
-          `;
+          const infoEl = document.createElement('div');
+          infoEl.style.cssText = 'font-size:12px; font-family:var(--font-mono);';
+          const numStrong = document.createElement('strong');
+          numStrong.textContent = `#${num}`;
+          infoEl.appendChild(numStrong);
+          infoEl.appendChild(document.createTextNode(` • ${hit.dirLabel || 'Hit'}`));
+
+          const ageSpan = document.createElement('span');
+          ageSpan.className = 'hits-log-age';
+          ageSpan.dataset.hitTs = String(hit.timestampMs || 0);
+          ageSpan.dataset.timePrefix = timeStr;
+          ageSpan.style.cssText = 'font-size:11px; color:var(--radar-text-muted); font-family:var(--font-mono);';
+          ageSpan.textContent = `${timeStr}${formatAgeShort(hit.timestampMs)}`;
+
+          row.appendChild(infoEl);
+          row.appendChild(ageSpan);
           row.addEventListener('click', () => {
             updateState({ selectedHitId: hit.id });
             if (window.innerWidth <= 820) {
@@ -349,6 +401,25 @@ export function initDetectionsScreen(subscribeState) {
           hitsLogList.appendChild(row);
         }
       }
+    }
+  }
+
+  function updateAgesInPlace() {
+    if (hitsPinsLayer) {
+      hitsPinsLayer.querySelectorAll('.hit-pin[data-hit-ts]').forEach((pin) => {
+        const ts = Number(pin.dataset.hitTs);
+        if (!ts) return;
+        const nextAge = getAgeClass(ts);
+        pin.classList.remove('pin-fresh', 'pin-warm', 'pin-stale');
+        pin.classList.add(nextAge);
+      });
+    }
+    if (hitsLogList) {
+      hitsLogList.querySelectorAll('.hits-log-age[data-hit-ts]').forEach((span) => {
+        const ts = Number(span.dataset.hitTs);
+        if (!ts) return;
+        span.textContent = `${span.dataset.timePrefix || ''}${formatAgeShort(ts)}`;
+      });
     }
   }
 
@@ -384,8 +455,11 @@ export function initDetectionsScreen(subscribeState) {
   // Zoomed Panning via Pointer Events on #hitsMapViewport / #hitsTransformLayer
   hitsMapViewport?.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.hit-pin')) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (hitsPanPointerId !== null) return;
     if (hitsZoom > 1.01) {
       hitsPanning = true;
+      hitsPanPointerId = e.pointerId;
       hitsPanStartX = e.clientX;
       hitsPanStartY = e.clientY;
       hitsStartOffX = hitsPanPxX;
@@ -400,16 +474,17 @@ export function initDetectionsScreen(subscribeState) {
   });
 
   hitsMapViewport?.addEventListener('pointermove', (e) => {
-    if (hitsPanning) {
+    if (hitsPanning && e.pointerId === hitsPanPointerId) {
       hitsPanPxX = hitsStartOffX + (e.clientX - hitsPanStartX);
       hitsPanPxY = hitsStartOffY + (e.clientY - hitsPanStartY);
       applyHitsTransform();
     }
   });
 
-  const finishPointer = () => {
-    if (hitsPanning) {
+  const finishPointer = (e) => {
+    if (hitsPanning && (!e || e.pointerId === undefined || e.pointerId === hitsPanPointerId)) {
       hitsPanning = false;
+      hitsPanPointerId = null;
       applyHitsTransform();
     }
   };
@@ -437,23 +512,60 @@ export function initDetectionsScreen(subscribeState) {
   });
 
   btnToggleHitsReticle?.addEventListener('click', () => {
-    const cur = appState.hitsReticleEnabled !== false;
-    updateState({ hitsReticleEnabled: !cur });
+    updateState({ overlayEnabled: !(appState.overlayEnabled !== false) });
     saveSettings(appState);
   });
 
   btnToggleHitsVisible?.addEventListener('click', () => {
-    hitsVisible = !hitsVisible;
-    syncHitsPinsVisibility();
+    updateState({ hitsMapShowPins: !(appState.hitsMapShowPins !== false) });
   });
 
-  btnHitsRezero?.addEventListener('click', () => {
+  btnToggleHitsTimestamps?.addEventListener('click', () => {
+    updateState({ showHitTimestamps: !appState.showHitTimestamps });
+    saveSettings(appState);
+  });
+
+  // Two-tap protection for destructive session-hit wipes in the field
+  const armTwoTap = (btn, defaultText, onConfirm) => {
+    let armed = false;
+    let timer = null;
+    const reset = () => {
+      armed = false;
+      clearTimeout(timer);
+      if (btn) {
+        btn.classList.remove('radar-btn-armed');
+        if (defaultText !== null) btn.textContent = defaultText;
+      }
+    };
+    btn?.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        btn.classList.add('radar-btn-armed');
+        if (defaultText !== null) btn.textContent = 'Sure?';
+        clearTimeout(timer);
+        timer = setTimeout(reset, 2600);
+        return;
+      }
+      reset();
+      onConfirm();
+    });
+  };
+
+  armTwoTap(btnHitsRezero, 'Re-Zero', () => {
     rezeroHeatmap();
     clearDetectionHits();
   });
 
-  btnHitsClear?.addEventListener('click', () => {
+  armTwoTap(btnHitsClear, null, () => {
     clearDetectionHits();
+  });
+
+  btnHitAimLoupe?.addEventListener('click', () => {
+    const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
+    const selectedHit = getSelectedHit(hits);
+    if (selectedHit) {
+      aimLoupeAtHit(selectedHit, { switchToLive: true, ensurePipVisible: true });
+    }
   });
 
   btnHitPrev?.addEventListener('click', () => {
@@ -493,13 +605,13 @@ export function initDetectionsScreen(subscribeState) {
     }
 
     await exportAnnotatedCanvasPng(tempCanvas, {
-      includeReticle: appState.hitsReticleEnabled !== false,
+      includeReticle: appState.overlayEnabled !== false,
       reticleZoom: 1.0,
       matchLiveFfp: true,
       prefix: 'SPOTR_Hits',
       drawExtra: async (ctx, w, h) => {
         ctx.save();
-        if (hitsVisible) {
+        if (appState.hitsMapShowPins !== false) {
           hits.forEach((hit, idx) => {
             const px = hit.normX * w;
             const py = hit.normY * h;
@@ -516,6 +628,17 @@ export function initDetectionsScreen(subscribeState) {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(String(idx + 1), px, py);
+            if (appState.showHitTimestamps && hit.timestampMs) {
+              drawHitTimestampBadge(ctx, px, py, isSel ? 16 : 13, hit.timestampMs, w, h);
+            }
+          });
+        }
+        if (appState.showDisplayTimestamp !== false) {
+          drawDisplayTimestampOnCanvas(ctx, w, h, selectedHit?.timestampMs || Date.now(), {
+            position: appState.timestampPosition || 'bottom-right',
+            opacity: (appState.timestampOpacity ?? 60) / 100,
+            adaptive: appState.timestampAdaptive !== false,
+            isLive: false
           });
         }
         ctx.restore();
@@ -532,21 +655,31 @@ export function initDetectionsScreen(subscribeState) {
       }
     }
     if (
-      patch.hitsReticleEnabled !== undefined ||
-      patch.overlayType !== undefined ||
-      patch.overlayOpacity !== undefined ||
-      patch.overlayScale !== undefined ||
-      patch.reticleFfpMode !== undefined ||
-      patch.customOverlayUrl !== undefined ||
-      patch.reticleConfig !== undefined ||
-      patch.themeColor !== undefined
+      state.currentScreen === 'gallery' &&
+      state.galleryArchiveTab === 'hits' &&
+      (patch.overlayEnabled !== undefined ||
+        patch.overlayType !== undefined ||
+        patch.overlayOpacity !== undefined ||
+        patch.overlayScale !== undefined ||
+        patch.reticleFfpMode !== undefined ||
+        patch.customOverlayUrl !== undefined ||
+        patch.reticleConfig !== undefined ||
+        patch.themeColor !== undefined)
     ) {
       syncHitsReticleOverlay();
+    }
+    if (patch.hitsMapShowPins !== undefined) {
+      syncHitsPinsVisibility();
+    }
+    if (patch.showHitTimestamps !== undefined) {
+      syncHitsTimestampsBtn();
     }
     if (
       patch.detectionHits !== undefined ||
       patch.selectedHitId !== undefined ||
-      patch.heatmapIgnoreMasks !== undefined
+      patch.heatmapIgnoreMasks !== undefined ||
+      patch.showHitTimestamps !== undefined ||
+      patch.hitsMapShowPins !== undefined
     ) {
       renderDetectionsMap();
     }
@@ -554,9 +687,10 @@ export function initDetectionsScreen(subscribeState) {
 
   ageTicker = setInterval(() => {
     if (appState.currentScreen === 'gallery' && appState.galleryArchiveTab === 'hits' && appState.detectionHits?.length) {
-      renderDetectionsMap();
+      updateAgesInPlace();
     }
   }, 5000);
 
+  syncHitsTimestampsBtn();
   renderDetectionsMap();
 }

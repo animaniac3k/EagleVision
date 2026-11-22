@@ -2,7 +2,7 @@
  * Floating Icon Strips, Movable/Collapsible Settings Window, Memory Buffer Config,
  * Micro-Change Heatmap, Overlays, Filters & HSL Color Theme
  */
-import { appState, updateState, subscribeState } from '../state.js';
+import { APP_VERSION, appState, updateState, subscribeState } from '../state.js';
 import {
   enumerateCameras,
   startCameraStream,
@@ -21,14 +21,14 @@ import {
 import { saveSettings } from '../storage/settingsStore.js';
 import {
   speakDetectionAnnouncement,
+  speakModeAnnouncement,
   stopVoiceAnnouncement,
   rezeroHeatmap,
-  addHeatmapIgnoreZone,
-  clearHeatmapIgnoreZones,
-  subscribeHeatmapTelemetry,
-  getLiveViewportProjection
+  clearDetectionHits,
+  captureAnnotatedSnapshot
 } from '../renderer/compositor.js';
 import { snapLoupeToLatestHit } from '../renderer/zoomWindow.js';
+import { openCalibrationScreen } from './calibrationScreen.js';
 import { toggleQuickTool } from './controllerScreen.js';
 
 export function applyThemeColor(hex) {
@@ -61,14 +61,13 @@ export function applyThemeColor(hex) {
 
   const root = document.documentElement.style;
 
-  // Background and panels
-  // Neutral dark glass surfaces & legible slate text regardless of accent hue
+  // High-contrast matte surfaces (no 4% transparent glass washout outdoors, zero GPU blur needed)
   root.setProperty('--radar-bg-deep', '#06090d');
   root.setProperty('--radar-bg', '#0b1016');
-  root.setProperty('--radar-panel', 'rgba(13, 19, 26, 0.84)');
-  root.setProperty('--radar-header', 'rgba(17, 24, 33, 0.90)');
-  root.setProperty('--radar-surface', 'rgba(255, 255, 255, 0.04)');
-  root.setProperty('--radar-surface-hover', 'rgba(255, 255, 255, 0.08)');
+  root.setProperty('--radar-panel', 'rgba(13, 19, 26, 0.94)');
+  root.setProperty('--radar-header', 'rgba(17, 24, 33, 0.96)');
+  root.setProperty('--radar-surface', 'rgba(20, 29, 39, 0.90)');
+  root.setProperty('--radar-surface-hover', 'rgba(34, 47, 61, 0.96)');
 
   // Text and accents
   root.setProperty('--radar-text', '#f8fafc');
@@ -76,23 +75,27 @@ export function applyThemeColor(hex) {
   root.setProperty('--radar-text-muted', '#94a3b8');
   root.setProperty('--radar-accent', hex);
 
+  // Proper WCAG relative luminance for guaranteed >= 4.5:1 button text contrast
+  const toLinear = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const relLuma = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
   if (l < 0.15) {
-    // Pure Tactical Black Scheme (Solid Black Reticle, high-contrast light borders & text)
-    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.25)');
-    root.setProperty('--radar-border-strong', '#94a3b8');
+    // Pure Tactical Black Scheme (crisp light border & text so primary CTAs stay legible)
+    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.28)');
+    root.setProperty('--radar-border-strong', '#e2e8f0');
     root.setProperty('--radar-accent-contrast', '#ffffff');
-    root.setProperty('--shadow-glow', '0 0 10px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.4)');
+    root.setProperty('--shadow-glow', '0 0 10px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.45)');
   } else if (l > 0.85) {
     // Pure White Scheme
-    root.setProperty('--radar-border', 'hsl(0, 0%, 30%)');
+    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.30)');
     root.setProperty('--radar-border-strong', '#ffffff');
-    root.setProperty('--radar-accent-contrast', '#051317');
-    root.setProperty('--shadow-glow', '0 0 14px rgba(255, 255, 255, 0.5)');
+    root.setProperty('--radar-accent-contrast', '#090d12');
+    root.setProperty('--shadow-glow', '0 0 14px rgba(255, 255, 255, 0.45)');
   } else {
-    // Chromatic Schemes (Orange, Green, Red, Blue)
-    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.14)');
+    // Chromatic Schemes (Orange, Green, Red, Blue, custom)
+    root.setProperty('--radar-border', 'rgba(255, 255, 255, 0.16)');
     root.setProperty('--radar-border-strong', hex);
-    const contrastColor = (l > 0.55 && h > 35 && h < 185) ? `hsl(${h}, ${surfSat}%, 5%)` : '#ffffff';
+    const contrastColor = relLuma > 0.179 ? '#090d12' : '#ffffff';
     root.setProperty('--radar-accent-contrast', contrastColor);
     root.setProperty('--shadow-glow', `0 0 14px hsla(${h}, ${sat}%, 55%, 0.4)`);
   }
@@ -102,11 +105,13 @@ export function initSidebarAndTopControls(videoEl) {
   const screenLive = document.getElementById('screenLive');
   const screenSettings = document.getElementById('screenSettings');
   const screenReticle = document.getElementById('screenReticle');
+  const screenCalibration = document.getElementById('screenCalibration');
   const screenController = document.getElementById('screenController');
   const screenGallery = document.getElementById('screenGallery');
 
   const btnDeclutterUi = document.getElementById('btnDeclutterUi');
-  const btnRestoreUi = document.getElementById('btnRestoreUi');
+  const iconEyeOpen = document.getElementById('iconEyeOpen');
+  const iconEyeSlash = document.getElementById('iconEyeSlash');
   const btnToggleOptions = document.getElementById('btnToggleOptions');
   const btnSettingsBackToLive = document.getElementById('btnSettingsBackToLive');
   const btnOpenReticleScreen = document.getElementById('btnOpenReticleScreen');
@@ -123,13 +128,13 @@ export function initSidebarAndTopControls(videoEl) {
   const btnRefreshCameras = document.getElementById('btnRefreshCameras');
 
   applyThemeColor(appState.themeColor || '#f97316');
-
-  // 0. Declutter Mode (Hides whole interface except single top-left restore button)
-  btnDeclutterUi?.addEventListener('click', () => {
-    updateState({ uiDecluttered: true });
+  document.querySelectorAll('.setup-version-badge').forEach((el) => {
+    el.textContent = APP_VERSION;
   });
-  btnRestoreUi?.addEventListener('click', () => {
-    updateState({ uiDecluttered: false });
+
+  // 0. Clean View Mode (Hides interface & reticle while keeping top-left Gear & Eye-Slash toggle visible)
+  btnDeclutterUi?.addEventListener('click', () => {
+    updateState({ uiDecluttered: !appState.uiDecluttered });
   });
 
   // 1. Fullscreen Settings Screen & Setup Sub-tab Navigation
@@ -158,6 +163,7 @@ export function initSidebarAndTopControls(videoEl) {
   document.querySelectorAll('.setup-jump-settings[data-setup-tab]').forEach((btn) => {
     btn.addEventListener('click', () => {
       screenReticle?.classList.add('hidden');
+      screenCalibration?.classList.add('hidden');
       screenController?.classList.add('hidden');
       screenLive?.classList.add('hidden');
       screenSettings?.classList.remove('hidden');
@@ -170,6 +176,7 @@ export function initSidebarAndTopControls(videoEl) {
   switchSettingsSubTab('camera');
   btnToggleOptions?.addEventListener('click', () => {
     screenLive?.classList.add('hidden');
+    screenCalibration?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
     updateState({ currentScreen: 'settings' });
     populateCameraDropdown().catch(() => {});
@@ -184,25 +191,31 @@ export function initSidebarAndTopControls(videoEl) {
   const openReticleScreen = () => {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.add('hidden');
+    screenCalibration?.classList.add('hidden');
     screenController?.classList.add('hidden');
     screenReticle?.classList.remove('hidden');
     updateState({ currentScreen: 'reticle' });
   };
   btnOpenReticleScreen?.addEventListener('click', openReticleScreen);
+  document.getElementById('btnCalibToReticle')?.addEventListener('click', openReticleScreen);
 
   const openControllerScreen = () => {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.add('hidden');
     screenReticle?.classList.add('hidden');
+    screenCalibration?.classList.add('hidden');
     screenController?.classList.remove('hidden');
     updateState({ currentScreen: 'controller' });
   };
   btnOpenControllerScreen?.addEventListener('click', openControllerScreen);
+  document.getElementById('btnCalibToController')?.addEventListener('click', openControllerScreen);
 
   if (appState.currentScreen === 'controller') {
     openControllerScreen();
   } else if (appState.currentScreen === 'reticle') {
     openReticleScreen();
+  } else if (appState.currentScreen === 'calibration') {
+    openCalibrationScreen();
   } else if (appState.currentScreen === 'settings') {
     screenLive?.classList.add('hidden');
     screenSettings?.classList.remove('hidden');
@@ -292,18 +305,13 @@ export function initSidebarAndTopControls(videoEl) {
     toggleQuickTool();
   });
 
-  // 3. Toggle Localized Micro-Change Heatmap (double-tap re-zeros; long-press / caret opens live setup)
-  let lastHeatmapTapMs = 0;
-  let rezeroFeedbackTimer = null;
+  // 3. Toggle Hit Detection & Clear Hits + Replay Buffer Popover
+  let clearFeedbackTimer = null;
   let heatmapLongPressTimer = null;
   let heatmapLongPressFired = false;
-  const btnLiveRezero = document.getElementById('btnLiveRezero');
-  const btnHeatmapTune = document.getElementById('btnHeatmapTune');
+  const btnLiveClearHits = document.getElementById('btnLiveClearHits');
+  const btnOpenCalibration = document.getElementById('btnOpenCalibration');
   const heatmapDockGroup = btnToggleHeatmap?.closest('.heatmap-dock-group');
-  const heatmapTunePopover = document.getElementById('heatmapTunePopover');
-  const heatmapPopoverHeader = document.getElementById('heatmapPopoverHeader');
-  const btnPopoverRezero = document.getElementById('btnPopoverRezero');
-  const btnCloseHeatmapSetup = document.getElementById('btnCloseHeatmapSetup');
 
   const btnReplayTune = document.getElementById('btnReplayTune');
   const replayDockGroup = btnReplayTune?.closest('.replay-dock-group');
@@ -385,41 +393,10 @@ export function initSidebarAndTopControls(videoEl) {
     return clampPosition;
   }
 
-  const clampHeatmapPopoverPosition = makePopoverDraggable(heatmapTunePopover, heatmapPopoverHeader);
   const clampReplayPopoverPosition = makePopoverDraggable(replayTunePopover, replayPopoverHeader);
 
-  const triggerLiveRezero = () => {
-    rezeroHeatmap();
-    [btnLiveRezero, btnPopoverRezero].forEach((b) => b?.classList.add('radar-btn-active'));
-    clearTimeout(rezeroFeedbackTimer);
-    rezeroFeedbackTimer = setTimeout(() => {
-      [btnLiveRezero, btnPopoverRezero].forEach((b) => b?.classList.remove('radar-btn-active'));
-    }, 900);
-  };
-
-  function setHeatmapSetupOpen(open) {
-    const next = Boolean(open);
-    if (next) {
-      updateState({
-        currentScreen: 'live',
-        uiDecluttered: false,
-        heatmapEnabled: true,
-        heatmapSetupOpen: true,
-        replaySetupOpen: false,
-        liveMasksVisible: true
-      });
-      saveSettings(appState);
-      requestAnimationFrame(() => {
-        clampHeatmapPopoverPosition();
-        renderLiveIgnoreMasks();
-      });
-    } else {
-      updateState({
-        heatmapSetupOpen: false,
-        liveMaskDrawActive: false,
-        liveMasksVisible: false
-      });
-    }
+  function openCalibrationFromLive() {
+    openCalibrationScreen();
   }
 
   function setReplaySetupOpen(open) {
@@ -429,9 +406,7 @@ export function initSidebarAndTopControls(videoEl) {
         currentScreen: 'live',
         uiDecluttered: false,
         replaySetupOpen: true,
-        heatmapSetupOpen: false,
-        liveMaskDrawActive: false,
-        liveMasksVisible: false
+        heatmapSetupOpen: false
       });
       requestAnimationFrame(() => clampReplayPopoverPosition());
     } else {
@@ -439,18 +414,73 @@ export function initSidebarAndTopControls(videoEl) {
     }
   }
 
-  btnLiveRezero?.addEventListener('click', triggerLiveRezero);
-  btnPopoverRezero?.addEventListener('click', triggerLiveRezero);
-  btnCloseHeatmapSetup?.addEventListener('click', () => setHeatmapSetupOpen(false));
-  btnHeatmapTune?.addEventListener('click', () => setHeatmapSetupOpen(!appState.heatmapSetupOpen));
+  // 0b. 1-Tap Live Snapshot & Rain/Carry Touch Lock
+  const btnLiveSnapshot = document.getElementById('btnLiveSnapshot');
+  btnLiveSnapshot?.addEventListener('click', async () => {
+    btnLiveSnapshot.classList.add('radar-btn-active');
+    try {
+      await captureAnnotatedSnapshot();
+    } finally {
+      setTimeout(() => btnLiveSnapshot.classList.remove('radar-btn-active'), 450);
+    }
+  });
+
+  const btnToggleTouchLock = document.getElementById('btnToggleTouchLock');
+  const touchLockOverlay = document.getElementById('touchLockOverlay');
+  const btnUnlockTouchScreen = document.getElementById('btnUnlockTouchScreen');
+  btnToggleTouchLock?.addEventListener('click', () => {
+    touchLockOverlay?.classList.remove('hidden');
+  });
+  btnUnlockTouchScreen?.addEventListener('click', () => {
+    touchLockOverlay?.classList.add('hidden');
+  });
+
+  let clearHitsArmed = false;
+  let clearHitsArmTimer = null;
+  function resetClearHitsArm() {
+    clearHitsArmed = false;
+    clearTimeout(clearHitsArmTimer);
+    if (btnLiveClearHits) {
+      btnLiveClearHits.classList.remove('radar-btn-armed');
+      btnLiveClearHits.title = 'Clear Hit Markers & Re-Zero Background';
+    }
+  }
+
+  btnLiveClearHits?.addEventListener('click', () => {
+    const hitsCount = Array.isArray(appState.detectionHits) ? appState.detectionHits.length : 0;
+    // Require 2-tap confirmation when logged hits would be wiped; allow instant Re-Zero at 0 hits
+    if (hitsCount > 0 && !clearHitsArmed) {
+      clearHitsArmed = true;
+      btnLiveClearHits.classList.add('radar-btn-armed');
+      btnLiveClearHits.title = 'Tap again to confirm clearing hits';
+      clearTimeout(clearHitsArmTimer);
+      clearHitsArmTimer = setTimeout(resetClearHitsArm, 2600);
+      return;
+    }
+    resetClearHitsArm();
+    clearDetectionHits();
+    rezeroHeatmap();
+    btnLiveClearHits.classList.add('radar-btn-active');
+    clearTimeout(clearFeedbackTimer);
+    clearFeedbackTimer = setTimeout(() => {
+      btnLiveClearHits.classList.remove('radar-btn-active');
+    }, 550);
+  });
+
+  btnOpenCalibration?.addEventListener('click', openCalibrationFromLive);
 
   btnCloseReplaySetup?.addEventListener('click', () => setReplaySetupOpen(false));
   btnReplayTune?.addEventListener('click', () => setReplaySetupOpen(!appState.replaySetupOpen));
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (appState.heatmapSetupOpen) setHeatmapSetupOpen(false);
-      if (appState.replaySetupOpen) setReplaySetupOpen(false);
+    if (e.key === 'Escape' && appState.replaySetupOpen) {
+      setReplaySetupOpen(false);
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (appState.replaySetupOpen) {
+      clampReplayPopoverPosition();
     }
   });
 
@@ -460,7 +490,7 @@ export function initSidebarAndTopControls(videoEl) {
     clearTimeout(heatmapLongPressTimer);
     heatmapLongPressTimer = setTimeout(() => {
       heatmapLongPressFired = true;
-      setHeatmapSetupOpen(!appState.heatmapSetupOpen);
+      openCalibrationFromLive();
     }, 420);
   });
 
@@ -470,7 +500,7 @@ export function initSidebarAndTopControls(videoEl) {
   btnToggleHeatmap.addEventListener('pointerleave', cancelHeatmapLongPress);
   btnToggleHeatmap.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    setHeatmapSetupOpen(!appState.heatmapSetupOpen);
+    openCalibrationFromLive();
   });
 
   btnToggleHeatmap.addEventListener('click', () => {
@@ -478,18 +508,11 @@ export function initSidebarAndTopControls(videoEl) {
       heatmapLongPressFired = false;
       return;
     }
-    const now = performance.now();
-    if (now - lastHeatmapTapMs < 350 && appState.heatmapEnabled) {
-      lastHeatmapTapMs = 0;
-      triggerLiveRezero();
-      return;
-    }
-    lastHeatmapTapMs = now;
     const nextEnabled = !appState.heatmapEnabled;
-    updateState({
-      heatmapEnabled: nextEnabled,
-      ...(nextEnabled ? {} : { heatmapSetupOpen: false, liveMaskDrawActive: false, liveMasksVisible: false })
-    });
+    if (nextEnabled) {
+      rezeroHeatmap();
+    }
+    updateState({ heatmapEnabled: nextEnabled });
     saveSettings(appState);
   });
 
@@ -738,8 +761,6 @@ export function initSidebarAndTopControls(videoEl) {
 
     await startCameraStream(videoEl, 'rtsp:' + rawUrl, streamLabel);
     if (appState.bufferEnabled) startMemoryBuffer(videoEl);
-
-    if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${streamLabel.toUpperCase()}`;
     populateCameraDropdown();
   });
 
@@ -769,8 +790,6 @@ export function initSidebarAndTopControls(videoEl) {
 
       await startCameraStream(videoEl, 'rtsp:' + streamUrl, streamLabel);
       if (appState.bufferEnabled) startMemoryBuffer(videoEl);
-
-      if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${streamLabel.toUpperCase()}`;
       populateCameraDropdown();
     } else {
       if (badgeRtspWake) {
@@ -816,7 +835,6 @@ export function initSidebarAndTopControls(videoEl) {
     if (textRtspStatus) textRtspStatus.textContent = `CONNECTING TO ${ip}...`;
     await startCameraStream(videoEl, 'rtsp:' + streamUrl, label);
     if (appState.bufferEnabled) startMemoryBuffer(videoEl);
-    if (textRtspStatus) textRtspStatus.textContent = `LIVE: ${label}`;
     populateCameraDropdown();
   });
 
@@ -831,16 +849,34 @@ export function initSidebarAndTopControls(videoEl) {
     if (textRtspStatus) textRtspStatus.textContent = `CONNECTING TO RTSP...`;
     await startCameraStream(videoEl, 'rtsp:' + customUrl, 'CUSTOM RTSP');
     if (appState.bufferEnabled) startMemoryBuffer(videoEl);
-    if (textRtspStatus) textRtspStatus.textContent = `LIVE: CUSTOM RTSP`;
     populateCameraDropdown();
   });
 
-  // Restore saved RTSP view state
+  // Restore saved RTSP view state (UI only — do not trigger redundant localStorage write on boot)
   if (appState.rtspSourceMode) {
-    setSourceMode(appState.rtspSourceMode);
+    const isRtsp = appState.rtspSourceMode === 'rtsp';
+    btnSourceModeUsb?.classList.toggle('radar-btn-active', !isRtsp);
+    btnSourceModeRtsp?.classList.toggle('radar-btn-active', isRtsp);
+    panelSourceUsb?.classList.toggle('hidden', isRtsp);
+    panelSourceRtsp?.classList.toggle('hidden', !isRtsp);
   }
   if (appState.rtspPreset) {
-    setRtspPreset(appState.rtspPreset);
+    const p = appState.rtspPreset;
+    btnPresetBresser?.classList.toggle('radar-btn-active', p === 'bresser');
+    btnPresetOnvif?.classList.toggle('radar-btn-active', p === 'onvif');
+    btnPresetCustom?.classList.toggle('radar-btn-active', p === 'custom');
+    if (secBresserConfig) {
+      secBresserConfig.classList.toggle('hidden', p !== 'bresser');
+      secBresserConfig.style.display = p === 'bresser' ? 'flex' : 'none';
+    }
+    if (secOnvifConfig) {
+      secOnvifConfig.classList.toggle('hidden', p !== 'onvif');
+      secOnvifConfig.style.display = p === 'onvif' ? 'flex' : 'none';
+    }
+    if (secCustomRtspConfig) {
+      secCustomRtspConfig.classList.toggle('hidden', p !== 'custom');
+      secCustomRtspConfig.style.display = p === 'custom' ? 'flex' : 'none';
+    }
   }
   if (inputBresserIp && appState.rtspCameraIp) {
     inputBresserIp.value = appState.rtspCameraIp;
@@ -951,560 +987,13 @@ export function initSidebarAndTopControls(videoEl) {
 
   // Note: Overlay reticle master controls (btnToggleOverlay, opacity, scale, load img) are managed exclusively in reticleScreen.js
 
-  // 10. Heatmap Display Duration (with Infinity support), Live Calibration & Voice Callouts
-  const sliderHeatmapDuration = document.getElementById('sliderHeatmapDuration');
-  const valHeatmapDuration = document.getElementById('valHeatmapDuration');
-  const inputHeatmapDuration = document.getElementById('inputHeatmapDuration');
-  const btnHeatmapInfinite = document.getElementById('btnHeatmapInfinite');
+  // 10. Voice Callouts & Customization (Calibration controls live in calibrationScreen.js)
   const btnToggleHeatmapSpeech = document.getElementById('btnToggleHeatmapSpeech');
-  const btnToggleHeatmapAutoSave = document.getElementById('btnToggleHeatmapAutoSave');
-  const syncAutoSaveUI = (on) => {
-    if (!btnToggleHeatmapAutoSave) return;
-    btnToggleHeatmapAutoSave.classList.toggle('radar-btn-active', on);
-    btnToggleHeatmapAutoSave.textContent = on ? 'AUTO-SAVE: ON' : 'AUTO-SAVE: OFF';
-  };
-  syncAutoSaveUI(Boolean(appState.heatmapAutoSave));
-  btnToggleHeatmapAutoSave?.addEventListener('click', () => {
-    const next = !appState.heatmapAutoSave;
-    updateState({ heatmapAutoSave: next });
-    saveSettings(appState);
-  });
-
   const sliderVoicePitch = document.getElementById('sliderVoicePitch');
   const valVoicePitch = document.getElementById('valVoicePitch');
   const sliderVoiceRate = document.getElementById('sliderVoiceRate');
   const valVoiceRate = document.getElementById('valVoiceRate');
   const btnTestVoiceSettings = document.getElementById('btnTestVoiceSettings');
-
-  const liveSliderHeatmapSens = document.getElementById('liveSliderHeatmapSens');
-  const liveValHeatmapSens = document.getElementById('liveValHeatmapSens');
-  const heatmapTuneSensChip = document.getElementById('heatmapTuneSensChip');
-  const liveSliderHeatmapMaxArea = document.getElementById('liveSliderHeatmapMaxArea');
-  const liveValHeatmapMaxArea = document.getElementById('liveValHeatmapMaxArea');
-  const liveSliderHeatmapMinCells = document.getElementById('liveSliderHeatmapMinCells');
-  const liveValHeatmapMinCells = document.getElementById('liveValHeatmapMinCells');
-  const liveSliderHeatmapShakeGate = document.getElementById('liveSliderHeatmapShakeGate');
-  const liveValHeatmapShakeGate = document.getElementById('liveValHeatmapShakeGate');
-
-  const heatmapLiveGatePill = document.getElementById('heatmapLiveGatePill');
-  const heatmapNoiseMeterFill = document.getElementById('heatmapNoiseMeterFill');
-  const heatmapNoisePeakTick = document.getElementById('heatmapNoisePeakTick');
-  const heatmapNoiseGateMarker = document.getElementById('heatmapNoiseGateMarker');
-  const heatmapNoiseTelemetryText = document.getElementById('heatmapNoiseTelemetryText');
-  const heatmapNoiseMarginText = document.getElementById('heatmapNoiseMarginText');
-
-  const DELTA_BAR_MAX = 85;
-  let lastNoiseDelta = 0;
-
-  function renderNoiseGateMarker(sens) {
-    const threshold = 82 - Math.max(10, Math.min(95, sens)) * 0.76;
-    if (heatmapNoiseGateMarker) {
-      const gatePct = Math.max(2, Math.min(98, (threshold / DELTA_BAR_MAX) * 100));
-      heatmapNoiseGateMarker.style.left = `${gatePct.toFixed(1)}%`;
-    }
-    if (heatmapNoiseMarginText) {
-      const margin = threshold - lastNoiseDelta;
-      heatmapNoiseMarginText.textContent = margin >= 0
-        ? `Headroom +${Math.round(margin)} Δ`
-        : `Noise +${Math.abs(Math.round(margin))} Δ over gate`;
-      heatmapNoiseMarginText.style.color = margin >= 4 ? '' : '#fda4af';
-    }
-  }
-
-  function syncSensitivityUI(sens) {
-    const clamped = Math.max(10, Math.min(95, Number(sens) || 60));
-    const threshold = Math.round(82 - clamped * 0.76);
-    if (liveSliderHeatmapSens) liveSliderHeatmapSens.value = String(clamped);
-    if (liveValHeatmapSens) liveValHeatmapSens.textContent = `${clamped}% · Δ>${threshold}`;
-    if (heatmapTuneSensChip) heatmapTuneSensChip.textContent = `${clamped}%`;
-    renderNoiseGateMarker(clamped);
-  }
-
-  const HEAT_GRID_CELLS = 160 * 90;
-  const MAX_HIT_AREA_MAX_PCT = 20;
-  const MAX_HIT_AREA_CURVE = 2.5;
-
-  function getMinMaxAreaPct(minCells = appState.heatmapMinCells ?? 2) {
-    const safeMin = Math.max(1, Math.min(20, Number(minCells) || 2));
-    return ((safeMin + 1) / HEAT_GRID_CELLS) * 100;
-  }
-
-  function clampMaxAreaPct(pct, minCells = appState.heatmapMinCells ?? 2) {
-    const minPct = getMinMaxAreaPct(minCells);
-    const num = Number(pct);
-    const fallback = Number.isFinite(num) && num > 0 ? num : 5;
-    return Math.max(minPct, Math.min(MAX_HIT_AREA_MAX_PCT, fallback));
-  }
-
-  function sliderPosToMaxAreaPct(pos, minCells = appState.heatmapMinCells ?? 2) {
-    const t = Math.max(0, Math.min(1, (Number(pos) || 0) / 100));
-    const minPct = getMinMaxAreaPct(minCells);
-    const raw = minPct + (MAX_HIT_AREA_MAX_PCT - minPct) * Math.pow(t, MAX_HIT_AREA_CURVE);
-    return Number(raw.toFixed(4));
-  }
-
-  function maxAreaPctToSliderPos(pct, minCells = appState.heatmapMinCells ?? 2) {
-    const minPct = getMinMaxAreaPct(minCells);
-    const clamped = clampMaxAreaPct(pct, minCells);
-    const norm = Math.max(0, Math.min(1, (clamped - minPct) / Math.max(0.0001, MAX_HIT_AREA_MAX_PCT - minPct)));
-    return Math.round(Math.pow(norm, 1 / MAX_HIT_AREA_CURVE) * 100);
-  }
-
-  function syncMaxAreaUI(pct, minCells = appState.heatmapMinCells ?? 2) {
-    const safeMin = Math.max(1, Math.min(20, Number(minCells) || 2));
-    const clamped = clampMaxAreaPct(pct, safeMin);
-    const pos = maxAreaPctToSliderPos(clamped, safeMin);
-    const cells = Math.max(safeMin + 1, Math.round((clamped / 100) * HEAT_GRID_CELLS));
-    if (liveSliderHeatmapMaxArea) liveSliderHeatmapMaxArea.value = String(pos);
-    if (liveValHeatmapMaxArea) liveValHeatmapMaxArea.textContent = `${cells} cells`;
-  }
-
-  function syncMinCellsUI(cells) {
-    const clamped = Math.max(1, Math.min(20, Number(cells) || 2));
-    const label = `${clamped} cell${clamped === 1 ? '' : 's'}`;
-    if (liveSliderHeatmapMinCells) liveSliderHeatmapMinCells.value = String(clamped);
-    if (liveValHeatmapMinCells) liveValHeatmapMinCells.textContent = label;
-  }
-
-  function clampShakeGatePct(pct, maxAreaPct = appState.heatmapMaxAreaPct ?? 5) {
-    const minShake = Math.max(5, Math.ceil(Number(maxAreaPct) || 5));
-    const raw = Number(pct);
-    const val = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 18;
-    return Math.max(minShake, Math.min(50, val));
-  }
-
-  function syncShakeGateUI(pct, maxAreaPct = appState.heatmapMaxAreaPct ?? 5) {
-    const clamped = clampShakeGatePct(pct, maxAreaPct);
-    const cells = Math.round((clamped / 100) * HEAT_GRID_CELLS);
-    if (liveSliderHeatmapShakeGate) liveSliderHeatmapShakeGate.value = String(clamped);
-    if (liveValHeatmapShakeGate) liveValHeatmapShakeGate.textContent = `${clamped}% (${cells}c)`;
-  }
-
-  function applyHeatmapSensitivity(val) {
-    const sens = Math.max(10, Math.min(95, Number(val) || 60));
-    syncSensitivityUI(sens);
-    updateState({ heatmapSensitivity: sens });
-    saveSettings(appState);
-  }
-
-  function applyHeatmapMaxAreaFromSlider(pos) {
-    const pct = sliderPosToMaxAreaPct(pos, appState.heatmapMinCells ?? 2);
-    syncMaxAreaUI(pct, appState.heatmapMinCells ?? 2);
-    const nextShake = clampShakeGatePct(appState.heatmapShakeGatePct ?? 18, pct);
-    syncShakeGateUI(nextShake, pct);
-    updateState({ heatmapMaxAreaPct: pct, heatmapShakeGatePct: nextShake });
-    saveSettings(appState);
-  }
-
-  function applyHeatmapMinCells(val) {
-    const cells = Math.max(1, Math.min(20, Number(val) || 2));
-    syncMinCellsUI(cells);
-    const nextMaxPct = clampMaxAreaPct(appState.heatmapMaxAreaPct ?? 5, cells);
-    syncMaxAreaUI(nextMaxPct, cells);
-    const nextShake = clampShakeGatePct(appState.heatmapShakeGatePct ?? 18, nextMaxPct);
-    syncShakeGateUI(nextShake, nextMaxPct);
-    updateState({ heatmapMinCells: cells, heatmapMaxAreaPct: nextMaxPct, heatmapShakeGatePct: nextShake });
-    saveSettings(appState);
-  }
-
-  function applyHeatmapShakeGate(val) {
-    const pct = clampShakeGatePct(val, appState.heatmapMaxAreaPct ?? 5);
-    syncShakeGateUI(pct, appState.heatmapMaxAreaPct ?? 5);
-    updateState({ heatmapShakeGatePct: pct });
-    saveSettings(appState);
-  }
-
-  syncSensitivityUI(appState.heatmapSensitivity ?? 60);
-  syncMinCellsUI(appState.heatmapMinCells ?? 2);
-  syncMaxAreaUI(appState.heatmapMaxAreaPct ?? 5, appState.heatmapMinCells ?? 2);
-  syncShakeGateUI(appState.heatmapShakeGatePct ?? 18, appState.heatmapMaxAreaPct ?? 5);
-
-  liveSliderHeatmapMaxArea?.addEventListener('input', (e) => applyHeatmapMaxAreaFromSlider(e.target.value));
-  liveSliderHeatmapMinCells?.addEventListener('input', (e) => applyHeatmapMinCells(e.target.value));
-  liveSliderHeatmapShakeGate?.addEventListener('input', (e) => applyHeatmapShakeGate(e.target.value));
-  liveSliderHeatmapSens?.addEventListener('input', (e) => applyHeatmapSensitivity(e.target.value));
-
-  // Live Noise-Floor & Gate Telemetry Subscription (active only when setup popover is open)
-  subscribeHeatmapTelemetry((snap) => {
-    if (!appState.heatmapSetupOpen) return;
-    lastNoiseDelta = snap.noiseDelta;
-    const noisePct = Math.max(0, Math.min(100, (snap.noiseDelta / DELTA_BAR_MAX) * 100));
-    const peakPct = Math.max(0, Math.min(100, (snap.peakDelta / DELTA_BAR_MAX) * 100));
-    if (heatmapNoiseMeterFill) {
-      heatmapNoiseMeterFill.style.width = `${noisePct.toFixed(1)}%`;
-      heatmapNoiseMeterFill.classList.toggle('level-warn', snap.noiseDelta >= snap.threshold * 0.72 && snap.noiseDelta < snap.threshold);
-      heatmapNoiseMeterFill.classList.toggle('level-hot', snap.noiseDelta >= snap.threshold);
-    }
-    if (heatmapNoisePeakTick) {
-      heatmapNoisePeakTick.style.left = `${peakPct.toFixed(1)}%`;
-    }
-    if (heatmapNoiseTelemetryText) {
-      heatmapNoiseTelemetryText.textContent = `Noise Δ${Math.round(snap.noiseDelta)} · Peak Δ${Math.round(snap.peakDelta)}`;
-    }
-    renderNoiseGateMarker(appState.heatmapSensitivity ?? 60);
-
-    if (heatmapLiveGatePill) {
-      const gateMap = {
-        idle: ['READY', 'gate-idle'],
-        building: ['DETECTING', 'gate-warn'],
-        below_min: [`< MIN (${snap.changedCells}/${appState.heatmapMinCells || 2})`, 'gate-warn'],
-        valid: [`HIT VALID (${snap.spikeCount}c)`, 'gate-valid'],
-        too_large: [`> MAX (${(snap.changedFraction * 100).toFixed(1)}%)`, 'gate-suppressed'],
-        global_shake: ['SHAKE GATE', 'gate-suppressed']
-      };
-      const [label, cls] = gateMap[snap.gateStatus] || gateMap.idle;
-      heatmapLiveGatePill.textContent = label;
-      heatmapLiveGatePill.className = `heatmap-gate-pill ${cls}`;
-    }
-  });
-
-  // Live Ignore Masks (Draw / Move / Resize / Show / Delete / Clear right on Live Viewport)
-  const liveIgnoreLayer = document.getElementById('liveIgnoreLayer');
-  const liveDrawPreview = document.getElementById('liveDrawPreview');
-  const btnLiveMaskDraw = document.getElementById('btnLiveMaskDraw');
-  const btnLiveMasksVisible = document.getElementById('btnLiveMasksVisible');
-  const btnLiveClearMasks = document.getElementById('btnLiveClearMasks');
-  const liveMaskDrawHint = document.getElementById('liveMaskDrawHint');
-  const MIN_MASK_SIZE = 0.02;
-  let clearMasksArmTimer = null;
-  let clearMasksArmed = false;
-  let liveDrawStart = null;
-  let activeMaskDrag = null;
-
-  function resetClearMasksArm() {
-    clearMasksArmed = false;
-    clearTimeout(clearMasksArmTimer);
-    if (btnLiveClearMasks) {
-      btnLiveClearMasks.textContent = 'Clear All';
-      btnLiveClearMasks.classList.remove('radar-btn-armed');
-    }
-  }
-
-  function applyMaskBoxGeometry(box, mask, proj) {
-    const leftPct = ((mask.x * proj.vw - proj.sx) / proj.cropW) * 100;
-    const topPct = ((mask.y * proj.vh - proj.sy) / proj.cropH) * 100;
-    const widthPct = ((mask.w * proj.vw) / proj.cropW) * 100;
-    const heightPct = ((mask.h * proj.vh) / proj.cropH) * 100;
-    box.style.left = `${leftPct.toFixed(2)}%`;
-    box.style.top = `${topPct.toFixed(2)}%`;
-    box.style.width = `${widthPct.toFixed(2)}%`;
-    box.style.height = `${heightPct.toFixed(2)}%`;
-  }
-
-  function attachMaskDragHandlers(targetEl, box, idx, mask, handleMode) {
-    targetEl.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
-      if (handleMode === 'move' && (e.target.closest('.live-ignore-handle') || e.target.closest('.live-ignore-box-remove'))) {
-        return;
-      }
-      const layerRect = liveIgnoreLayer?.getBoundingClientRect();
-      if (!layerRect || !layerRect.width || !layerRect.height) return;
-      const proj = getLiveViewportProjection();
-      const orig = {
-        x: Number(mask.x) || 0,
-        y: Number(mask.y) || 0,
-        w: Number(mask.w) || MIN_MASK_SIZE,
-        h: Number(mask.h) || MIN_MASK_SIZE
-      };
-      activeMaskDrag = {
-        idx,
-        handleMode,
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        layerRect,
-        proj,
-        orig,
-        box
-      };
-      box.classList.add('is-editing');
-      try {
-        targetEl.setPointerCapture(e.pointerId);
-      } catch {
-        // Ignore synthetic capture errors
-      }
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    targetEl.addEventListener('pointermove', (e) => {
-      if (!activeMaskDrag || activeMaskDrag.pointerId !== e.pointerId || activeMaskDrag.idx !== idx) return;
-      const { startX, startY, layerRect, proj, orig, handleMode: mode } = activeMaskDrag;
-      const dvx = (e.clientX - startX) / layerRect.width;
-      const dvy = (e.clientY - startY) / layerRect.height;
-      const dsx = (dvx * proj.cropW) / proj.vw;
-      const dsy = (dvy * proj.cropH) / proj.vh;
-
-      let nx = orig.x;
-      let ny = orig.y;
-      let nw = orig.w;
-      let nh = orig.h;
-
-      if (mode === 'move') {
-        nx = Math.max(0, Math.min(1 - orig.w, orig.x + dsx));
-        ny = Math.max(0, Math.min(1 - orig.h, orig.y + dsy));
-      } else {
-        let left = orig.x;
-        let top = orig.y;
-        let right = orig.x + orig.w;
-        let bottom = orig.y + orig.h;
-        if (mode.includes('w')) left = Math.max(0, Math.min(right - MIN_MASK_SIZE, orig.x + dsx));
-        if (mode.includes('e')) right = Math.min(1, Math.max(left + MIN_MASK_SIZE, orig.x + orig.w + dsx));
-        if (mode.includes('n')) top = Math.max(0, Math.min(bottom - MIN_MASK_SIZE, orig.y + dsy));
-        if (mode.includes('s')) bottom = Math.min(1, Math.max(top + MIN_MASK_SIZE, orig.y + orig.h + dsy));
-        nx = left;
-        ny = top;
-        nw = right - left;
-        nh = bottom - top;
-      }
-
-      const updated = { x: nx, y: ny, w: nw, h: nh };
-      applyMaskBoxGeometry(box, updated, proj);
-
-      const curMasks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
-      if (idx >= 0 && idx < curMasks.length) {
-        const nextMasks = curMasks.map((item, i) => (i === idx ? updated : item));
-        updateState({ heatmapIgnoreMasks: nextMasks });
-      }
-      e.stopPropagation();
-    });
-
-    const finishMaskEdit = (e) => {
-      if (!activeMaskDrag || activeMaskDrag.idx !== idx) return;
-      if (e?.pointerId !== undefined && e.pointerId !== activeMaskDrag.pointerId) return;
-      e?.stopPropagation?.();
-      box.classList.remove('is-editing');
-      activeMaskDrag = null;
-      saveSettings(appState);
-      renderLiveIgnoreMasks();
-    };
-    targetEl.addEventListener('pointerup', finishMaskEdit);
-    targetEl.addEventListener('pointercancel', finishMaskEdit);
-    targetEl.addEventListener('lostpointercapture', finishMaskEdit);
-  }
-
-  function renderLiveIgnoreMasks() {
-    if (!liveIgnoreLayer) return;
-    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
-    const showMasks = Boolean(appState.heatmapSetupOpen && appState.liveMasksVisible);
-    const drawActive = Boolean(appState.heatmapSetupOpen && appState.liveMaskDrawActive);
-
-    if (btnLiveMasksVisible) {
-      btnLiveMasksVisible.disabled = masks.length === 0;
-      btnLiveMasksVisible.classList.toggle('radar-btn-active', showMasks && masks.length > 0);
-      btnLiveMasksVisible.textContent = showMasks ? `👁 Masks (${masks.length})` : `🙈 Hidden (${masks.length})`;
-    }
-    if (btnLiveMaskDraw) {
-      btnLiveMaskDraw.classList.toggle('radar-btn-active', drawActive);
-      btnLiveMaskDraw.textContent = drawActive ? '✓ Done Drawing' : '✎ Draw Mask';
-    }
-    if (btnLiveClearMasks) {
-      btnLiveClearMasks.classList.toggle('hidden', masks.length === 0);
-      if (masks.length === 0) resetClearMasksArm();
-    }
-    if (liveMaskDrawHint) {
-      liveMaskDrawHint.classList.toggle('hidden', !drawActive);
-    }
-
-    liveIgnoreLayer.classList.toggle('hidden', !showMasks && !drawActive);
-    liveIgnoreLayer.classList.toggle('mask-draw-active', drawActive);
-    liveIgnoreLayer.classList.toggle('mask-edit-active', showMasks);
-
-    if (!showMasks && !drawActive) {
-      activeMaskDrag = null;
-      liveDrawStart = null;
-      liveDrawPreview?.classList.add('hidden');
-    }
-
-    if (activeMaskDrag) return;
-
-    liveIgnoreLayer.innerHTML = '';
-    if (!showMasks) return;
-
-    const proj = getLiveViewportProjection();
-    masks.forEach((m, idx) => {
-      const box = document.createElement('div');
-      box.className = 'live-ignore-box';
-      box.title = 'Drag to move mask, or drag corners to resize';
-      applyMaskBoxGeometry(box, m, proj);
-      attachMaskDragHandlers(box, box, idx, m, 'move');
-
-      ['nw', 'ne', 'sw', 'se'].forEach((corner) => {
-        const handle = document.createElement('div');
-        handle.className = `live-ignore-handle handle-${corner}`;
-        handle.title = 'Drag corner to resize mask';
-        attachMaskDragHandlers(handle, box, idx, m, corner);
-        box.appendChild(handle);
-      });
-
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'live-ignore-box-remove';
-      rm.title = 'Remove ignore zone';
-      rm.textContent = '×';
-      rm.addEventListener('pointerdown', (e) => e.stopPropagation());
-      rm.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const next = masks.filter((_, i) => i !== idx);
-        updateState({ heatmapIgnoreMasks: next });
-        saveSettings(appState);
-      });
-      box.appendChild(rm);
-      liveIgnoreLayer.appendChild(box);
-    });
-  }
-
-  btnLiveMaskDraw?.addEventListener('click', () => {
-    const next = !appState.liveMaskDrawActive;
-    updateState({
-      liveMaskDrawActive: next,
-      ...(next ? { liveMasksVisible: true } : {})
-    });
-  });
-
-  btnLiveMasksVisible?.addEventListener('click', () => {
-    updateState({ liveMasksVisible: !appState.liveMasksVisible });
-  });
-
-  btnLiveClearMasks?.addEventListener('click', () => {
-    const masks = Array.isArray(appState.heatmapIgnoreMasks) ? appState.heatmapIgnoreMasks : [];
-    if (!masks.length) return;
-    if (!clearMasksArmed) {
-      clearMasksArmed = true;
-      btnLiveClearMasks.textContent = 'Confirm Clear?';
-      btnLiveClearMasks.classList.add('radar-btn-armed');
-      clearTimeout(clearMasksArmTimer);
-      clearMasksArmTimer = setTimeout(resetClearMasksArm, 2500);
-      return;
-    }
-    resetClearMasksArm();
-    updateState({ liveMaskDrawActive: false });
-    clearHeatmapIgnoreZones();
-    saveSettings(appState);
-  });
-
-  liveIgnoreLayer?.addEventListener('pointerdown', (e) => {
-    if (!appState.liveMaskDrawActive || e.target.closest('.live-ignore-box') || e.target.closest('.live-ignore-box-remove')) return;
-    const rect = liveIgnoreLayer.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const vx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const vy = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    liveDrawStart = { vx, vy, pointerId: e.pointerId };
-    try {
-      liveIgnoreLayer.setPointerCapture(e.pointerId);
-    } catch {
-      // Ignore synthetic pointer capture errors
-    }
-    if (liveDrawPreview) {
-      liveDrawPreview.classList.remove('hidden');
-      liveDrawPreview.style.left = `${(vx * 100).toFixed(2)}%`;
-      liveDrawPreview.style.top = `${(vy * 100).toFixed(2)}%`;
-      liveDrawPreview.style.width = '0%';
-      liveDrawPreview.style.height = '0%';
-    }
-  });
-
-  liveIgnoreLayer?.addEventListener('pointermove', (e) => {
-    if (!liveDrawStart || e.pointerId !== liveDrawStart.pointerId || !liveDrawPreview) return;
-    const rect = liveIgnoreLayer.getBoundingClientRect();
-    const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    liveDrawPreview.style.left = `${(Math.min(liveDrawStart.vx, curX) * 100).toFixed(2)}%`;
-    liveDrawPreview.style.top = `${(Math.min(liveDrawStart.vy, curY) * 100).toFixed(2)}%`;
-    liveDrawPreview.style.width = `${(Math.abs(curX - liveDrawStart.vx) * 100).toFixed(2)}%`;
-    liveDrawPreview.style.height = `${(Math.abs(curY - liveDrawStart.vy) * 100).toFixed(2)}%`;
-  });
-
-  const finishLiveMaskDraw = (e) => {
-    if (!liveDrawStart || (e?.pointerId !== undefined && e.pointerId !== liveDrawStart.pointerId)) return;
-    const rect = liveIgnoreLayer.getBoundingClientRect();
-    const curX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const curY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    const vx0 = Math.min(liveDrawStart.vx, curX);
-    const vy0 = Math.min(liveDrawStart.vy, curY);
-    const vwFrac = Math.abs(curX - liveDrawStart.vx);
-    const vhFrac = Math.abs(curY - liveDrawStart.vy);
-    liveDrawStart = null;
-    liveDrawPreview?.classList.add('hidden');
-
-    if (vwFrac >= 0.025 && vhFrac >= 0.025) {
-      const proj = getLiveViewportProjection();
-      const srcX = (proj.sx + vx0 * proj.cropW) / proj.vw;
-      const srcY = (proj.sy + vy0 * proj.cropH) / proj.vh;
-      const srcW = (vwFrac * proj.cropW) / proj.vw;
-      const srcH = (vhFrac * proj.cropH) / proj.vh;
-      addHeatmapIgnoreZone({ x: srcX, y: srcY, w: srcW, h: srcH });
-      saveSettings(appState);
-    }
-  };
-  liveIgnoreLayer?.addEventListener('pointerup', finishLiveMaskDraw);
-  liveIgnoreLayer?.addEventListener('pointercancel', () => {
-    liveDrawStart = null;
-    liveDrawPreview?.classList.add('hidden');
-  });
-  window.addEventListener('resize', () => {
-    if (appState.heatmapSetupOpen) {
-      clampHeatmapPopoverPosition();
-      renderLiveIgnoreMasks();
-    }
-    if (appState.replaySetupOpen) {
-      clampReplayPopoverPosition();
-    }
-  });
-
-  function setHeatmapDuration(dur) {
-    if (dur >= 99999 || dur === Infinity) {
-      if (sliderHeatmapDuration) sliderHeatmapDuration.value = '125';
-      if (valHeatmapDuration) valHeatmapDuration.textContent = '∞';
-      if (inputHeatmapDuration) inputHeatmapDuration.value = '99999';
-      document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((b) => b.classList.remove('radar-btn-active'));
-      btnHeatmapInfinite?.classList.add('radar-btn-active');
-      updateState({ heatmapDuration: 99999 });
-    } else {
-      const clamped = Math.max(1, dur);
-      if (sliderHeatmapDuration) sliderHeatmapDuration.value = String(Math.min(120, clamped));
-      if (valHeatmapDuration) valHeatmapDuration.textContent = `${clamped}s`;
-      if (inputHeatmapDuration) inputHeatmapDuration.value = String(clamped);
-      btnHeatmapInfinite?.classList.remove('radar-btn-active');
-      document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((b) => {
-        b.classList.toggle('radar-btn-active', Number(b.dataset.dur) === clamped);
-      });
-      updateState({ heatmapDuration: clamped });
-    }
-    saveSettings(appState);
-  }
-
-  const initHeatDur = Number(appState.heatmapDuration) || 30;
-  setHeatmapDuration(initHeatDur);
-
-  sliderHeatmapDuration?.addEventListener('input', (e) => {
-    const v = Number(e.target.value);
-    if (v >= 125) {
-      setHeatmapDuration(Infinity);
-    } else {
-      setHeatmapDuration(v);
-    }
-  });
-
-  inputHeatmapDuration?.addEventListener('change', (e) => {
-    const v = Number(e.target.value) || 30;
-    setHeatmapDuration(v);
-  });
-
-  document.querySelectorAll('.duration-preset-btn[data-dur]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const dur = Number(btn.dataset.dur);
-      if (dur > 0) setHeatmapDuration(dur);
-    });
-  });
-
-  btnHeatmapInfinite?.addEventListener('click', () => {
-    if (appState.heatmapDuration >= 99999) {
-      setHeatmapDuration(30);
-    } else {
-      setHeatmapDuration(Infinity);
-    }
-  });
 
   const btnToggleVoiceAnnounce = document.getElementById('btnToggleVoiceAnnounce');
   const voiceModeLabel = document.getElementById('voiceModeLabel');
@@ -1560,9 +1049,9 @@ export function initSidebarAndTopControls(videoEl) {
     updateState({ heatmapSpeechEnabled: nextSpeech, detectionCalloutMode: nextMode });
     saveSettings(appState);
     syncVoiceToggleUI(nextSpeech, nextMode);
-    if (nextSpeech && !wasOn) {
-      speakDetectionAnnouncement('Voice callouts active');
-    } else if (!nextSpeech) {
+    if (nextSpeech) {
+      speakModeAnnouncement(nextMode === 'poa' ? 'Point of Aim' : 'Point of Impact');
+    } else {
       stopVoiceAnnouncement();
     }
   }
@@ -1759,16 +1248,23 @@ export function initSidebarAndTopControls(videoEl) {
     saveSettings(appState);
   });
 
-  // 12. Interface Color Swatches & 2D Color Picker
-  const swatches = document.querySelectorAll('.theme-swatch');
+  // 12. Interface Color Swatches & 2D Color Picker (exclude Reticle-only swatches to avoid double-binding)
+  const swatches = document.querySelectorAll('.theme-swatch:not(.theme-swatch-reticle)');
   const colorPickerCustom = document.getElementById('colorPickerCustom');
 
-  function selectThemeColor(color) {
-    applyThemeColor(color);
-    colorPickerCustom.value = color;
+  function syncThemeSwatchesUI(color) {
+    const clean = (color || '#f97316').toLowerCase();
+    applyThemeColor(color || '#f97316');
+    if (colorPickerCustom && colorPickerCustom.value.toLowerCase() !== clean) {
+      colorPickerCustom.value = color || '#f97316';
+    }
     swatches.forEach((s) => {
-      s.classList.toggle('active', s.dataset.color.toLowerCase() === color.toLowerCase());
+      s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === clean);
     });
+  }
+
+  function selectThemeColor(color) {
+    syncThemeSwatchesUI(color);
     updateState({ themeColor: color });
     saveSettings(appState);
   }
@@ -1808,133 +1304,299 @@ export function initSidebarAndTopControls(videoEl) {
     });
   }
 
-  // Reactive UI Sync
-  subscribeState((state, patch = {}) => {
-    if (screenLive) {
-      screenLive.classList.toggle('ui-decluttered', Boolean(state.uiDecluttered));
+  // 14. Display/Video & Hit Timestamps
+  const btnToggleDisplayTimestamp = document.getElementById('btnToggleDisplayTimestamp');
+  const btnToggleHitTimestamps = document.getElementById('btnToggleHitTimestamps');
+  const valTimestampPos = document.getElementById('valTimestampPos');
+  const tsPosBtns = document.querySelectorAll('.ts-pos-btn[data-pos]');
+  const sliderTimestampOpacity = document.getElementById('sliderTimestampOpacity');
+  const valTimestampOpacity = document.getElementById('valTimestampOpacity');
+  const btnToggleTimestampAdaptive = document.getElementById('btnToggleTimestampAdaptive');
+
+  const TS_POS_LABELS = {
+    'top-left': 'Top Left',
+    'top-center': 'Top Middle',
+    'top-right': 'Top Right',
+    'bottom-left': 'Bottom Left',
+    'bottom-center': 'Bottom Middle',
+    'bottom-right': 'Bottom Right'
+  };
+
+  function syncTimestampButtonsUI(state) {
+    const dispOn = state.showDisplayTimestamp !== false;
+    const hitsOn = Boolean(state.showHitTimestamps);
+    const pos = state.timestampPosition || 'bottom-right';
+    const op = Math.max(15, Math.min(100, Number(state.timestampOpacity ?? 60)));
+    const adaptive = state.timestampAdaptive !== false;
+
+    if (btnToggleDisplayTimestamp) {
+      btnToggleDisplayTimestamp.textContent = dispOn ? 'ON' : 'OFF';
+      btnToggleDisplayTimestamp.classList.toggle('radar-btn-active', dispOn);
     }
-    if (btnRestoreUi) {
-      btnRestoreUi.classList.toggle('hidden', !state.uiDecluttered);
+    if (btnToggleHitTimestamps) {
+      btnToggleHitTimestamps.textContent = hitsOn ? 'ON' : 'OFF';
+      btnToggleHitTimestamps.classList.toggle('radar-btn-active', hitsOn);
+    }
+    if (valTimestampPos) {
+      valTimestampPos.textContent = TS_POS_LABELS[pos] || 'Bottom Right';
+    }
+    tsPosBtns.forEach((btn) => {
+      btn.classList.toggle('radar-btn-active', btn.dataset.pos === pos);
+    });
+    if (sliderTimestampOpacity) sliderTimestampOpacity.value = String(op);
+    if (valTimestampOpacity) valTimestampOpacity.textContent = `${op}%`;
+    if (btnToggleTimestampAdaptive) {
+      btnToggleTimestampAdaptive.textContent = adaptive ? 'AUTO' : 'FIXED';
+      btnToggleTimestampAdaptive.classList.toggle('radar-btn-active', adaptive);
+    }
+  }
+
+  btnToggleDisplayTimestamp?.addEventListener('click', () => {
+    updateState({ showDisplayTimestamp: !(appState.showDisplayTimestamp !== false) });
+    saveSettings(appState);
+  });
+
+  tsPosBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const pos = btn.dataset.pos;
+      if (!pos) return;
+      updateState({ timestampPosition: pos });
+      saveSettings(appState);
+    });
+  });
+
+  sliderTimestampOpacity?.addEventListener('input', (e) => {
+    const op = Math.max(15, Math.min(100, Number(e.target.value) || 60));
+    updateState({ timestampOpacity: op });
+    saveSettings(appState);
+  });
+
+  btnToggleTimestampAdaptive?.addEventListener('click', () => {
+    updateState({ timestampAdaptive: !(appState.timestampAdaptive !== false) });
+    saveSettings(appState);
+  });
+
+  btnToggleHitTimestamps?.addEventListener('click', () => {
+    updateState({ showHitTimestamps: !appState.showHitTimestamps });
+    saveSettings(appState);
+  });
+
+  // Reactive UI Sync (patch-gated to avoid unnecessary DOM work during 1Hz buffer ticks & pan/aim drags)
+  function syncSubscribedControls(state, patch = {}, isInit = false) {
+    if (isInit || patch.themeColor !== undefined) {
+      syncThemeSwatchesUI(state.themeColor || '#f97316');
     }
 
-    // Fullscreen view visibility sync
-    if (screenLive) {
-      const isSettings = state.currentScreen === 'settings';
-      const isReticle = state.currentScreen === 'reticle';
-      const isController = state.currentScreen === 'controller';
-      const isLive = state.currentScreen === 'live';
-      const isGallery = state.currentScreen === 'gallery';
+    if (isInit || patch.uiDecluttered !== undefined) {
+      const isDecluttered = Boolean(state.uiDecluttered);
+      if (screenLive) {
+        screenLive.classList.toggle('ui-decluttered', isDecluttered);
+      }
+      if (iconEyeOpen) iconEyeOpen.classList.toggle('hidden', isDecluttered);
+      if (iconEyeSlash) iconEyeSlash.classList.toggle('hidden', !isDecluttered);
+      if (btnDeclutterUi) {
+        btnDeclutterUi.classList.toggle('radar-btn-active', isDecluttered);
+        btnDeclutterUi.setAttribute('aria-pressed', String(isDecluttered));
+        btnDeclutterUi.title = isDecluttered
+          ? 'Show Interface Controls & Reticle'
+          : 'Clean View (Hide Controls & Reticle)';
+      }
+    }
 
-      if (screenGallery) screenGallery.classList.toggle('hidden', !isGallery);
-
-      screenLive.classList.toggle('hidden', !isLive);
-      if (screenSettings) screenSettings.classList.toggle('hidden', !isSettings);
-      if (screenReticle) screenReticle.classList.toggle('hidden', !isReticle);
-      if (screenController) screenController.classList.toggle('hidden', !isController);
-      btnToggleOptions?.classList.toggle('radar-btn-active', isSettings);
-    }
-    syncLoupeModeUI(state.pipEnabled, state.autoAimLoupe);
-    if (btnToggleOverlayTop) {
-      btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
-    }
-    reticleDockGroup?.classList.toggle('is-reticle-on', Boolean(state.overlayEnabled));
-    syncReticleFfpUI(state.reticleFfpMode);
-    btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
-    heatmapDockGroup?.classList.toggle('is-heatmap-on', Boolean(state.heatmapEnabled));
-    const setupOpen = Boolean(state.heatmapSetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
-    if (state.heatmapSetupOpen && !setupOpen) {
-      queueMicrotask(() => setHeatmapSetupOpen(false));
-    }
-    heatmapTunePopover?.classList.toggle('hidden', !setupOpen);
-    if (btnHeatmapTune) {
-      btnHeatmapTune.classList.toggle('radar-btn-active', setupOpen);
-      btnHeatmapTune.setAttribute('aria-expanded', setupOpen ? 'true' : 'false');
-    }
-    const replayOpen = Boolean(state.replaySetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
-    if (state.replaySetupOpen && !replayOpen) {
-      queueMicrotask(() => setReplaySetupOpen(false));
-    }
-    replayTunePopover?.classList.toggle('hidden', !replayOpen);
-    if (btnReplayTune) {
-      btnReplayTune.classList.toggle('radar-btn-active', replayOpen);
-      btnReplayTune.setAttribute('aria-expanded', replayOpen ? 'true' : 'false');
-    }
     if (
-      patch.heatmapSetupOpen !== undefined ||
-      patch.heatmapIgnoreMasks !== undefined ||
-      patch.liveMasksVisible !== undefined ||
-      patch.liveMaskDrawActive !== undefined ||
-      patch.mainZoom !== undefined ||
-      patch.mainPanX !== undefined ||
-      patch.mainPanY !== undefined ||
-      patch.currentScreen !== undefined
+      isInit ||
+      patch.showDisplayTimestamp !== undefined ||
+      patch.showHitTimestamps !== undefined ||
+      patch.timestampPosition !== undefined ||
+      patch.timestampOpacity !== undefined ||
+      patch.timestampAdaptive !== undefined
     ) {
-      renderLiveIgnoreMasks();
+      syncTimestampButtonsUI(state);
     }
-    if (patch.heatmapSensitivity !== undefined) syncSensitivityUI(state.heatmapSensitivity);
-    if (patch.heatmapMinCells !== undefined) syncMinCellsUI(state.heatmapMinCells);
-    if (patch.heatmapMaxAreaPct !== undefined || patch.heatmapMinCells !== undefined) {
-      syncMaxAreaUI(state.heatmapMaxAreaPct, state.heatmapMinCells);
-    }
-    if (patch.heatmapShakeGatePct !== undefined || patch.heatmapMaxAreaPct !== undefined) {
-      syncShakeGateUI(state.heatmapShakeGatePct, state.heatmapMaxAreaPct);
-    }
-    const detectorActive = Boolean(state.heatmapEnabled || state.heatmapSpeechEnabled);
-    if (btnLiveRezero) {
-      btnLiveRezero.disabled = !detectorActive;
-      btnLiveRezero.classList.toggle('dock-btn-dimmed', !detectorActive);
-    }
-    syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled), state.detectionCalloutMode);
-    if (patch.detectionCalloutMode !== undefined) {
-      syncCalloutModeUI(state.detectionCalloutMode);
-    }
-    syncAutoSaveUI(Boolean(state.heatmapAutoSave));
 
-    btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
-    bufferDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
-    bufferText.textContent = state.bufferEnabled
-      ? `${Math.round(state.bufferedSeconds)}/${state.bufferMaxSeconds}s`
-      : 'RAM OFF';
-    replayDockGroup?.classList.toggle('is-buffer-off', !state.bufferEnabled);
-    if (replayDockDot) {
-      replayDockDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
+    if (isInit || patch.currentScreen !== undefined) {
+      heatmapLongPressFired = false;
+      if (screenLive) {
+        const isSettings = state.currentScreen === 'settings';
+        const isReticle = state.currentScreen === 'reticle';
+        const isCalibration = state.currentScreen === 'calibration';
+        const isController = state.currentScreen === 'controller';
+        const isLive = state.currentScreen === 'live';
+        const isGallery = state.currentScreen === 'gallery';
+
+        if (screenGallery) screenGallery.classList.toggle('hidden', !isGallery);
+        screenLive.classList.toggle('hidden', !isLive);
+        if (screenSettings) screenSettings.classList.toggle('hidden', !isSettings);
+        if (screenReticle) screenReticle.classList.toggle('hidden', !isReticle);
+        if (screenCalibration) screenCalibration.classList.toggle('hidden', !isCalibration);
+        if (screenController) screenController.classList.toggle('hidden', !isController);
+        btnToggleOptions?.classList.toggle('radar-btn-active', isSettings);
+      }
     }
-    updateReplayBtnLabel(state.bufferMaxSeconds || 20, state.bufferEnabled);
 
-    // Update Memory Availability Meter in Settings
-    const bufDims = getBufferedTargetDimensions(state.streamWidth, state.streamHeight);
-    valBufferResolution.textContent = `${bufDims.width}×${bufDims.height}`;
-    const usedMB = (state.bufferBytes / (1024 * 1024)).toFixed(1);
-    const estMB = getEstimatedBufferMB();
-    const maxBudgetMB = getAvailableMemoryBudgetMB();
-    memUsedLabel.textContent = `USED: ${usedMB} MB`;
-    memBudgetLabel.textContent = `EST: ~${estMB} MB / ${maxBudgetMB} MB FREE`;
+    // Live Source Status Pill & RTSP Status / FPS Banner (truthful async connection telemetry)
+    if (
+      isInit ||
+      patch.streamStatus !== undefined ||
+      patch.activeDeviceLabel !== undefined ||
+      patch.fps !== undefined ||
+      patch.isRtspStream !== undefined ||
+      patch.isSimulatedStream !== undefined
+    ) {
+      const status = state.streamStatus || (state.isSimulatedStream ? 'simulated' : 'live');
+      const liveSourceDot = document.getElementById('liveSourceDot');
+      const liveSourceLabel = document.getElementById('liveSourceLabel');
+      if (liveSourceDot && liveSourceLabel) {
+        liveSourceDot.className = `live-source-dot status-${status}`;
+        if (status === 'reconnecting') {
+          liveSourceLabel.textContent = 'RECONNECTING...';
+        } else if (status === 'offline') {
+          liveSourceLabel.textContent = 'STREAM OFFLINE';
+        } else if (status === 'connecting') {
+          liveSourceLabel.textContent = 'CONNECTING...';
+        } else if (status === 'simulated' || state.isSimulatedStream) {
+          liveSourceLabel.textContent = 'TEST SIGNAL';
+        } else {
+          liveSourceLabel.textContent = `LIVE · ${(state.activeDeviceLabel || 'CAMERA').slice(0, 18)}`;
+        }
+      }
+      if (state.isRtspStream) {
+        if (textRtspStatus) {
+          if (status === 'live') textRtspStatus.textContent = `LIVE: ${state.activeDeviceLabel}`;
+          else if (status === 'reconnecting') textRtspStatus.textContent = `RECONNECTING: ${state.activeDeviceLabel}...`;
+          else if (status === 'offline') textRtspStatus.textContent = `OFFLINE: ${state.activeDeviceLabel}`;
+          else if (status === 'connecting') textRtspStatus.textContent = `CONNECTING: ${state.activeDeviceLabel}...`;
+        }
+        if (badgeRtspWake) {
+          if (status === 'live') { badgeRtspWake.textContent = 'LIVE'; badgeRtspWake.style.color = '#22c55e'; }
+          else if (status === 'reconnecting') { badgeRtspWake.textContent = 'RETRYING'; badgeRtspWake.style.color = '#f59e0b'; }
+          else if (status === 'offline') { badgeRtspWake.textContent = 'OFFLINE'; badgeRtspWake.style.color = '#fda4af'; }
+        }
+        if (textRtspFps) {
+          textRtspFps.textContent = status === 'live' && state.fps ? `${state.fps} FPS` : '';
+        }
+      } else if (textRtspFps) {
+        textRtspFps.textContent = '';
+      }
+    }
 
-    const estPct = Math.min(100, Math.round((estMB / maxBudgetMB) * 100));
-    const usedPct = Math.min(100, Math.round((parseFloat(usedMB) / maxBudgetMB) * 100));
-    memBarEstFill.style.width = `${estPct}%`;
-    memBarUsedFill.style.width = `${usedPct}%`;
+    if (isInit || patch.pipEnabled !== undefined || patch.autoAimLoupe !== undefined) {
+      syncLoupeModeUI(state.pipEnabled, state.autoAimLoupe);
+    }
 
-    mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
-    mainZoomBadge.classList.toggle('zoom-can-reset', state.mainZoom > 1.01);
+    if (isInit || patch.overlayEnabled !== undefined) {
+      if (btnToggleOverlayTop) {
+        btnToggleOverlayTop.classList.toggle('radar-btn-active', state.overlayEnabled);
+      }
+      reticleDockGroup?.classList.toggle('is-reticle-on', Boolean(state.overlayEnabled));
+    }
 
-    btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
-    btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
+    if (isInit || patch.reticleFfpMode !== undefined) {
+      syncReticleFfpUI(state.reticleFfpMode);
+    }
+
+    if (isInit || patch.heatmapEnabled !== undefined) {
+      btnToggleHeatmap.classList.toggle('radar-btn-active', state.heatmapEnabled);
+      heatmapDockGroup?.classList.toggle('is-heatmap-on', Boolean(state.heatmapEnabled));
+    }
+
+    if (isInit || patch.replaySetupOpen !== undefined || patch.currentScreen !== undefined || patch.uiDecluttered !== undefined) {
+      const replayOpen = Boolean(state.replaySetupOpen && state.currentScreen === 'live' && !state.uiDecluttered);
+      if (state.replaySetupOpen && !replayOpen) {
+        queueMicrotask(() => setReplaySetupOpen(false));
+      }
+      replayTunePopover?.classList.toggle('hidden', !replayOpen);
+      if (btnReplayTune) {
+        btnReplayTune.classList.toggle('radar-btn-active', replayOpen);
+        btnReplayTune.setAttribute('aria-expanded', replayOpen ? 'true' : 'false');
+      }
+    }
+
+    if (isInit || patch.detectionHits !== undefined || patch.heatmapEnabled !== undefined || patch.heatmapSpeechEnabled !== undefined) {
+      const hitsCount = Array.isArray(state.detectionHits) ? state.detectionHits.length : 0;
+      const canClear = hitsCount > 0 || Boolean(state.heatmapEnabled || state.heatmapSpeechEnabled);
+      if (btnLiveClearHits) {
+        btnLiveClearHits.disabled = !canClear;
+        // Never disable pointer-events via .dock-btn-dimmed when Re-Zero is valid at 0 hits!
+        btnLiveClearHits.classList.toggle('dock-btn-dimmed', !canClear);
+      }
+    }
+
+    if (isInit || patch.heatmapSpeechEnabled !== undefined || patch.detectionCalloutMode !== undefined) {
+      syncVoiceToggleUI(Boolean(state.heatmapSpeechEnabled), state.detectionCalloutMode);
+      if (patch.detectionCalloutMode !== undefined) {
+        syncCalloutModeUI(state.detectionCalloutMode);
+      }
+    }
+
+    if (
+      isInit ||
+      patch.replaySetupOpen !== undefined ||
+      patch.bufferEnabled !== undefined ||
+      patch.bufferedSeconds !== undefined ||
+      patch.bufferMaxSeconds !== undefined ||
+      patch.bufferBytes !== undefined ||
+      patch.bufferTargetFps !== undefined ||
+      patch.bufferFastQuality !== undefined ||
+      patch.streamWidth !== undefined ||
+      patch.streamHeight !== undefined
+    ) {
+      replayDockGroup?.classList.toggle('is-buffer-off', !state.bufferEnabled);
+      if (replayDockDot) {
+        replayDockDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
+      }
+      updateReplayBtnLabel(state.bufferMaxSeconds || 20, state.bufferEnabled);
+
+      // Gate heavy memory-meter DOM updates to when Replay Setup popover is actually open
+      if (isInit || state.replaySetupOpen) {
+        btnToggleBuffer.classList.toggle('radar-btn-active', state.bufferEnabled);
+        bufferDot.className = state.bufferEnabled ? 'status-dot' : 'status-dot status-dot-off';
+        bufferText.textContent = state.bufferEnabled
+          ? `${Math.round(state.bufferedSeconds)}/${state.bufferMaxSeconds}s`
+          : 'RAM OFF';
+
+        const bufDims = getBufferedTargetDimensions(state.streamWidth, state.streamHeight);
+        valBufferResolution.textContent = `${bufDims.width}×${bufDims.height}`;
+        const usedMB = (state.bufferBytes / (1024 * 1024)).toFixed(1);
+        const estMB = getEstimatedBufferMB();
+        const maxBudgetMB = getAvailableMemoryBudgetMB();
+        memUsedLabel.textContent = `USED: ${usedMB} MB`;
+        memBudgetLabel.textContent = `EST: ~${estMB} MB / ${maxBudgetMB} MB FREE`;
+
+        const estPct = Math.min(100, Math.round((estMB / maxBudgetMB) * 100));
+        const usedPct = Math.min(100, Math.round((parseFloat(usedMB) / maxBudgetMB) * 100));
+        memBarEstFill.style.transform = `scaleX(${(estPct / 100).toFixed(3)})`;
+        memBarUsedFill.style.transform = `scaleX(${(usedPct / 100).toFixed(3)})`;
+      }
+    }
+
+    if (isInit || patch.mainZoom !== undefined) {
+      mainZoomBadge.textContent = `${state.mainZoom.toFixed(1)}x`;
+      mainZoomBadge.classList.toggle('zoom-can-reset', state.mainZoom > 1.01);
+    }
+
+    if (isInit || patch.invert !== undefined || patch.grayscale !== undefined) {
+      btnFilterInvert.classList.toggle('radar-btn-active', state.invert);
+      btnFilterGrayscale.classList.toggle('radar-btn-active', state.grayscale);
+    }
 
     // Live Gamepad Connection & Action Telemetry
-    const gamepadStatusDot = document.getElementById('gamepadStatusDot');
-    const gamepadStatusText = document.getElementById('gamepadStatusText');
-    const liveActionBanner = document.getElementById('cmLiveActionBanner');
-    if (gamepadStatusDot && gamepadStatusText) {
-      gamepadStatusDot.classList.toggle('connected', Boolean(state.gamepadConnected));
-      gamepadStatusText.textContent = state.gamepadConnected
-        ? (state.gamepadName.split('(')[0].trim() || 'Controller Connected')
-        : 'DISCONNECTED (PRESS ANY BUTTON)';
+    if (isInit || patch.gamepadConnected !== undefined || patch.gamepadName !== undefined || patch.lastGamepadAction !== undefined) {
+      const gamepadStatusDot = document.getElementById('gamepadStatusDot');
+      const gamepadStatusText = document.getElementById('gamepadStatusText');
+      const liveActionBanner = document.getElementById('cmLiveActionBanner');
+      if (gamepadStatusDot && gamepadStatusText) {
+        gamepadStatusDot.classList.toggle('connected', Boolean(state.gamepadConnected));
+        gamepadStatusText.textContent = state.gamepadConnected
+          ? (state.gamepadName.split('(')[0].trim() || 'Controller Connected')
+          : 'DISCONNECTED (PRESS ANY BUTTON)';
+      }
+      if (liveActionBanner && patch.lastGamepadAction !== undefined && state.lastGamepadAction) {
+        liveActionBanner.textContent = state.lastGamepadAction;
+      }
     }
-    if (liveActionBanner && patch.lastGamepadAction !== undefined && state.lastGamepadAction) {
-      liveActionBanner.textContent = state.lastGamepadAction;
-    }
+  }
 
-
-  });
+  syncSubscribedControls(appState, {}, true);
+  subscribeState((state, patch = {}) => syncSubscribedControls(state, patch, false));
 }

@@ -20,13 +20,21 @@
   display: block;
   cursor: grab;
   touch-action: none;
-  will-change: transform;
-  transform: translateZ(0);
   contain: strict;
 }
 
 #mainCanvas:active {
   cursor: grabbing;
+}
+
+#liveOverlayCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 8;
 }
 
 /* Superimposed Guide Layer */
@@ -41,8 +49,6 @@
   justify-content: center;
   z-index: 10;
   overflow: hidden;
-  will-change: transform;
-  transform: translateZ(0);
 }
 
 #svgOverlay {
@@ -90,17 +96,28 @@
 #pipZoomWindow {
   position: absolute;
   right: 16px;
-  top: 72px;
-  width: 330px;
-  height: 220px;
+  top: 76px;
+  width: min(330px, 44vw);
+  height: min(220px, 32vh);
   min-width: 210px;
   min-height: 145px;
   background: #06090d;
-  border: 1.5px solid color-mix(in srgb, rgba(255, 255, 255, 0.28) calc(var(--ui-opacity, 1) * 100%), transparent);
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   overflow: hidden;
   z-index: 25;
+}
+
+@media (max-width: 720px) {
+  #pipZoomWindow {
+    top: 104px;
+    right: 8px;
+    width: min(240px, 48vw);
+    height: min(160px, 26vh);
+    min-width: 170px;
+    min-height: 120px;
+  }
 }
 
 #pipHeader {
@@ -125,13 +142,12 @@
   pointer-events: auto;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--radar-text);
-  background: rgba(10, 14, 19, 0.72);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  padding: 4px 10px;
+  background: rgba(10, 14, 19, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 11px;
   border-radius: var(--radius-pill);
 }
 
@@ -140,21 +156,20 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  background: rgba(10, 14, 19, 0.72);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 14, 19, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 2px 4px;
   border-radius: var(--radius-pill);
 }
 
 .pip-controls .radar-btn-sm {
-  height: 28px;
-  min-width: 28px;
-  padding: 0 6px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0 8px;
   border-radius: var(--radius-pill);
   border-color: transparent;
   background: transparent;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .pip-controls .radar-btn-sm:hover {
@@ -202,15 +217,15 @@
   background: rgba(255, 255, 255, 0.55);
 }
 
-/* Subtle Corner Resize Handles */
+/* Gloved Corner Resize Handles (38px touch area) */
 .pip-resize-handle {
   position: absolute;
   bottom: 4px;
-  width: 26px;
-  height: 26px;
+  width: 38px;
+  height: 38px;
   z-index: 10;
   touch-action: none;
-  opacity: calc(var(--ui-opacity, 1) * 0.75);
+  opacity: calc(var(--ui-opacity, 1) * 0.85);
   transition: opacity 0.15s ease;
 }
 
@@ -234,15 +249,7 @@
   opacity: 1;
 }
 
-/* Transient Heatmap Setup Feedback Canvas & Live Ignore Masks */
-#heatmapSetupCanvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 6;
-}
+/* Calibration Ignore Masks */
 
 .live-ignore-layer {
   position: absolute;
@@ -287,11 +294,11 @@
 
 .live-ignore-handle {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
   background: #fbbf24;
-  border: 1.5px solid #0b0f17;
+  border: 2px solid #0b0f17;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
   pointer-events: auto;
   touch-action: none;
@@ -300,30 +307,30 @@
 .live-ignore-handle::after {
   content: '';
   position: absolute;
-  inset: -7px;
+  inset: -12px;
 }
 
 .live-ignore-handle.handle-nw {
-  top: -6px;
-  left: -6px;
+  top: -9px;
+  left: -9px;
   cursor: nwse-resize;
 }
 
 .live-ignore-handle.handle-ne {
-  top: -6px;
-  right: -6px;
+  top: -9px;
+  right: -9px;
   cursor: nesw-resize;
 }
 
 .live-ignore-handle.handle-sw {
-  bottom: -6px;
-  left: -6px;
+  bottom: -9px;
+  left: -9px;
   cursor: nesw-resize;
 }
 
 .live-ignore-handle.handle-se {
-  bottom: -6px;
-  right: -6px;
+  bottom: -9px;
+  right: -9px;
   cursor: nwse-resize;
 }
 
@@ -333,18 +340,18 @@
 
 .live-ignore-box-remove {
   position: absolute;
-  top: 3px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(11, 15, 23, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  background: rgba(11, 15, 23, 0.94);
   color: #fda4af;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 20px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 29px;
   text-align: center;
   cursor: pointer;
   padding: 0;

@@ -2,6 +2,7 @@
  * USB Camera Enumeration, Stream Acquisition & Simulated Inspection Signal Fallback
  */
 import { appState, updateState, subscribeState } from '../state.js';
+import { clearMemoryBuffer } from '../recorder/memoryRingBuffer.js';
 
 let activeMediaStream = null;
 let simCanvas = null;
@@ -13,19 +14,27 @@ let rtspFrameSeq = 0;
 let rtspAnimTimer = null;
 let rtspDrawLoopActive = false;
 let rtspAbortController = null;
+let rtspReconnectTimer = null;
+let rtspImgFallbackActive = false;
 let lastGatewayPaused = false;
 let activeMjpegPauseUrl = '';
 let activeMjpegStopUrl = '';
 let uvcGatewaySupported = null;
+let uvcGatewayCheckedHost = null;
 let streamSessionSeq = 0;
 const rtspJpegListeners = new Set();
+
+export function isRtspImgFallbackActive() {
+  return rtspImgFallbackActive;
+}
 
 subscribeState((state) => {
   if (!state.isRtspStream || !activeMjpegPauseUrl) {
     lastGatewayPaused = false;
     return;
   }
-  const shouldPause = state.currentScreen === 'gallery';
+  // Pause native/Python gateway capture & JPEG encoding whenever user leaves Live & Calibration
+  const shouldPause = state.currentScreen !== 'live' && state.currentScreen !== 'calibration';
   if (shouldPause !== lastGatewayPaused) {
     lastGatewayPaused = shouldPause;
     fetch(`${activeMjpegPauseUrl}?paused=${shouldPause ? '1' : '0'}`, { method: 'POST' }).catch(() => {});
@@ -116,8 +125,9 @@ export async function checkRtspGatewayStatus() {
 }
 
 async function fetchAndroidUvcCameras() {
-  if (uvcGatewaySupported === false) return [];
   const gatewayBase = getGatewayBaseUrl();
+  if (uvcGatewaySupported === false && uvcGatewayCheckedHost === gatewayBase) return [];
+  uvcGatewayCheckedHost = gatewayBase;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 800);
@@ -195,8 +205,10 @@ export async function enumerateCameras() {
 }
 
 export async function startCameraStream(videoEl, preferredDeviceId = 'auto', customLabel = null) {
-  stopCurrentStream();
+  await stopCurrentStream();
+  clearMemoryBuffer();
   const sessionSeq = ++streamSessionSeq;
+  updateState({ streamStatus: 'connecting' });
 
   // Route network / RTSP streams to the dedicated MJPEG canvas bridge
   if (typeof preferredDeviceId === 'string' && (preferredDeviceId.startsWith('rtsp:') || preferredDeviceId.startsWith('rtsp://'))) {
@@ -232,14 +244,31 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
 
   try {
     const acquireStream = async (constraints) => {
+      let timedOut = false;
+      let timerId = null;
       const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
         video: constraints,
         audio: false
       });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Camera acquisition timeout')), 10000)
-      );
-      return Promise.race([getUserMediaPromise, timeoutPromise]);
+      // Ensure late-resolving streams after timeout immediately release hardware camera tracks
+      getUserMediaPromise
+        .then((lateStream) => {
+          if (timedOut) {
+            lateStream?.getTracks?.().forEach((t) => t.stop());
+          }
+        })
+        .catch(() => {});
+      const timeoutPromise = new Promise((_, reject) => {
+        timerId = setTimeout(() => {
+          timedOut = true;
+          reject(new Error('Camera acquisition timeout'));
+        }, 10000);
+      });
+      try {
+        return await Promise.race([getUserMediaPromise, timeoutPromise]);
+      } finally {
+        if (timerId) clearTimeout(timerId);
+      }
     };
 
     const videoConstraints = {
@@ -286,6 +315,7 @@ export async function startCameraStream(videoEl, preferredDeviceId = 'auto', cus
     updateState({
       activeDeviceId: actualDeviceId,
       activeDeviceLabel: (track && track.label) ? track.label.slice(0, 24).toUpperCase() : 'CAMERA',
+      streamStatus: 'live',
       streamWidth: videoEl.videoWidth || settings.width || 1920,
       streamHeight: videoEl.videoHeight || settings.height || 1080,
       isSimulatedStream: false,
@@ -410,6 +440,9 @@ function startSimulatedStream(videoEl) {
   let tick = 0;
 
   const drawSimFrame = () => {
+    if (document.hidden || (appState.currentScreen !== 'live' && appState.currentScreen !== 'calibration')) {
+      return;
+    }
     tick += 1;
     ctx.drawImage(staticBgCanvas, 0, 0);
 
@@ -443,6 +476,7 @@ function startSimulatedStream(videoEl) {
   updateState({
     activeDeviceId: 'sim',
     activeDeviceLabel: 'TEST SIGNAL 1080P',
+    streamStatus: 'simulated',
     streamWidth: w,
     streamHeight: h,
     isSimulatedStream: true,
@@ -492,8 +526,9 @@ export async function startUvcStream(videoEl, uvcDeviceId, label = 'USB UVC CAME
   });
 }
 
-async function startMjpegCanvasStream(videoEl, opts) {
-  stopCurrentStream();
+async function startMjpegCanvasStream(videoEl, opts, retryAttempt = 0) {
+  await stopCurrentStream();
+  const sessionSeq = ++streamSessionSeq;
 
   const {
     streamApiUrl,
@@ -511,6 +546,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
 
   activeMjpegPauseUrl = pauseUrl;
   activeMjpegStopUrl = stopUrl;
+  rtspImgFallbackActive = false;
 
   rtspCanvas = document.createElement('canvas');
   rtspCanvas.width = initW;
@@ -524,13 +560,17 @@ async function startMjpegCanvasStream(videoEl, opts) {
   ctx.fillStyle = '#2dd4bf';
   ctx.font = 'bold 24px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(connectingTitle, initW / 2, initH / 2);
+  ctx.fillText(retryAttempt > 0 ? `RECONNECTING (${retryAttempt}/4)...` : connectingTitle, initW / 2, initH / 2);
 
   let lastTrackedW = initW;
   let lastTrackedH = initH;
+  let receivedAnyFrame = false;
+
+  const abortCtrl = new AbortController();
+  rtspAbortController = abortCtrl;
 
   const syncFrameDimensions = (nw, nh) => {
-    if (nw <= 0 || nh <= 0) return;
+    if (nw <= 0 || nh <= 0 || abortCtrl.signal.aborted) return;
     if (rtspCanvas.width !== nw || rtspCanvas.height !== nh) {
       rtspCanvas.width = nw;
       rtspCanvas.height = nh;
@@ -543,14 +583,17 @@ async function startMjpegCanvasStream(videoEl, opts) {
   };
 
   const renderMjpegDisconnect = async (errMsg = null) => {
-    if (!rtspDrawLoopActive) return;
+    if (!rtspDrawLoopActive || abortCtrl.signal.aborted || sessionSeq !== streamSessionSeq) return;
     if (rtspStatusPollTimer) {
       clearInterval(rtspStatusPollTimer);
       rtspStatusPollTimer = null;
     }
     let detailMsg = errMsg || defaultDisconnectDetail;
     try {
-      const res = await fetch(statusUrl, { cache: 'no-store' });
+      const stCtrl = new AbortController();
+      const stTimer = setTimeout(() => stCtrl.abort(), 1800);
+      const res = await fetch(statusUrl, { cache: 'no-store', signal: stCtrl.signal });
+      clearTimeout(stTimer);
       const st = res.ok ? await res.json() : null;
       if (!st || !st.available) {
         detailMsg = 'Camera gateway offline';
@@ -560,7 +603,38 @@ async function startMjpegCanvasStream(videoEl, opts) {
         detailMsg = `Stream ended at stage: ${st.stage} (frames=${st.framesDecoded ?? 0})`;
       }
     } catch {}
-    if (!rtspDrawLoopActive) return;
+    if (!rtspDrawLoopActive || abortCtrl.signal.aborted || sessionSeq !== streamSessionSeq) return;
+
+    // Automatic bounded field reconnect on transient Wi-Fi / USB drop (4 attempts: 1.5s, 3s, 5s, 8s)
+    const maxRetries = 4;
+    if (retryAttempt < maxRetries && detailMsg !== 'Camera gateway offline') {
+      const backoffMs = [1500, 3000, 5000, 8000][retryAttempt] || 5000;
+      updateState({ streamStatus: 'reconnecting' });
+      ctx.fillStyle = '#051317';
+      ctx.fillRect(0, 0, rtspCanvas.width, rtspCanvas.height);
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'bold 22px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`RECONNECTING (${retryAttempt + 1}/${maxRetries})...`, rtspCanvas.width / 2, rtspCanvas.height / 2 - 18);
+      ctx.font = '15px monospace';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(detailMsg.slice(0, 110), rtspCanvas.width / 2, rtspCanvas.height / 2 + 20);
+      rtspFrameSeq += 1;
+
+      const freshOpts = {
+        ...opts,
+        streamApiUrl: streamApiUrl.replace(/_t=\d+/, `_t=${Date.now()}`)
+      };
+      rtspReconnectTimer = setTimeout(() => {
+        rtspReconnectTimer = null;
+        if (sessionSeq === streamSessionSeq && !abortCtrl.signal.aborted) {
+          startMjpegCanvasStream(videoEl, freshOpts, retryAttempt + 1);
+        }
+      }, backoffMs);
+      return;
+    }
+
+    updateState({ streamStatus: 'offline' });
     ctx.fillStyle = '#051317';
     ctx.fillRect(0, 0, rtspCanvas.width, rtspCanvas.height);
     ctx.fillStyle = '#fda4af';
@@ -575,34 +649,44 @@ async function startMjpegCanvasStream(videoEl, opts) {
 
   rtspDrawLoopActive = true;
 
-  // Periodically query gateway status to sync exact stream telemetry (dimensions & FPS)
+  // Periodically query gateway status to sync exact stream telemetry (with timeout & in-flight guard)
+  let statusPollInFlight = false;
   rtspStatusPollTimer = setInterval(async () => {
-    if (!rtspDrawLoopActive) return;
+    if (!rtspDrawLoopActive || abortCtrl.signal.aborted || statusPollInFlight) return;
+    statusPollInFlight = true;
+    const pollCtrl = new AbortController();
+    const pollTimeout = setTimeout(() => pollCtrl.abort(), 1800);
     try {
-      const res = await fetch(statusUrl, { cache: 'no-store' });
-      if (!res.ok) return;
+      const res = await fetch(statusUrl, { cache: 'no-store', signal: pollCtrl.signal });
+      if (!res.ok || abortCtrl.signal.aborted) return;
       const st = await res.json();
+      if (abortCtrl.signal.aborted) return;
       if (st && st.isStreaming) {
         if (st.width && st.height && (st.width !== appState.streamWidth || st.height !== appState.streamHeight)) {
           syncFrameDimensions(st.width, st.height);
         }
         if (typeof st.fps === 'number' && st.fps > 0) {
-          updateState({ fps: Math.round(st.fps) });
+          const nextFps = Math.round(st.fps);
+          if (nextFps !== appState.fps) {
+            updateState({ fps: nextFps });
+          }
         }
       }
-    } catch {}
-  }, 1000);
-
-  const abortCtrl = new AbortController();
-  rtspAbortController = abortCtrl;
+    } catch {
+      // Ignore transient poll timeout
+    } finally {
+      clearTimeout(pollTimeout);
+      statusPollInFlight = false;
+    }
+  }, 1200);
 
   let pendingJpeg = null;
   let decodingFrame = false;
 
   const scheduleDecode = () => {
     if (decodingFrame || !pendingJpeg || !rtspDrawLoopActive || abortCtrl.signal.aborted) return;
-    // Skip browser-side JPEG decode & canvas draw when live viewport is hidden (replay/gallery/settings)
-    if (appState.currentScreen !== 'live') {
+    // Skip browser-side JPEG decode & canvas draw when neither Live nor Calibration is active
+    if (appState.currentScreen !== 'live' && appState.currentScreen !== 'calibration') {
       pendingJpeg = null;
       return;
     }
@@ -617,6 +701,11 @@ async function startMjpegCanvasStream(videoEl, opts) {
             syncFrameDimensions(bmp.width, bmp.height);
             ctx.drawImage(bmp, 0, 0, rtspCanvas.width, rtspCanvas.height);
             rtspFrameSeq += 1;
+            if (!receivedAnyFrame) {
+              receivedAnyFrame = true;
+              retryAttempt = 0;
+              updateState({ streamStatus: 'live' });
+            }
           }
         } finally {
           bmp.close();
@@ -630,17 +719,22 @@ async function startMjpegCanvasStream(videoEl, opts) {
   };
 
   const startImgFallback = () => {
+    rtspImgFallbackActive = true;
     rtspImg = new Image();
     rtspImg.crossOrigin = 'anonymous';
     rtspImg.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.001;pointer-events:none;';
     document.body.appendChild(rtspImg);
 
     const drawLoop = () => {
-      if (!rtspDrawLoopActive || !rtspImg) return;
-      if (appState.currentScreen === 'live' && rtspImg.complete && rtspImg.naturalWidth > 0) {
+      if (!rtspDrawLoopActive || !rtspImg || abortCtrl.signal.aborted) return;
+      if ((appState.currentScreen === 'live' || appState.currentScreen === 'calibration') && rtspImg.complete && rtspImg.naturalWidth > 0) {
         syncFrameDimensions(rtspImg.naturalWidth, rtspImg.naturalHeight);
         ctx.drawImage(rtspImg, 0, 0, rtspCanvas.width, rtspCanvas.height);
         rtspFrameSeq += 1;
+        if (!receivedAnyFrame) {
+          receivedAnyFrame = true;
+          updateState({ streamStatus: 'live' });
+        }
       }
       rtspAnimTimer = requestAnimationFrame(drawLoop);
     };
@@ -684,13 +778,18 @@ async function startMjpegCanvasStream(videoEl, opts) {
         return out;
       };
 
-      const findDoubleCrlf = (arr) => {
+      const findHeaderEnd = (arr) => {
         for (let i = 0; i <= arr.length - 4; i++) {
           if (arr[i] === 13 && arr[i + 1] === 10 && arr[i + 2] === 13 && arr[i + 3] === 10) {
-            return i;
+            return { idx: i, sepLen: 4 };
           }
         }
-        return -1;
+        for (let i = 0; i <= arr.length - 2; i++) {
+          if (arr[i] === 10 && arr[i + 1] === 10) {
+            return { idx: i, sepLen: 2 };
+          }
+        }
+        return null;
       };
 
       while (rtspDrawLoopActive && !abortCtrl.signal.aborted) {
@@ -724,16 +823,16 @@ async function startMjpegCanvasStream(videoEl, opts) {
             const prevLen = headerBuf.length;
             const probeSlice = value.subarray(pos, Math.min(value.length, pos + 256));
             const combined = appendBytes(headerBuf, probeSlice);
-            const hdrEnd = findDoubleCrlf(combined);
-            if (hdrEnd < 0) {
+            const hdrEndObj = findHeaderEnd(combined);
+            if (!hdrEndObj) {
               headerBuf = combined;
               pos += probeSlice.length;
               if (headerBuf.length > 4096) headerBuf = new Uint8Array(0);
               continue;
             }
-            const hdrText = asciiDecoder.decode(combined.subarray(0, hdrEnd));
+            const hdrText = asciiDecoder.decode(combined.subarray(0, hdrEndObj.idx));
             const match = /content-length:\s*(\d+)/i.exec(hdrText);
-            const consumedFromValue = Math.max(0, (hdrEnd + 4) - prevLen);
+            const consumedFromValue = Math.max(0, (hdrEndObj.idx + hdrEndObj.sepLen) - prevLen);
             pos += consumedFromValue;
             headerBuf = new Uint8Array(0);
             if (match) {
@@ -742,6 +841,11 @@ async function startMjpegCanvasStream(videoEl, opts) {
                 frameBuf = new Uint8Array(expectedLen);
                 frameFill = 0;
               }
+            } else if (/content-type:\s*image\/jpeg/i.test(hdrText)) {
+              // Fallback to <img> decoder if server sends boundary-only MJPEG without Content-Length
+              try { reader.cancel(); } catch {}
+              startImgFallback();
+              return;
             }
           }
         }
@@ -765,6 +869,7 @@ async function startMjpegCanvasStream(videoEl, opts) {
   updateState({
     activeDeviceId: deviceId,
     activeDeviceLabel: (label || 'STREAM').slice(0, 24).toUpperCase(),
+    streamStatus: retryAttempt > 0 ? 'reconnecting' : 'connecting',
     streamWidth: initW,
     streamHeight: initH,
     isSimulatedStream: false,
@@ -774,8 +879,12 @@ async function startMjpegCanvasStream(videoEl, opts) {
   return null;
 }
 
-export function stopCurrentStream() {
+export async function stopCurrentStream() {
   streamSessionSeq += 1;
+  if (rtspReconnectTimer) {
+    clearTimeout(rtspReconnectTimer);
+    rtspReconnectTimer = null;
+  }
   if (simTimer) {
     clearInterval(simTimer);
     simTimer = null;
@@ -789,6 +898,7 @@ export function stopCurrentStream() {
     rtspAnimTimer = null;
   }
   rtspDrawLoopActive = false;
+  rtspImgFallbackActive = false;
   if (rtspAbortController) {
     rtspAbortController.abort();
     rtspAbortController = null;
@@ -810,11 +920,19 @@ export function stopCurrentStream() {
   const stopUrl = activeMjpegStopUrl;
   activeMjpegPauseUrl = '';
   activeMjpegStopUrl = '';
-  // Notify active native/local gateway stream to release hardware/socket
+  // Notify active native/local gateway stream and await briefly so a new stream start doesn't race with stop
   if (appState.isRtspStream) {
     updateState({ isRtspStream: false });
     const fallbackStop = `${getGatewayBaseUrl()}/api/rtsp/stop`;
-    fetch(stopUrl || fallbackStop, { method: 'POST' }).catch(() => {});
+    const stopCtrl = new AbortController();
+    const stopTimeout = setTimeout(() => stopCtrl.abort(), 750);
+    try {
+      await fetch(stopUrl || fallbackStop, { method: 'POST', signal: stopCtrl.signal });
+    } catch {
+      // Ignore stop errors if gateway already closed
+    } finally {
+      clearTimeout(stopTimeout);
+    }
   }
 }
 

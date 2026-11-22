@@ -362,7 +362,8 @@ export function renderReticleOverlayLayer(
   if (state.overlayType === 'custom' && state.customOverlayUrl && customImgEl) {
     svgEl.classList.add('hidden');
     customImgEl.classList.remove('hidden');
-    if (customImgEl.src !== state.customOverlayUrl) {
+    if (customImgEl.dataset.srcUrl !== state.customOverlayUrl) {
+      customImgEl.dataset.srcUrl = state.customOverlayUrl;
       customImgEl.src = state.customOverlayUrl;
     }
   } else {
@@ -376,12 +377,27 @@ export function renderReticleOverlayLayer(
   }
 }
 
+const LIVE_OVERLAY_KEYS = [
+  'overlayEnabled', 'overlayType', 'overlayOpacity', 'overlayScale',
+  'reticleFfpMode', 'mainZoom', 'customOverlayUrl', 'reticleConfig', 'themeColor'
+];
+
 export function initOverlayManager() {
   const overlayLayer = document.getElementById('overlayLayer');
   const svgOverlay = document.getElementById('svgOverlay');
   const customImg = document.getElementById('customOverlayImg');
 
-  function renderLiveOverlay(state) {
+  function renderLiveOverlay(state, patch) {
+    if (patch && Object.keys(patch).length > 0) {
+      let relevant = false;
+      for (let i = 0; i < LIVE_OVERLAY_KEYS.length; i++) {
+        if (LIVE_OVERLAY_KEYS[i] in patch) {
+          relevant = true;
+          break;
+        }
+      }
+      if (!relevant) return;
+    }
     renderReticleOverlayLayer(
       overlayLayer,
       svgOverlay,
@@ -392,6 +408,5 @@ export function initOverlayManager() {
     );
   }
 
-  renderLiveOverlay(appState);
   subscribeState(renderLiveOverlay);
 }

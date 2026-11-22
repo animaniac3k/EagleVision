@@ -1,24 +1,16 @@
-# SPOTR Software Architecture Document (v0.1.11)
+# SPOTR Software Architecture Document (v0.62.0)
+
+> **Repository Note:** This repository (`EagleVision`) hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*). All former specification notes from `docs/project_plan.txt` have been consolidated here as the single technical source of truth.
+
+---
 
 ## 1. Executive Overview
 
-**SPOTR** (*Recon • Detect • Alert • Optical Precision*) is a driverless, offline-first Progressive Web Application (PWA) paired with a Python 3 RTSP gateway (`server.py`) and an embedded Android/ChromeOS host (`platforms/android`, `SpotrServer.kt`). It delivers 60 FPS digital magnification, First Focal Plane (FFP) graduated reticles, consolidated 20Hz micro-motion detection with 1:1 synced studio voice callouts, a rolling RAM ring buffer with unified Playback & Spatial Hits review, and WebHID/Bluetooth controller integration.
+**SPOTR** is a zero-dependency, offline-first Progressive Web Application (PWA) paired with:
+- A local Python 3 + OpenCV RTSP gateway (`platforms/windows/server.py`, with root proxy `server.py`), and
+- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 62` / `v0.62.0`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
 
-```
-+---------------------------------------------------------------------------------------------------------+
-|                                       SPOTR PWA / ANDROID SHELL                                         |
-|                     (Pure Browser-Native ES2022 • Zero NPM Runtime Dependencies • 60 FPS)               |
-+---------------------------------------------------------------------------------------------------------+
-       │                                     │                                    │
-       ▼                                     ▼                                    ▼
-+──────────────────────────+       +───────────────────────────────────+       +──────────────────────────+
-| Hardware HID & Inputs    |       | Multi-Source Ingestion Pipeline   |       | Consolidated CV & Voice  |
-| • WebHID (DualShock 4/5) |       | • UVC USB (getUserMedia / libuvc) |       | • 20Hz 160×90 Luma Grid  |
-| • 8BitDo Micro (K-Mode)  |       | • RTSP Gateway (OpenCV/MediaCodec)|       | • Max Area Gate (5% def) |
-| • HTML5 Gamepad API      |       | • Bresser Wi-Fi Wake Proxy (UDP)  |       | • 1:1 Hit + Voice Sync   |
-| • Bluetooth Ring/Remote  |       | • MJPEG Condition-Push Stream     |       | • Studio Audio Sprite    |
-+──────────────────────────+       +───────────────────────────────────+       +──────────────────────────+
-```
+Target hardware ranges from **low-power tablets** (e.g., **Lenovo IdeaPad Duet 3** 4 GB RAM, ARM SoCs) to rugged Android phones and desktop/laptop systems. Every subsystem is engineered for **gloved field operation**, **battery conservation**, and **zero cloud dependency**.
 
 ---
 
@@ -26,94 +18,54 @@
 
 ```mermaid
 flowchart TD
-    subgraph Inputs["1. Hardware Input Subsystems"]
+    subgraph Inputs["1. Hardware Input Subsystems (Isolated)"]
         BT["WebHID Bluetooth<br/>(DualShock 4 / DualSense)"]
         GP["HTML5 Gamepad API &<br/>8BitDo Micro (K-Mode)"]
-        RING["Bluetooth Ring / Remote<br/>(HID Keys, Wheel & Touch)"]
-        MOUSE["Touch / Mouse / Pointer Events"]
+        RING["Bluetooth Ring / Remote<br/>(Explicit Opt-In: ringEnabled)"]
+        TOUCH["Gloved Touch / Mouse / Keyboard<br/>(Rain/Carry Touch Lock)"]
     end
 
-    subgraph Store["2. Unidirectional Reactive Store (state.js)"]
-        STATE[("appState<br/>(Single Source of Truth)")]
-        UPDATE["updateState(patch)"]
-        SUB["subscribeState(listener)"]
+    subgraph Store["2. Reactive State & Persistence"]
+        STATE[("appState (js/state.js)<br/>Single Source of Truth")]
+        LOCAL[("localStorage (settingsStore.js)<br/>Debounced + Clamped Sanitizer")]
+        IDB[("IndexedDB (videoStore.js)<br/>Saved Clips & .webm Export")]
     end
 
-    subgraph CameraEngine["3. Camera Ingestion Pipeline"]
-        MEDIA["navigator.mediaDevices<br/>(UVC / Built-in Cameras)"]
-        GW["Gateway (server.py / SpotrServer.kt)<br/>(RTSP + Android libuvc MJPEG)"]
-        STREAM["streamManager.js<br/>(Source Arbitration & Pause Sync)"]
+    subgraph Ingestion["3. Multi-Source Camera Pipeline"]
+        UVC_WEB["getUserMedia (UVC USB / Webcam)"]
+        GW_WIN["Windows/Linux Gateway (server.py)<br/>OpenCV FFmpeg RTSP → MJPEG"]
+        GW_AND["Android Host (SpotrServer.kt)<br/>MediaCodec RTSP + libuvc USB"]
+        SM["streamManager.js<br/>Auto-Reconnect & Pause Sync"]
     end
 
-    subgraph CompositorEngine["4. Compositor & Consolidated Detection (compositor.js)"]
-        MAIN_C["Main Viewport Canvas<br/>(60 FPS, alpha: false)"]
-        PIP_C["Digital Zoom Loupe<br/>(zoomWindow.js + Aim Loupe)"]
-        HEAT["20Hz Consolidated Detector<br/>(Max Area Gate 5% • Shake >18%)"]
-        AUDIO["Voice Engine (voiceAudioEngine.js)<br/>(1:1 Synced Callouts)"]
+    subgraph Engine["4. Dual-Canvas Compositor & Detection"]
+        MAIN_C["#mainCanvas + #liveOverlayCanvas<br/>60 FPS Frame-Deduped Renderer"]
+        PIP["Digital Zoom Loupe (zoomWindow.js)<br/>1.5x–12.0x + Auto Aim"]
+        HEAT["20Hz Micro-Change Detector<br/>160×90 Grid + Shake/Area Gates"]
+        VOICE["Lazy Studio Voice Engine<br/>(voice-sprite.mp3 + Web Speech)"]
     end
 
-    subgraph MemoryEngine["5. RAM Ring Buffer & Unified Archive"]
-        RAM["memoryRingBuffer.js<br/>(Live-Only Capture, 5s–60s)"]
-        PLAYBACK["Unified Screen 2: Playback | Hits<br/>(videoBrowser.js & detectionsScreen.js)"]
-        IDB[("IndexedDB (videoStore.js)<br/>(Saved Clips & .webm Export)")]
-        LOCAL[("LocalStorage (settingsStore.js)<br/>(Config, Masks, Reticle Toggles)")]
+    subgraph Archive["5. Rolling RAM Buffer & Screen 2 Archive"]
+        RAM["memoryRingBuffer.js<br/>Live-Only Capture (RAM-Capped)"]
+        PLAY["Screen 2: Playback & Spatial Hits<br/>(videoBrowser.js + detectionsScreen.js)"]
     end
 
-    Inputs --> UPDATE
-    GW -->|MJPEG Frame Push| STREAM
-    MEDIA -->|HTMLVideoElement| STREAM
-    STREAM --> CompositorEngine
-    STREAM -->|Live-Only Capture| RAM
-    UPDATE --> STATE
-    STATE --> SUB
-    SUB --> CompositorEngine
-    SUB --> PLAYBACK
-    RAM -->|Snapshot LIVE BUFFER| PLAYBACK
-    PLAYBACK -->|Manual Save / Optional Auto-Save| IDB
-    STATE -->|Persist| LOCAL
+    Inputs --> STATE
+    UVC_WEB --> SM
+    GW_WIN -->|MJPEG Push| SM
+    GW_AND -->|MJPEG Push| SM
+    SM --> Engine
+    SM -->|Live Screen Only| RAM
+    STATE <--> LOCAL
+    STATE --> Engine
+    STATE --> PLAY
+    RAM -->|Zero-Copy Snapshot| PLAY
+    PLAY -->|Manual / Optional Auto-Save| IDB
 ```
 
 ---
 
-## 3. Subsystem Breakdown
-
-### 3.1 Unidirectional State Store (`js/state.js` & `js/storage/settingsStore.js`)
-- Holds camera source state, `mainZoom` / `mainPanX` / `mainPanY`, Digital Loupe coordinates (`roiX`, `roiY`), per-screen reticle toggles (`overlayEnabled` on Live, `playbackReticleEnabled` default `false`, `hitsReticleEnabled` default `true`), detection parameters (`heatmapSensitivity`, `heatmapDuration`, `heatmapMaxAreaPct` default `5%`, `heatmapMinCells` default `2`, `heatmapAutoSave` default `false`), ignore masks (`heatmapIgnoreMasks`), and session hits (`detectionHits`).
-
-### 3.2 Camera Ingestion & Native Android Bridge (`js/camera/streamManager.js`, `server.py`, `platforms/android`)
-- **Desktop/ChromeOS**: Captures UVC USB cameras via `getUserMedia`, or network RTSP/Bresser streams via `server.py` (OpenCV + `threading.Condition` MJPEG push + UDP wake proxy).
-- **Android APK (`com.spotr.tactical`)**: `MainActivity.kt` hosts `SpotrServer.kt` (NanoHTTPD on `127.0.0.1:8080`), bridging both native RTSP (`RtspSessionManager.kt` + `MediaCodecJpegDecoder.kt`) and USB UVC cameras (`UsbUvcSessionManager.kt` via `libuvc`), including `/api/rtsp/pause` and `/api/uvc/pause` during Screen 2 review.
-
-### 3.3 Compositor, Digital Loupe & Consolidated Detection (`js/renderer/compositor.js`, `zoomWindow.js`)
-- **Digital Zoom Loupe (`zoomWindow.js`)**: Resizable/draggable PiP loupe (`1.5x–12.0x`) with `aimLoupeAtHit()` and `snapLoupeToLatestHit()`, accessible directly from the Live dock (`#btnLiveAimLoupe`) or controller binding.
-- **Consolidated 20Hz Detection Pipeline (`updateHeatmap` → `handleConsolidatedDetection`)**:
-  - Analyzes a `160×90` (`14,400`-cell) luminance grid while skipping cells inside `heatmapIgnoreMasks`.
-  - Runs whenever `heatmapEnabled || heatmapSpeechEnabled` is active (drawing thermal overlays only when `heatmapEnabled` is true).
-  - **Global Shake Gate**: Rejects and re-anchors background if `>18%` of unmasked cells change simultaneously.
-  - **Multi-Hit / Area Gate**: Suppresses hit creation and alerts if changed or spiked cells exceed `heatmapMaxAreaPct` (default `5%` = `1/20th` of the screen) or fall below `heatmapMinCells` (default `2`).
-  - **1:1 Synced Event Output**: Merges ongoing flickers within `1500ms` & `0.055` radius; every new confirmed hit atomically logs the pin to `detectionHits`, triggers the studio voice callout (`announceHitVoice`), records a single timeline marker (`recordEvent('heatmap')`), and optionally queues `triggerAutoSaveHeatmapClip()`.
-
-### 3.4 Parametric Reticle Engine (`js/renderer/overlayManager.js`)
-- `renderReticleOverlayLayer()` drives all three stages from a single SVG/custom-image builder (`buildGraduatedCrosshairSvg`):
-  - **Live (`#overlayLayer`)**: Controlled by `overlayEnabled` (supports FFP lock with `mainZoom`).
-  - **Playback (`#galleryReticleLayer`)**: Controlled by `playbackReticleEnabled` (**OFF by default**).
-  - **Hits Map (`#hitsReticleLayer`)**: Controlled by `hitsReticleEnabled` (**ON by default**), scaled directly inside `#hitsTransformLayer`.
-- `exportAnnotatedCanvasPng()` in `compositor.js` rasterizes the configured reticle (including resolved theme accent color or custom image) onto PNG snapshots for each screen according to that screen's reticle state.
-
-### 3.5 RAM Ring Buffer & Unified Screen 2: Playback | Hits (`memoryRingBuffer.js`, `instantReplay.js`, `videoBrowser.js`, `detectionsScreen.js`)
-- **Live-Only RAM Ring Buffer**: Captures frames only while `appState.currentScreen === 'live'`, automatically pausing when entering Playback, Hits, or Setup. `snapshotMemoryBuffer()` prunes frames older than `bufferMaxSeconds` before creating a snapshot.
-- **Unified Playback (`videoBrowser.js`)**:
-  - Pressing **Replay** opens Screen 2 (`Playback` tab) directly on the pinned **`LIVE BUFFER (RAM)`** source without auto-saving to IndexedDB; clicking **`Save Clip`** persists it on demand.
-  - Supports `0.5x` slow-mo, `-1 / +1` frame stepping, CCTV waveform event scrubbing, `Reticle: OFF/ON`, PNG snapshot, `.webm` export, and per-clip deletion.
-- **Spatial Hits Map (`detectionsScreen.js`)**:
-  - Displays numbered pins (no popup text callouts) and minimal `#N / Total` navigation.
-  - **`Hits: ON/OFF`** hides/shows pins so underlying target marks can be inspected.
-  - **`👁 Masks (N)`** toggles visual mask visibility while keeping masking active; **`✎ Edit Masks`** enables drag-to-draw, per-mask `×` removal, and confirmed **`Clear All`**.
-  - **`Re-Zero`** re-anchors the heatmap background and clears logged hits together.
-
----
-
-## 4. Screen State Transition Topology
+## 3. 6-Screen Navigation Topology
 
 ```mermaid
 stateDiagram-v2
@@ -121,22 +73,85 @@ stateDiagram-v2
     SplashScreen --> LiveScreen: Auto-dismiss / Tap / Key
 
     LiveScreen --> UnifiedPlayback: Tap Replay (LIVE BUFFER) or Clips
-    UnifiedPlayback --> LiveScreen: ← Live / Circle / BTN 1-2
+    LiveScreen --> HitsMap: Tap Top-Right Hits Badge
     UnifiedPlayback --> HitsMap: Switch Tab (Playback ↔ Hits)
     HitsMap --> UnifiedPlayback: Switch Tab (Hits ↔ Playback)
-    HitsMap --> LiveScreen: ← Live / Circle
+    UnifiedPlayback --> LiveScreen: ← Live / Circle / Esc
+    HitsMap --> LiveScreen: ← Live / Circle / Esc
+    HitsMap --> CalibrationScreen: Tap Calibrate
 
-    LiveScreen --> SettingsScreen: Setup (Camera / Detection / Display)
+    LiveScreen --> SettingsScreen: Setup Gear
+    LiveScreen --> CalibrationScreen: Long-Press Hits
     SettingsScreen --> ReticleScreen: Reticle Tab
+    SettingsScreen --> CalibrationScreen: Calibration Tab
     SettingsScreen --> ControllerScreen: Controllers Tab
     SettingsScreen --> LiveScreen: ← Live
     ReticleScreen --> LiveScreen: ← Live
+    CalibrationScreen --> LiveScreen: ← Live / Circle
     ControllerScreen --> LiveScreen: ← Live
 ```
 
+| Screen | Container ID | Primary Purpose | Background Pipeline State |
+| :--- | :--- | :--- | :--- |
+| **1. Live** | `#screenLive` | 60 FPS scope viewport, FFP reticle, PiP loupe, streamlined gloved dock, Touch Lock, 1-tap snapshot, Source Status Pill | Compositor active, RAM buffer active (if enabled), RTSP/UVC active |
+| **2. Playback & Hits** | `#screenGallery` | Unified `LIVE BUFFER (RAM)` + IndexedDB clips (`0.5x` slow-mo, `-1/+1` step, `.webm` export) & Spatial Hits Map (decoupled `Pins: ON/OFF`, `Aim Loupe`, `Calibrate`) | Live compositor paused, RAM buffer paused, gateway JPEG encoding paused |
+| **3. Setup** | `#screenSettings` | Camera sources (USB / Wi-Fi RTSP), Voice tuning, Display & Theme (6 swatches + custom picker, Display Timestamps, Telemetry HUD toggle) | Live compositor paused, RAM buffer paused, gateway paused |
+| **4. Reticle** | `#screenReticle` | Parametric crosshair studio (FFP/SFP, 4 center styles, independent reticle color swatches, custom image DataURL persistence, 2-tap Reset) | Live compositor paused, RAM buffer paused, gateway paused |
+| **5. Controllers** | `#screenController` | DualShock 4/5 WebHID, 8BitDo Micro K-Mode, isolated Bluetooth Ring toggle (`ringEnabled`, OFF by default), visual remap & JSON profile import/export | Live compositor paused, RAM buffer paused, gateway paused |
+| **6. Calibration** | `#screenCalibration` | 1:1 thermal heatmap debug view, 3 Environment Presets (`Indoor`, `Calm Range`, `Wind / Mirage`), `✦ Auto-Tune`, noise meter, Ignore Zones | Live camera & 20Hz heatmap active (hit logging suppressed), RAM buffer paused |
+
 ---
 
-## 5. Offline & Security Model
+## 4. Gateway HTTP API Reference
 
-- **100% Local Processing**: Video ingestion, motion diffing, voice sprite playback, and IndexedDB clip storage remain completely on-device.
-- **Offline Service Worker (`sw.js`)**: Pre-caches all core assets (`spotr-v0.1.15`) and auto-reloads on version updates (`APP_VERSION` = `v0.1.11`).
+Both the Windows/Desktop gateway (`platforms/windows/server.py`) and the Android embedded gateway (`SpotrServer.kt` on `127.0.0.1:8080`) expose the same local REST/MJPEG surface:
+
+| Method | Endpoint | Platforms | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/rtsp/status` | Windows, Android | Returns gateway availability, OpenCV/MediaCodec backend info, active URL, FPS, resolution, and error status. |
+| `GET` | `/api/rtsp/wake?ip=192.168.0.1&path=/app/getmediainfo` | Windows, Android | Local/private IP validated camera wake proxy (sends Bresser UDP magic packet on Android + HTTP `getmediainfo` probe) and returns `ch0`/`ch1` stream URLs. |
+| `GET` | `/api/rtsp/stream?url=rtsp://...&transport=tcp` | Windows, Android | Streams low-latency `multipart/x-mixed-replace; boundary=frame` JPEG frames (validates `rtsp://` scheme and `tcp`/`udp` transport; client-refcounted). |
+| `POST` | `/api/rtsp/pause?paused=1\|0` | Windows, Android | Pauses/resumes JPEG encoding (and skips H.264/H.265 P-frames on Android) while off Live/Calibration without tearing down the RTSP socket. |
+| `POST` | `/api/rtsp/stop` | Windows, Android | Stops active RTSP capture session and releases camera socket. |
+| `GET` | `/api/uvc/list` | Android (stub on Windows) | Lists attached USB UVC video devices (`deviceId`, label, VID:PID, permission status). Windows returns `{"supported": false, "cameras": []}`. |
+| `GET` | `/api/uvc/status` | Android | Returns active USB UVC capture status, stage, FPS, and resolution. |
+| `GET` | `/api/uvc/stream?deviceId=uvc:...` | Android | Streams native `libuvc` USB camera frames as multipart MJPEG. |
+| `POST` | `/api/uvc/pause?paused=1\|0` | Android | Pauses/resumes USB UVC NV21→JPEG encoding. |
+| `POST` | `/api/uvc/stop` | Android | Stops active USB UVC preview and releases camera handles cleanly. |
+
+---
+
+## 5. Slow-Hardware & Battery Optimizations (v0.62.0)
+
+Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo IdeaPad Duet 3) cool, responsive, and OOM-free during multi-hour range sessions:
+
+1. **Zero `backdrop-filter: blur()` Over Live Video:** All translucent glass blur passes have been replaced with crisp, high-contrast matte surfaces (`rgba(13, 19, 26, 0.94)`), eliminating 17+ per-frame GPU blur passes over 60 FPS video.
+2. **Demand-Driven Render & Polling Loops:**
+   - The 60–120 Hz compositor `requestAnimationFrame` loop pauses automatically when `document.hidden` or off Live/Calibration.
+   - USB `<video>` canvas blits are deduplicated via `videoEl.currentTime` (zero redundant blits on 30 FPS cameras running on 60–120 Hz screens).
+   - The `gamepadController.js` polling loop stops completely when no gamepad is connected or the tab is hidden.
+   - The playback canvas loop stops whenever playback is paused or on the Hits tab.
+   - The 20 Hz 14,400-cell thermal debug `putImageData` pass runs exclusively on Screen 6 Calibration.
+3. **Conservative Memory Guardrails:**
+   - `voice-sprite.mp3` is decoded lazily only when Voice Callouts are enabled (saving 19–38 MB RAM on boot when muted).
+   - `memoryRingBuffer.js` inspects `navigator.deviceMemory` and caps RAM allocation (`<= 220 MB` on 4 GB tablets) with generation-safe reset handling.
+   - Leaving Screen 2 immediately frees `activeBufferClip` (releasing 50–300 MB of decoded frame references).
+   - Detection thumbnails are downscaled to 640 px (`0.65` JPEG quality).
+4. **Native Android & Windows Gateway Performance:**
+   - **Android (`MediaCodecJpegDecoder.kt`):** Semi-planar NV21 bulk UV copy fast path (>70% NV21 conversion CPU reduction), skip-decode while paused with clean IDR resync on resume, automatic hardware-to-software decoder fallback for ChromeOS ARCVM, `FLAG_KEEP_SCREEN_ON`, low-latency `WifiLock`, and Android 10+ no-internet camera Wi-Fi network binding.
+   - **Windows (`server.py`):** `disable_nagle_algorithm = True` + single coalesced frame write (eliminates 40–200 ms/frame Nagle+Delayed-ACK stalls), monotonic frame sequencing, and localhost-only binding by default (`--lan` opt-in for iOS/tablet LAN access).
+
+---
+
+## 6. Input Isolation Architecture
+
+- **Bluetooth Ring Isolation (`appState.ringEnabled`, default `false`):** `ringController.js` ignores all HID key, wheel, and synthetic touch events unless the operator explicitly enables **BT Ring: ON** in **Setup → Controllers → Bluetooth Ring & Remote** (and automatically yields when the **8BitDo Micro** profile is active). This guarantees Bluetooth Rings never hijack 8BitDo Micro K-Mode or keyboard shortcuts.
+- **Rain / Carry Touch Lock (`#btnToggleTouchLock`):** Locks the Live viewport behind a protective shield (`#touchLockOverlay`) so rain droplets or sling contact cannot alter zoom, reticle, or hits. Unlocking requires a deliberate **1-second hold** on `#btnUnlockTouchScreen`.
+
+---
+
+## 7. Offline & Security Model
+
+- **100% On-Device Processing:** Video capture, 20 Hz luminance diffing, voice audio sprites, timestamps, and IndexedDB clips stay completely local.
+- **Service Worker (`core/sw.js`, `spotr-v0.62.0`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits or RAM buffers.
+- **Localhost & SSRF Hardening:** Both gateways validate `rtsp://` schemes, whitelist `tcp`/`udp` transport, restrict `/api/rtsp/wake` to private/link-local/loopback hosts, block directory listing and `..` path traversal, and bind `127.0.0.1` by default.

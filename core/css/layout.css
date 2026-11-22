@@ -1,8 +1,9 @@
-/* Main App Shell & Screen Containers */
+/* Main App Shell & Screen Containers (100dvh prevents mobile browser bar cutoff) */
 #appRoot {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background-color: var(--radar-bg);
@@ -30,20 +31,43 @@
 }
 
 .strip-top-left {
-  top: 14px;
-  left: 16px;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
 }
 
 .strip-top-right {
-  top: 14px;
-  right: 16px;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
+}
+
+@media (max-width: 540px) {
+  .strip-top-left {
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    gap: 4px;
+  }
+  .strip-top-right {
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    gap: 4px;
+  }
+  .strip-top-left .radar-btn.btn-icon-only {
+    min-width: 38px;
+    width: 38px;
+    height: 38px;
+  }
+  .archive-pill-group {
+    height: 38px;
+  }
+  .archive-pill-btn {
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
 }
 
 .strip-bottom {
   position: absolute;
-  bottom: 14px;
-  left: 16px;
-  right: 16px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -58,46 +82,57 @@
   pointer-events: auto;
 }
 
+.quick-tool-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .live-bottom-center {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: 0;
   z-index: 36;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 24px);
 }
 
 @media (max-width: 1120px) {
+  .strip-bottom {
+    left: calc(8px + env(safe-area-inset-left, 0px));
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    justify-content: center;
+    gap: 0;
+  }
+  .quick-tool-wrap {
+    position: absolute;
+    left: 0;
+    bottom: 64px;
+    pointer-events: none;
+  }
+  .quick-tool-wrap > * {
+    pointer-events: auto;
+  }
   .live-bottom-center {
     position: static;
     transform: none;
-    margin-left: auto;
+    margin: 0 auto;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 
-/* Declutter Mode */
-.btn-restore-ui {
-  position: absolute;
-  top: 14px;
-  left: 16px;
-  z-index: 60;
-  opacity: 0.7;
-  box-shadow: var(--shadow-panel);
-}
-
-.btn-restore-ui:hover {
-  opacity: 1;
-}
-
-#screenLive.ui-decluttered .floating-strip,
+/* Declutter / Clean View Mode (Keeps top-left Setup Gear & Eye-Slash toggle visible; hides reticle + rest of UI) */
+#screenLive.ui-decluttered .strip-top-right,
 #screenLive.ui-decluttered .strip-bottom,
+#screenLive.ui-decluttered .hide-in-clean,
 #screenLive.ui-decluttered #hudOverlay,
 #screenLive.ui-decluttered #pipZoomWindow,
 #screenLive.ui-decluttered #zoomTargetCrosshair,
-#screenLive.ui-decluttered #heatmapTunePopover,
 #screenLive.ui-decluttered #replayTunePopover,
-#screenLive.ui-decluttered #heatmapSetupCanvas,
-#screenLive.ui-decluttered #liveIgnoreLayer {
+#screenLive.ui-decluttered #overlayLayer,
+#screenLive.ui-decluttered #reticleFfpToast {
   display: none !important;
 }
 
@@ -202,7 +237,7 @@
   max-width: 940px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
   gap: 18px;
 }
 
@@ -278,7 +313,8 @@
 /* =================================================================== */
 /* SCREEN 4: RETICLE CUSTOMIZER & SCENE BACKDROPS                      */
 /* =================================================================== */
-#screenReticle {
+#screenReticle,
+#screenCalibration {
   position: relative;
   width: 100%;
   height: 100%;
@@ -286,6 +322,69 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.calib-stage-area {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: #05090e;
+  padding: 12px;
+}
+
+.calib-stage-topbar {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 25;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calib-debug-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(8, 12, 17, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.calib-debug-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--radar-text-secondary);
+}
+
+.calib-stage-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #04070c;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.6);
+}
+
+#calibMainCanvas,
+#calibSetupCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#calibSetupCanvas {
+  pointer-events: none;
+  z-index: 6;
 }
 
 .reticle-workspace {
@@ -364,9 +463,7 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: rgba(10, 14, 19, 0.76);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10, 14, 19, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-panel);
@@ -402,8 +499,7 @@
   height: 36px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
-  background: rgba(10, 14, 19, 0.76);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 14, 19, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
   color: #e2e8f0;
   font-size: 12.5px;
@@ -429,8 +525,7 @@
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(10, 14, 19, 0.72);
-  backdrop-filter: blur(10px);
+  background: rgba(10, 14, 19, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-pill);
   padding: 5px 14px;
@@ -522,7 +617,7 @@
   color: var(--radar-text);
   box-shadow: var(--shadow-panel);
   pointer-events: none;
-  z-index: 35;
+  z-index: 45;
   transition: opacity 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
 }
@@ -532,9 +627,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
+  height: 44px;
   background: var(--radar-panel);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-pill);
   padding: 0 12px;
@@ -608,12 +702,13 @@
   .reticle-workspace {
     flex-direction: column;
   }
-  .reticle-stage-area {
-    min-height: 280px;
+  .reticle-stage-area,
+  .calib-stage-area {
+    min-height: 180px;
   }
   .reticle-sidebar-drawer {
     width: 100%;
-    max-height: 48%;
+    max-height: 52%;
     border-left: none;
     border-top: 1px solid var(--radar-border);
   }
@@ -724,18 +819,17 @@
 /* Telemetry HUD Overlay */
 #hudOverlay {
   position: absolute;
-  right: 16px;
-  bottom: 72px;
-  width: 260px;
+  left: 16px;
+  bottom: 84px;
+  width: 248px;
   padding: 12px 14px;
   background: var(--radar-panel);
-  backdrop-filter: blur(12px);
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-panel);
   font-family: var(--font-mono);
   font-size: 12.5px;
-  z-index: 25;
+  z-index: 26;
   pointer-events: none;
   opacity: var(--ui-opacity, 1);
 }
@@ -956,8 +1050,7 @@
 .cm-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1237,6 +1330,7 @@
 .cm-table-wrap {
   flex: 1;
   overflow-y: auto;
+  touch-action: pan-y;
   margin-top: 10px;
   border: 1px solid var(--radar-border);
   border-radius: var(--radius-sm);

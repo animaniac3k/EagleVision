@@ -7,6 +7,8 @@
  * canvas rendering without redundant clears.
  */
 
+import { drawDisplayTimestampOnCanvas, sampleSourceRegionLuma } from '../renderer/timestampOverlay.js';
+
 const MAX_CACHED_BITMAPS = 8;
 const PREFETCH_AHEAD = 3;
 const MAX_INFLIGHT_PREFETCH = 4;
@@ -24,6 +26,10 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
   let targetIdx = -1;
   let currentBitmap = null;
   let decodingTarget = false;
+  let cachedLumaIdx = -1;
+  let cachedLumaPos = '';
+  let cachedLumaVal = 30;
+  let lastLumaSampleMs = 0;
 
   const bitmapCache = new Map(); // idx -> ImageBitmap (LRU order)
   const inflight = new Map();    // idx -> Promise<ImageBitmap | null>
@@ -50,7 +56,14 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
       return Promise.resolve(null);
     }
     if (bitmapCache.has(idx)) {
-      return Promise.resolve(bitmapCache.get(idx));
+      const hit = bitmapCache.get(idx);
+      if (hit && hit.width > 0) {
+        // Refresh LRU recency
+        bitmapCache.delete(idx);
+        bitmapCache.set(idx, hit);
+        return Promise.resolve(hit);
+      }
+      bitmapCache.delete(idx);
     }
     if (inflight.has(idx)) {
       return inflight.get(idx);
@@ -81,7 +94,7 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
   }
 
   function draw() {
-    if (!currentBitmap || !canvasEl) return;
+    if (!currentBitmap || !canvasEl || currentBitmap.width <= 0 || currentBitmap.height <= 0) return;
     const iw = currentBitmap.width || canvasEl.width;
     const ih = currentBitmap.height || canvasEl.height;
     const cw = canvasEl.width;
@@ -101,18 +114,43 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
     const sy = Math.max(0, Math.min(ih - cropH, centerY - cropH / 2));
 
     ctx.drawImage(currentBitmap, sx, sy, cropW, cropH, 0, 0, cw, ch);
+    if (tf.showTimestamp && Number.isFinite(tf.baseWallMs)) {
+      const offsetSec = currentIdx >= 0 ? getTimeForIndex(currentIdx) : 0;
+      const pos = tf.tsPosition || 'bottom-right';
+      const adaptive = tf.tsAdaptive !== false;
+      let bgLuma = 30;
+      if (adaptive) {
+        const now = performance.now();
+        if (currentIdx !== cachedLumaIdx || pos !== cachedLumaPos || now - lastLumaSampleMs > 350) {
+          cachedLumaVal = sampleSourceRegionLuma(currentBitmap, pos, sx, sy, cropW, cropH);
+          cachedLumaIdx = currentIdx;
+          cachedLumaPos = pos;
+          lastLumaSampleMs = now;
+        }
+        bgLuma = cachedLumaVal;
+      }
+      drawDisplayTimestampOnCanvas(ctx, cw, ch, tf.baseWallMs + offsetSec * 1000, {
+        position: pos,
+        opacity: tf.tsOpacity ?? 0.6,
+        adaptive,
+        bgLuma,
+        isLive: false
+      });
+    }
   }
 
   function shouldApplyDecodedFrame(reqIdx) {
     if (currentBitmap === null || currentIdx < 0) return true;
     if (reqIdx === targetIdx) return true;
-    if (reqIdx > currentIdx && reqIdx <= targetIdx) return true;
-    // Allow forward/target updates after loop wrap or backward scrub
-    if (targetIdx < currentIdx && reqIdx <= targetIdx) return true;
+    // Forward playback or scrub
+    if (targetIdx > currentIdx && reqIdx > currentIdx && reqIdx <= targetIdx) return true;
+    // Backward scrub: only accept frames between targetIdx and currentIdx (never older stale frames)
+    if (targetIdx < currentIdx && reqIdx >= targetIdx && reqIdx < currentIdx) return true;
     return false;
   }
 
   function applyBitmap(idx, bmp) {
+    if (!bmp || bmp.width <= 0 || bmp.height <= 0) return;
     bitmapCache.delete(idx);
     bitmapCache.set(idx, bmp);
     currentBitmap = bmp;
@@ -137,13 +175,13 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
 
   function pumpDecode() {
     if (targetIdx < 0 || targetIdx >= frames.length) return;
-    if (targetIdx === currentIdx && currentBitmap) {
+    if (targetIdx === currentIdx && currentBitmap && currentBitmap.width > 0) {
       prefetchAhead(targetIdx, generation);
       return;
     }
 
     const cached = bitmapCache.get(targetIdx);
-    if (cached) {
+    if (cached && cached.width > 0) {
       applyBitmap(targetIdx, cached);
       prefetchAhead(targetIdx, generation);
       return;
@@ -167,7 +205,8 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
         applyBitmap(reqIdx, bmp);
       }
 
-      if (targetIdx !== currentIdx && targetIdx >= 0 && targetIdx < frames.length) {
+      // Guard against infinite decode spin on a corrupt JPEG frame: only recurse if targetIdx moved
+      if (targetIdx !== reqIdx && targetIdx !== currentIdx && targetIdx >= 0 && targetIdx < frames.length) {
         pumpDecode();
       } else {
         prefetchAhead(targetIdx, gen);

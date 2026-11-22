@@ -18,20 +18,22 @@
  * visual button glowing, and a one-click "Learn Button" calibration tool.
  */
 
-import { appState, updateState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { saveSettings } from '../storage/settingsStore.js';
 import { isSplashScreenActive, dismissSplashScreen } from './splashScreen.js';
 
 const ZOOM_CYCLE_STOPS = [1.0, 1.5, 2.0, 2.5, 3.0];
 
+// Only used when Bluetooth Ring mode is explicitly enabled AND no custom learned bindings exist.
+// Deliberately excludes Tab and F12 so browser accessibility and DevTools are never hijacked.
 const DEFAULT_KEY_MAP = {
   UP: ['ArrowUp', 'PageUp', 'KeyW'],
   DOWN: ['ArrowDown', 'PageDown', 'KeyS'],
   LEFT: ['ArrowLeft', 'MediaTrackPrevious', 'KeyA'],
   RIGHT: ['ArrowRight', 'MediaTrackNext', 'KeyD'],
   CENTER: ['Enter', 'NumpadEnter', 'Space', 'MediaPlayPause', 'KeyF'],
-  BTN1: ['AudioVolumeUp', 'KeyX', 'KeyR', 'F12'],
-  BTN2: ['AudioVolumeDown', 'KeyM', 'KeyT', 'Tab', 'KeyB']
+  BTN1: ['AudioVolumeUp', 'KeyX', 'KeyR'],
+  BTN2: ['AudioVolumeDown', 'KeyM', 'KeyT', 'KeyB']
 };
 
 const RING_SWIPE_MAX_MS = 420;
@@ -40,11 +42,16 @@ const SUPPRESS_CLICK_MS = 450;
 
 let learningAction = null;
 let lastWheelMs = 0;
-let lastKeyDownMs = 0;
 let suppressNextClickUntil = 0;
 let suppressNextAuxUntil = 0;
+const handledKeyDownCodes = new Set();
+
+function isRingActive() {
+  return Boolean(appState.ringEnabled && appState.activeControllerProfile !== '8bitdo_micro');
+}
 
 function hasMappedSwipeSignals() {
+  if (!isRingActive()) return false;
   const map = appState.ringKeyMap || {};
   return Object.values(map).some((v) => typeof v === 'string' && v.includes('Swipe'));
 }
@@ -96,13 +103,20 @@ export function initRingController() {
   const ringRawSignalLogEl = document.getElementById('ringRawSignalLog');
   let lastPrimaryRawMs = 0;
 
-  function logRawSignal(summary, isFallback = false) {
+  // Automatically cancel Ring Learn mode whenever user leaves the Controller screen
+  subscribeState((state, patch = {}) => {
+    if ('currentScreen' in patch && state.currentScreen !== 'controller' && learningAction) {
+      setLearningAction(null);
+    }
+  });
+
+  function logRawSignal(summaryOrFn, isFallback = false) {
+    if (!ringRawSignalLogEl || appState.currentScreen !== 'controller') return;
     const now = performance.now();
     if (isFallback && now - lastPrimaryRawMs < 120) return;
     if (!isFallback) lastPrimaryRawMs = now;
-    if (ringRawSignalLogEl && appState.currentScreen === 'controller') {
-      ringRawSignalLogEl.textContent = `RAW: ${summary}`;
-    }
+    const summary = typeof summaryOrFn === 'function' ? summaryOrFn() : summaryOrFn;
+    ringRawSignalLogEl.textContent = `RAW: ${summary}`;
   }
 
   function getCustomRingMap() {
@@ -159,9 +173,12 @@ export function initRingController() {
         if (codes.includes('TouchTap')) return act;
       }
     }
-    // 3. Check built-in multi-protocol remote bindings
-    for (const [act, codes] of Object.entries(DEFAULT_KEY_MAP)) {
-      if (codes.includes(codeOrKey)) return act;
+    // 3. Built-in multi-protocol remote fallback ONLY when user has not learned custom bindings
+    const hasCustomBindings = Object.values(customMap).some((v) => Boolean(v && String(v).trim()));
+    if (!hasCustomBindings) {
+      for (const [act, codes] of Object.entries(DEFAULT_KEY_MAP)) {
+        if (codes.includes(codeOrKey)) return act;
+      }
     }
     return null;
   }
@@ -221,15 +238,20 @@ export function initRingController() {
   function executeDirectionalAction(act) {
     // A. Unified Playback / Hits Gallery
     if (appState.currentScreen === 'gallery') {
+      if (appState.galleryArchiveTab === 'hits') {
+        if (act === 'LEFT') document.getElementById('btnHitPrev')?.click();
+        else if (act === 'RIGHT') document.getElementById('btnHitNext')?.click();
+        else if (act === 'DOWN') document.getElementById('btnBackToLive')?.click();
+        return;
+      }
       if (act === 'LEFT') {
-        const scrubber = document.getElementById('galleryScrubber');
-        scrubRangeElement(scrubber, -1);
+        document.getElementById('btnGalleryStepBack')?.click();
       } else if (act === 'RIGHT') {
         document.getElementById('btnGalleryStep')?.click();
       } else if (act === 'UP') {
         document.getElementById('btnGallerySlowMo')?.click();
       } else if (act === 'DOWN') {
-        document.getElementById('btnToggleGalleryDrawer')?.click();
+        document.getElementById('btnBackToLive')?.click();
       }
       return;
     }
@@ -278,20 +300,25 @@ export function initRingController() {
       const learnedCoords = parseTouchTapCoords(signalCode);
       for (const [act, boundCode] of Object.entries(nextMap)) {
         if (act === learningAction) continue;
-        const trimmed = String(boundCode).trim();
-        if (trimmed === signalCode) {
-          delete nextMap[act];
-          continue;
-        }
-        if (learnedCoords) {
-          const otherCoords = parseTouchTapCoords(trimmed);
-          if (otherCoords && Math.hypot(learnedCoords.x - otherCoords.x, learnedCoords.y - otherCoords.y) <= 6) {
-            delete nextMap[act];
+        const tokens = String(boundCode).split(',').map((s) => s.trim()).filter(Boolean);
+        const filtered = tokens.filter((tok) => {
+          if (tok === signalCode) return false;
+          if (learnedCoords) {
+            const otherCoords = parseTouchTapCoords(tok);
+            if (otherCoords && Math.hypot(learnedCoords.x - otherCoords.x, learnedCoords.y - otherCoords.y) <= 6) {
+              return false;
+            }
           }
+          return true;
+        });
+        if (filtered.length === 0) {
+          delete nextMap[act];
+        } else if (filtered.length !== tokens.length) {
+          nextMap[act] = filtered.join(', ');
         }
       }
       nextMap[learningAction] = signalCode;
-      updateState({ ringKeyMap: nextMap });
+      updateState({ ringKeyMap: nextMap, ringEnabled: true });
       saveSettings(appState);
       if (ringLastSignalEl) {
         ringLastSignalEl.textContent = `BOUND [${learningAction}] → ${signalCode}`;
@@ -377,7 +404,12 @@ export function initRingController() {
         return;
       }
 
-      logRawSignal(`keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
+      // Isolate Bluetooth Ring: never intercept keyboard/8BitDo Micro unless Ring mode is explicitly enabled or learning
+      if (!learningAction && !isRingActive()) {
+        return;
+      }
+
+      logRawSignal(() => `keydown code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
 
       // Do not hijack typing if focus is inside an input, textarea, select, or editable element
       const activeEl = document.activeElement;
@@ -391,15 +423,7 @@ export function initRingController() {
 
       const code = extractKeySignal(e);
       if (!code) return;
-      if (
-        !learningAction &&
-        appState.activeControllerProfile === '8bitdo_micro' &&
-        !Object.keys(appState.ringKeyMap || {}).length &&
-        !/^(Page|Media|AudioVolume)/.test(code)
-      ) {
-        return;
-      }
-      lastKeyDownMs = performance.now();
+      handledKeyDownCodes.add(code);
 
       const handled = handleRingSignal(code);
       if (handled) {
@@ -410,13 +434,18 @@ export function initRingController() {
     { capture: true }
   );
 
-  // Fallback for ChromeOS/Android HID consumer keys that dispatch only keyup
+  // Fallback for ChromeOS/Android HID consumer keys that dispatch only keyup (without prior keydown)
   window.addEventListener(
     'keyup',
     (e) => {
-      logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`, true);
+      const code = extractKeySignal(e);
+      if (code && handledKeyDownCodes.has(code)) {
+        handledKeyDownCodes.delete(code);
+        return;
+      }
       if (window.isSpotrRebindingKey?.()) return;
-      if (performance.now() - lastKeyDownMs <= 300) return;
+      if (!learningAction && !isRingActive()) return;
+      logRawSignal(() => `keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`, true);
       const activeEl = document.activeElement;
       const tag = activeEl?.tagName;
       if (
@@ -425,17 +454,8 @@ export function initRingController() {
       ) {
         return;
       }
-      const code = extractKeySignal(e);
       if (!code || code === 'Escape') return;
-      if (
-        !learningAction &&
-        appState.activeControllerProfile === '8bitdo_micro' &&
-        !Object.keys(appState.ringKeyMap || {}).length &&
-        !/^(Page|Media|AudioVolume)/.test(code)
-      ) {
-        return;
-      }
-      logRawSignal(`keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
+      logRawSignal(() => `keyup code=${e.code || '-'} key=${e.key || '-'} keyCode=${e.keyCode || 0}`);
       const handled = handleRingSignal(code);
       if (handled) {
         e.preventDefault();
@@ -445,11 +465,12 @@ export function initRingController() {
     { capture: true }
   );
 
-  // 2. Listen for Bluetooth Ring Scroll-Wheel ticks
+  // 2. Listen for Bluetooth Ring Scroll-Wheel ticks (isolated to Ring mode or Learn)
   window.addEventListener(
     'wheel',
     (e) => {
-      logRawSignal(`wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)}`);
+      if (!learningAction && !isRingActive()) return;
+      logRawSignal(() => `wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)}`);
       const targetEl = e.target instanceof Element ? e.target : null;
       if (!learningAction) {
         if (
@@ -460,7 +481,7 @@ export function initRingController() {
         }
         if (
           targetEl &&
-          targetEl.closest('#optionsPanel, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #heatmapTunePopover, #replayTunePopover')
+          targetEl.closest('#screenSettings, #screenCalibration, #screenReticle, #screenController, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #replayTunePopover')
         ) {
           return;
         }
@@ -479,7 +500,7 @@ export function initRingController() {
       }
 
       if (!wheelCode) return;
-      logRawSignal(`wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)} → ${wheelCode}`);
+      logRawSignal(() => `wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)} → ${wheelCode}`);
 
       if (!learningAction && !resolveRingAction(wheelCode)) {
         const dir = wheelCode.replace('Wheel', '').toUpperCase();
@@ -517,7 +538,7 @@ export function initRingController() {
     if (!el || !(el instanceof Element)) return false;
     return Boolean(
       el.closest(
-        '#optionsPanel, #galleryDrawer, .pip-controls, .pip-resize-handle, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
+        '#screenSettings, #screenCalibration, #screenReticle, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #replayTunePopover, #zoomTargetCrosshair, #pipHeader, .pip-controls, .pip-resize-handle, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
       )
     );
   }
@@ -532,11 +553,12 @@ export function initRingController() {
   window.addEventListener(
     'pointerdown',
     (e) => {
+      if (!learningAction && !isRingActive() && appState.currentScreen !== 'controller') return;
       const onForm = isFormControl(e.target);
       if (onForm && !learningAction && appState.currentScreen !== 'controller') return;
       const now = performance.now();
       logRawSignal(
-        `ptr-down(${e.pointerType || '?'}) id=${e.pointerId} btn=${e.button} @${Math.round(e.clientX)},${Math.round(e.clientY)}${onForm ? ' [form]' : ''}`
+        () => `ptr-down(${e.pointerType || '?'}) id=${e.pointerId} btn=${e.button} @${Math.round(e.clientX)},${Math.round(e.clientY)}${onForm ? ' [form]' : ''}`
       );
       activeSwipePointer = {
         id: e.pointerId,
@@ -560,24 +582,22 @@ export function initRingController() {
       if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) return;
       activeSwipePointer.lastX = e.clientX;
       activeSwipePointer.lastY = e.clientY;
-      const dx = e.clientX - activeSwipePointer.startX;
-      const dy = e.clientY - activeSwipePointer.startY;
-      const dist = Math.hypot(dx, dy);
-      if (dist >= 8) {
-        logRawSignal(
-          `ptr-move(${activeSwipePointer.pointerType}) dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)}`
-        );
+      if (appState.currentScreen === 'controller') {
+        const dx = e.clientX - activeSwipePointer.startX;
+        const dy = e.clientY - activeSwipePointer.startY;
+        const dist = Math.hypot(dx, dy);
+        if (dist >= 8) {
+          logRawSignal(
+            () => `ptr-move(${activeSwipePointer.pointerType}) dist=${Math.round(dist)}px dx=${Math.round(dx)} dy=${Math.round(dy)}`
+          );
+        }
       }
     },
     { capture: true, passive: true }
   );
 
   function finishSwipePointer(e, isCancel) {
-    if (
-      !activeSwipePointer ||
-      (e.pointerId !== activeSwipePointer.id &&
-        (e.pointerType || 'unknown') !== activeSwipePointer.pointerType)
-    ) {
+    if (!activeSwipePointer || e.pointerId !== activeSwipePointer.id) {
       return;
     }
     const ptr = activeSwipePointer;
@@ -603,19 +623,21 @@ export function initRingController() {
       recentTapCount = 0;
     }
 
-    const pctX = window.innerWidth > 0 ? Math.round((ptr.startX / window.innerWidth) * 100) : 0;
-    const pctY = window.innerHeight > 0 ? Math.round((ptr.startY / window.innerHeight) * 100) : 0;
-
-    logRawSignal(
-      `ptr(${ptr.pointerType}) btn=${ptr.button} @${Math.round(ptr.startX)},${Math.round(ptr.startY)}(${pctX}%,${pctY}%) dist=${Math.round(dist)}px${tapInfo} ${Math.round(elapsed)}ms${isCancel ? ' [cancel]' : ''}`
-    );
+    logRawSignal(() => {
+      const pctX = window.innerWidth > 0 ? Math.round((ptr.startX / window.innerWidth) * 100) : 0;
+      const pctY = window.innerHeight > 0 ? Math.round((ptr.startY / window.innerHeight) * 100) : 0;
+      return `ptr(${ptr.pointerType}) btn=${ptr.button} @${Math.round(ptr.startX)},${Math.round(ptr.startY)}(${pctX}%,${pctY}%) dist=${Math.round(dist)}px${tapInfo} ${Math.round(elapsed)}ms${isCancel ? ' [cancel]' : ''}`;
+    });
 
     if (ptr.startedOnForm && !learningAction) return;
+    if (!learningAction && !isRingActive()) return;
+
+    const canExecuteOnScreen = appState.currentScreen === 'live' || appState.currentScreen === 'gallery';
 
     // Non-primary mouse buttons (Middle / Right / Browser Back / Browser Forward)
     if (!isCancel && ptr.button >= 1 && dist < RING_SWIPE_MIN_DIST_PX) {
       const btnCode = `MouseBtn${ptr.button}`;
-      if (learningAction || resolveRingAction(btnCode)) {
+      if (learningAction || (canExecuteOnScreen && resolveRingAction(btnCode))) {
         suppressNextAuxUntil = performance.now() + 200;
         handleRingSignal(btnCode);
         return;
@@ -632,6 +654,7 @@ export function initRingController() {
       }
       if (
         !learningAction &&
+        canExecuteOnScreen &&
         !isCancel &&
         elapsed <= 750 &&
         !isInteractiveOverlayTarget(ptr.target) &&
@@ -665,7 +688,7 @@ export function initRingController() {
       }
     }
 
-    if (isInteractiveOverlayTarget(ptr.target)) return;
+    if (!canExecuteOnScreen || isInteractiveOverlayTarget(ptr.target)) return;
 
     if (resolveRingAction(swipeCode)) {
       suppressNextClickUntil = performance.now() + SUPPRESS_CLICK_MS;
@@ -682,13 +705,14 @@ export function initRingController() {
     passive: true
   });
 
-  // Fallback raw telemetry listeners for unusual ChromeOS HID touch/scroll/gamepad inputs
+  // Fallback raw telemetry listeners (strictly gated to Controller screen to avoid background string churn)
   window.addEventListener(
     'touchstart',
     (e) => {
+      if (appState.currentScreen !== 'controller') return;
       const t = e.touches?.[0];
       logRawSignal(
-        `touchstart n=${e.touches?.length || 0} @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
+        () => `touchstart n=${e.touches?.length || 0} @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
         true
       );
     },
@@ -697,9 +721,10 @@ export function initRingController() {
   window.addEventListener(
     'touchend',
     (e) => {
+      if (appState.currentScreen !== 'controller') return;
       const t = e.changedTouches?.[0];
       logRawSignal(
-        `touchend @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
+        () => `touchend @${t ? `${Math.round(t.clientX)},${Math.round(t.clientY)}` : '?'}`,
         true
       );
     },
@@ -708,14 +733,15 @@ export function initRingController() {
   window.addEventListener(
     'scroll',
     (e) => {
+      if (appState.currentScreen !== 'controller') return;
       const target = e.target instanceof Element ? e.target : null;
       const label = target?.id || target?.className || 'window';
-      logRawSignal(`scroll(${String(label).slice(0, 24)})`, true);
+      logRawSignal(() => `scroll(${String(label).slice(0, 24)})`, true);
     },
     { capture: true, passive: true }
   );
   window.addEventListener('gamepadconnected', (e) => {
-    logRawSignal(`gamepad: ${e.gamepad?.id || 'connected'}`, true);
+    logRawSignal(() => `gamepad: ${e.gamepad?.id || 'connected'}`, true);
   });
 
   window.addEventListener(

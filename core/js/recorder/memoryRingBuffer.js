@@ -7,7 +7,7 @@
  * readback or double-JPEG re-encoding.
  */
 import { appState, updateState, subscribeState } from '../state.js';
-import { subscribeRtspJpegFrames } from '../camera/streamManager.js';
+import { subscribeRtspJpegFrames, getRtspCanvas, isRtspImgFallbackActive } from '../camera/streamManager.js';
 import { getSoundPeak, initSoundSampler, stopSoundSampler } from '../audio/soundSampler.js';
 
 let frameRing = []; // Array of { timestampMs, perfMs, jpegBuffer, width, height, soundPeak }
@@ -18,8 +18,11 @@ let rtspUnsubscribe = null;
 let captureCanvas = null;
 let captureCtx = null;
 let encodingInProgress = false;
+let bufferGeneration = 0;
 let currentVideoEl = null;
 let lastBufferStateUpdateTime = 0;
+let lastPublishedSeconds = -1;
+let lastPublishedBytes = -1;
 let lastRtspCaptureMs = 0;
 let pausedAtMs = appState.currentScreen !== 'live' ? performance.now() : null;
 
@@ -64,19 +67,22 @@ export function recordEvent(type = 'event') {
 
 /**
  * Estimates the maximum safe RAM budget (in MB) for in-memory video buffering
- * on the current device/browser.
+ * on the current device/browser. Accounts for ArrayBuffers living outside V8's JS heap
+ * so low-RAM tablets (e.g. 4 GB Duet 3) avoid OOM tab kills.
  */
 export function getAvailableMemoryBudgetMB() {
+  const deviceGB = Number(navigator.deviceMemory) || 4;
+  // Conservative ceiling based on physical device memory: 4GB -> 220MB, 8GB -> 400MB, 16GB+ -> 512MB
+  const deviceCapMB = Math.round(Math.min(512, Math.max(128, deviceGB * 55)));
   if (performance && performance.memory && performance.memory.jsHeapSizeLimit) {
     const freeHeapBytes = Math.max(
       128 * 1024 * 1024,
       performance.memory.jsHeapSizeLimit - (performance.memory.usedJSHeapSize || 0)
     );
-    // Use up to 40% of remaining JS heap (capped between 128 MB and 768 MB)
-    return Math.round(Math.min(768, Math.max(128, (freeHeapBytes * 0.4) / (1024 * 1024))));
+    const heapCapMB = Math.round((freeHeapBytes * 0.35) / (1024 * 1024));
+    return Math.max(128, Math.min(deviceCapMB, heapCapMB));
   }
-  const deviceGB = navigator.deviceMemory || 4;
-  return Math.round(Math.min(768, Math.max(150, deviceGB * 90)));
+  return deviceCapMB;
 }
 
 export function getBufferedTargetDimensions(nativeW, nativeH) {
@@ -115,6 +121,7 @@ function appendFrameToRing(jpegBuffer, width, height, capturedAt, soundPeak, tar
   frameRing.push({
     timestampMs: capturedAt,
     perfMs: capturedAt,
+    wallMs: Date.now(),
     jpegBuffer,
     width,
     height,
@@ -148,10 +155,15 @@ function appendFrameToRing(jpegBuffer, width, height, capturedAt, soundPeak, tar
 
   if (capturedAt - lastBufferStateUpdateTime >= 500) {
     lastBufferStateUpdateTime = capturedAt;
-    updateState({
-      bufferedSeconds: Number(spanSec.toFixed(1)),
-      bufferBytes: totalBytes
-    });
+    const roundedSec = Number(spanSec.toFixed(1));
+    if (roundedSec !== lastPublishedSeconds || totalBytes !== lastPublishedBytes) {
+      lastPublishedSeconds = roundedSec;
+      lastPublishedBytes = totalBytes;
+      updateState({
+        bufferedSeconds: roundedSec,
+        bufferBytes: totalBytes
+      });
+    }
   }
 }
 
@@ -207,10 +219,11 @@ export function startMemoryBuffer(videoEl) {
     captureCtx = captureCanvas.getContext('2d', { alpha: false }) || captureCanvas.getContext('2d');
   }
 
-  // Fallback canvas capture loop for USB UVC & simulated streams
+  // Fallback canvas capture loop for USB UVC, simulated streams & MJPEG <img> fallback
   captureInterval = setInterval(() => {
-    if (!appState.bufferEnabled || appState.currentScreen !== 'live' || appState.isRtspStream || encodingInProgress) return;
-    const source = currentVideoEl;
+    const rtspFallback = appState.isRtspStream && isRtspImgFallbackActive();
+    if (!appState.bufferEnabled || appState.currentScreen !== 'live' || (appState.isRtspStream && !rtspFallback) || encodingInProgress) return;
+    const source = rtspFallback ? getRtspCanvas() : currentVideoEl;
     if (!source) return;
     if (source.tagName === 'VIDEO' && source.readyState < 2) return;
 
@@ -224,6 +237,7 @@ export function startMemoryBuffer(videoEl) {
     }
 
     encodingInProgress = true;
+    const encodeGen = bufferGeneration;
     const capturedAt = performance.now();
     const currentPeak = appState.bufferMicEnabled ? getSoundPeak() : 0;
 
@@ -232,19 +246,25 @@ export function startMemoryBuffer(videoEl) {
       captureCanvas.toBlob(
         async (blob) => {
           try {
+            if (encodeGen !== bufferGeneration) return;
             if (!blob || !appState.bufferEnabled || appState.currentScreen !== 'live') return;
             const jpegBuffer = await blob.arrayBuffer();
+            if (encodeGen !== bufferGeneration) return;
             if (!appState.bufferEnabled || appState.currentScreen !== 'live') return;
             appendFrameToRing(jpegBuffer, capW, capH, capturedAt, currentPeak, targetFps);
           } finally {
-            encodingInProgress = false;
+            if (encodeGen === bufferGeneration) {
+              encodingInProgress = false;
+            }
           }
         },
         'image/jpeg',
         jpegQuality
       );
     } catch {
-      encodingInProgress = false;
+      if (encodeGen === bufferGeneration) {
+        encodingInProgress = false;
+      }
     }
   }, intervalMs);
 }
@@ -283,7 +303,21 @@ export function updateMemoryBufferConfig() {
   }
 }
 
+export function clearMemoryBuffer() {
+  bufferGeneration += 1;
+  frameRing = [];
+  ringEvents = [];
+  totalBytes = 0;
+  encodingInProgress = false;
+  lastBufferStateUpdateTime = 0;
+  lastPublishedSeconds = 0;
+  lastPublishedBytes = 0;
+  lastRtspCaptureMs = 0;
+  updateState({ bufferedSeconds: 0, bufferBytes: 0 });
+}
+
 export function stopMemoryBuffer() {
+  bufferGeneration += 1;
   if (captureInterval) {
     clearInterval(captureInterval);
     captureInterval = null;
@@ -297,6 +331,8 @@ export function stopMemoryBuffer() {
   totalBytes = 0;
   encodingInProgress = false;
   lastBufferStateUpdateTime = 0;
+  lastPublishedSeconds = 0;
+  lastPublishedBytes = 0;
   lastRtspCaptureMs = 0;
   pausedAtMs = appState.currentScreen !== 'live' ? performance.now() : null;
   stopSoundSampler();
@@ -404,6 +440,8 @@ export async function snapshotMemoryBuffer() {
     frameTimestamps,
     startTs: firstTs,
     endTs: lastTs,
+    startWallMs: frameRing[0].wallMs || (Date.now() - Math.round(rawSpanSec * 1000)),
+    endWallMs: lastFrame.wallMs || Date.now(),
     fps: effectiveFps,
     durationSec: Number(durationSec.toFixed(1)),
     sizeBytes: totalBytes,

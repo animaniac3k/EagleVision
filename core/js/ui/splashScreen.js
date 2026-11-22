@@ -8,6 +8,7 @@
 let isSplashActive = true;
 let dismissTimer = null;
 let splashEl = null;
+let cleanupListeners = null;
 
 export function isSplashScreenActive() {
   return isSplashActive;
@@ -22,12 +23,20 @@ export function dismissSplashScreen(source = 'unknown') {
     dismissTimer = null;
   }
 
+  if (cleanupListeners) {
+    cleanupListeners();
+    cleanupListeners = null;
+  }
+
   if (splashEl) {
     splashEl.classList.add('splash-hidden');
-    splashEl.style.pointerEvents = 'none';
     splashEl.style.opacity = '0';
+    // Defer pointerEvents='none' by 120ms so a pointerdown tap on splash never ghosts a click onto Live buttons underneath
     setTimeout(() => {
-      splashEl.style.display = 'none';
+      if (splashEl) splashEl.style.pointerEvents = 'none';
+    }, 120);
+    setTimeout(() => {
+      if (splashEl) splashEl.style.display = 'none';
     }, 350);
   }
 }
@@ -53,18 +62,27 @@ export function initSplashScreen() {
   }, 1100);
 
   // 2. Immediate dismissal handlers on any user interaction
-  const onDismissEvent = () => {
+  const onDismissEvent = (e) => {
     if (!isSplashActive) return;
+    if (e && e.cancelable && e.type !== 'touchstart') {
+      e.preventDefault();
+    }
     dismissSplashScreen('user-action');
   };
 
-  // Attach to splash element
   splashEl.addEventListener('click', onDismissEvent);
   splashEl.addEventListener('pointerdown', onDismissEvent);
   splashEl.addEventListener('touchstart', onDismissEvent, { passive: true });
+  window.addEventListener('click', onDismissEvent, { capture: true });
+  window.addEventListener('pointerdown', onDismissEvent, { capture: true });
+  window.addEventListener('keydown', onDismissEvent, { capture: true });
 
-  // Attach global capturing listeners to window for instant response
-  window.addEventListener('click', onDismissEvent, { capture: true, once: true });
-  window.addEventListener('pointerdown', onDismissEvent, { capture: true, once: true });
-  window.addEventListener('keydown', onDismissEvent, { capture: true, once: true });
+  cleanupListeners = () => {
+    splashEl?.removeEventListener('click', onDismissEvent);
+    splashEl?.removeEventListener('pointerdown', onDismissEvent);
+    splashEl?.removeEventListener('touchstart', onDismissEvent);
+    window.removeEventListener('click', onDismissEvent, { capture: true });
+    window.removeEventListener('pointerdown', onDismissEvent, { capture: true });
+    window.removeEventListener('keydown', onDismissEvent, { capture: true });
+  };
 }

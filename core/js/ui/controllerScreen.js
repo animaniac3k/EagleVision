@@ -110,20 +110,20 @@ export const ACTION_DEFINITIONS = [
     defaultKey: 'KeyP'
   },
 
-  // DETECTION & HEATMAP
+  // DETECTION & HITS
   {
     id: 'toggle_heatmap',
     category: 'vision',
-    name: 'Toggle Heatmap Engine',
-    desc: 'Toggle 60 FPS micro-motion detection layer',
+    name: 'Toggle Hits Detection',
+    desc: 'Toggle 20Hz localized hit detection & target markers',
     defaultGamepad: 'triangle',
     defaultKey: 'KeyH'
   },
   {
     id: 'toggle_voice',
     category: 'vision',
-    name: 'Mute / Unmute Voice',
-    desc: 'Toggle directional speech target announcements',
+    name: 'Cycle Voice Callouts',
+    desc: 'Cycle directional voice callouts (OFF → POI → POA)',
     defaultGamepad: 'l3',
     defaultKey: 'KeyM'
   },
@@ -278,8 +278,8 @@ export const ACTION_DEFINITIONS = [
   {
     id: 'rezero_heatmap',
     category: 'vision',
-    name: 'Re-Zero Heatmap Background',
-    desc: 'Re-anchor heatmap reference immediately and clear fading thermal trails',
+    name: 'Re-Zero Detector Background',
+    desc: 'Re-anchor hit detection reference immediately',
     defaultGamepad: 'none',
     defaultKey: 'KeyZ'
   },
@@ -351,7 +351,7 @@ export const REMOTE_BUTTON_DEFS = [
     id: 'UP',
     name: 'UP (▲)',
     badge: 'PAN',
-    desc: 'Pan Live View Up • Replay: Restart Playback',
+    desc: 'Pan Live View Up • Replay: Toggle 0.5x Slow-Mo',
     defaultCodes: 'ArrowUp, PageUp, KeyW'
   },
   {
@@ -387,26 +387,26 @@ export const REMOTE_BUTTON_DEFS = [
     name: 'BUTTON 1 (⏻ 1)',
     badge: 'REPLAY (ALT)',
     desc: 'Instant Replay In / Out (Note: ChromeOS often intercepts BTN 1 as Volume Up)',
-    defaultCodes: 'AudioVolumeUp, KeyX, KeyR, F12'
+    defaultCodes: 'AudioVolumeUp, KeyX, KeyR'
   },
   {
     id: 'BTN2',
     name: 'BUTTON 2 (2)',
     badge: 'REPLAY',
     desc: 'Instant Replay In / Out (Recommended on ChromeOS)',
-    defaultCodes: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
+    defaultCodes: 'AudioVolumeDown, KeyM, KeyT, KeyB'
   }
 ];
 
-// Default Bluetooth Ring & Remote Key Map
+// Default Bluetooth Ring & Remote Key Map (excludes F12 & Tab)
 export const DEFAULT_RING_KEY_MAP = {
   UP: 'ArrowUp, PageUp, KeyW',
   DOWN: 'ArrowDown, PageDown, KeyS',
   LEFT: 'ArrowLeft, MediaTrackPrevious, KeyA',
   RIGHT: 'ArrowRight, MediaTrackNext, KeyD',
   CENTER: 'Enter, Space, MediaPlayPause, KeyF',
-  BTN1: 'AudioVolumeUp, KeyX, KeyR, F12',
-  BTN2: 'AudioVolumeDown, KeyM, KeyT, Tab, KeyB'
+  BTN1: 'AudioVolumeUp, KeyX, KeyR',
+  BTN2: 'AudioVolumeDown, KeyM, KeyT, KeyB'
 };
 
 // Built-in Factory Profile Presets
@@ -686,6 +686,13 @@ export function initControllerScreen() {
     updateState({ currentScreen: 'settings' });
   });
 
+  document.querySelectorAll('.setup-jump-calibration').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      cancelRebinding();
+      profileOverflowMenu?.classList.add('hidden');
+    });
+  });
+
   btnControllerToReticle?.addEventListener('click', () => {
     cancelRebinding();
     profileOverflowMenu?.classList.add('hidden');
@@ -802,13 +809,17 @@ export function initControllerScreen() {
     if (!prof) return;
 
     const newBindings = JSON.parse(JSON.stringify(prof.bindings || {}));
-    const newRingMap = JSON.parse(JSON.stringify(prof.ringKeyMap || DEFAULT_RING_KEY_MAP));
+    const isMicro = profileId === '8bitdo_micro';
+    const newRingMap = isMicro
+      ? {}
+      : JSON.parse(JSON.stringify(prof.ringKeyMap || DEFAULT_RING_KEY_MAP));
     const cal = prof.calibration || {};
 
     updateState({
       activeControllerProfile: profileId,
       controllerBindings: newBindings,
       ringKeyMap: newRingMap,
+      ...(isMicro ? { ringEnabled: false } : {}),
       leftStickDeadzone: cal.leftStickDeadzone ?? 16,
       rightStickDeadzone: cal.rightStickDeadzone ?? 16,
       leftStickInvertY: Boolean(cal.leftStickInvertY),
@@ -989,16 +1000,31 @@ export function initControllerScreen() {
       try {
         const data = JSON.parse(e.target.result);
         let importedCount = 0;
-        const customMap = appState.customControllerProfiles || {};
+        const customMap = { ...(appState.customControllerProfiles || {}) };
+        const forbiddenIds = new Set(['__proto__', 'constructor', 'prototype', ...Object.keys(BUILT_IN_PROFILES)]);
 
         if (data.customProfiles && typeof data.customProfiles === 'object') {
           Object.entries(data.customProfiles).forEach(([id, prof]) => {
+            if (forbiddenIds.has(id)) return;
             if (prof && prof.name && (prof.bindings || prof.ringKeyMap)) {
               customMap[id] = prof;
               importedCount++;
             }
           });
-        } else if (data.bindings || data.ringKeyMap) {
+        }
+        if (importedCount === 0 && data.activeConfiguration && (data.activeConfiguration.bindings || data.activeConfiguration.ringKeyMap)) {
+          const id = `custom_${Date.now()}`;
+          customMap[id] = {
+            id,
+            name: data.name || file.name.replace(/\.json$/i, ''),
+            isBuiltIn: false,
+            createdAt: Date.now(),
+            bindings: data.activeConfiguration.bindings || {},
+            ringKeyMap: data.activeConfiguration.ringKeyMap || {},
+            calibration: data.activeConfiguration.calibration || {}
+          };
+          importedCount = 1;
+        } else if (importedCount === 0 && (data.bindings || data.ringKeyMap)) {
           const id = `custom_${Date.now()}`;
           customMap[id] = {
             id,
@@ -1221,16 +1247,19 @@ export function initControllerScreen() {
         cancelRebinding();
         return;
       }
-      e.preventDefault();
-      assignBinding(activeRebindActionId, activeRebindType, e.code || e.key);
+      if (activeRebindType === 'key') {
+        e.preventDefault();
+        assignBinding(activeRebindActionId, 'key', e.code || e.key);
+      }
     }
   });
 
-  // Global keyboard shortcuts driven by active bindings (supports continuous Pan / Aim + Micro feedback)
+  // Global keyboard shortcuts driven by active bindings (screen-scoped so Setup/Calibration aren't hijacked)
   const CONTINUOUS_ACTIONS = new Set([
     'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right',
     'reticle_scale_up', 'reticle_scale_down', 'step_forward', 'step_backward'
   ]);
+  const NAV_ONLY_ACTIONS = new Set(['open_settings', 'return_live']);
 
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable) return;
@@ -1238,32 +1267,50 @@ export function initControllerScreen() {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     if (e.key === 'F12') return;
 
+    const screen = appState.currentScreen;
     const code = e.code || e.key;
     const currentBindings = getActiveBindings();
 
-    // Direct support for ArrowKeys (aim_reticle) & WASD (pan_view) when bound to analog axes
-    if (currentBindings.aim_reticle?.key === 'ArrowKeys' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
-      e.preventDefault();
-      const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
-      const [dx, dy] = map[code];
-      steerViewOrLoupe('aim', dx, dy);
-      return;
-    }
-    if (currentBindings.pan_view?.key === 'KeyW/A/S/D' && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(code)) {
-      e.preventDefault();
-      const map = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
-      const [dx, dy] = map[code];
-      steerViewOrLoupe('pan', dx, dy);
-      return;
+    // Direct support for ArrowKeys (aim_reticle) & WASD (pan_view) only on Live feed
+    if (screen === 'live') {
+      if (currentBindings.aim_reticle?.key === 'ArrowKeys' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) {
+        e.preventDefault();
+        const map = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+        const [dx, dy] = map[code];
+        steerViewOrLoupe('aim', dx, dy);
+        return;
+      }
+      if (currentBindings.pan_view?.key === 'KeyW/A/S/D' && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(code)) {
+        e.preventDefault();
+        const map = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0] };
+        const [dx, dy] = map[code];
+        steerViewOrLoupe('pan', dx, dy);
+        return;
+      }
     }
 
-    const entry = Object.entries(currentBindings).find(([actId, b]) => {
+    const matchingEntries = Object.entries(currentBindings).filter(([actId, b]) => {
       if (!b.key || b.key === 'none') return false;
       return b.key === code || b.key === e.key;
     });
 
+    let entry = null;
+    if (matchingEntries.length === 1) {
+      entry = matchingEntries[0];
+    } else if (matchingEntries.length > 1) {
+      if (screen === 'gallery') {
+        entry = matchingEntries.find(([id]) => ACTION_DEFINITIONS.find((a) => a.id === id)?.category === 'playback') || matchingEntries[0];
+      } else {
+        entry = matchingEntries.find(([id]) => ACTION_DEFINITIONS.find((a) => a.id === id)?.category !== 'playback') || matchingEntries[0];
+      }
+    }
+
     if (entry) {
       const actionId = entry[0];
+      // Prevent Live-only shortcuts from firing behind Setup/Reticle/Calibration/Controller screens
+      if (screen !== 'live' && screen !== 'gallery' && !NAV_ONLY_ACTIONS.has(actionId)) {
+        return;
+      }
       if (e.repeat && !CONTINUOUS_ACTIONS.has(actionId)) {
         e.preventDefault();
         return;
@@ -1382,11 +1429,25 @@ export function initControllerScreen() {
   }
 
   function cancelRebinding() {
+    let cancelledAny = false;
     if (activeRebindActionId) {
       activeRebindActionId = null;
       activeRebindType = null;
       clearTimeout(rebindTimeout);
       renderMappingTable();
+      cancelledAny = true;
+    }
+    if (microLearnSlotId) {
+      microLearnSlotId = null;
+      if (typeof renderMicroTable === 'function') renderMicroTable();
+      cancelledAny = true;
+    }
+    if (getLearningAction()) {
+      setLearningAction(null);
+      if (typeof renderRemoteTable === 'function') renderRemoteTable();
+      cancelledAny = true;
+    }
+    if (cancelledAny) {
       showToastBanner('REBINDING CANCELLED');
     }
   }
@@ -1417,6 +1478,12 @@ export function initControllerScreen() {
     showToastBanner(`BOUND ${rawValue.toUpperCase()} TO "${actDef.name.toUpperCase()}"`);
   }
 
+  // Cache .cm-visual-btn badges to avoid 250Hz DOM queries during WebHID streaming
+  const visualBtnCache = new Map();
+  document.querySelectorAll('.cm-visual-btn[data-gp]').forEach((el) => {
+    if (el.dataset.gp) visualBtnCache.set(el.dataset.gp, el);
+  });
+
   // Export internal API for gamepadController to feed button presses when rebinding
   window.controllerMappingAPI = {
     isRebinding: () => Boolean(activeRebindActionId && activeRebindType === 'gamepad'),
@@ -1428,7 +1495,7 @@ export function initControllerScreen() {
       return false;
     },
     highlightGamepadInput: (role, pressed) => {
-      const badge = document.querySelector(`.cm-visual-btn[data-gp="${role}"]`);
+      const badge = visualBtnCache.get(role);
       if (badge) {
         badge.classList.toggle('cm-active-glow', pressed);
       }
@@ -1460,10 +1527,27 @@ export function initControllerScreen() {
   const btnResetMicroPreset = document.getElementById('btnResetMicroPreset');
   const microSvgContainer = document.getElementById('microSvgContainer');
   const remoteMappingTableBody = document.getElementById('remoteMappingTableBody');
+  const btnToggleRingEnabled = document.getElementById('btnToggleRingEnabled');
+  const ringIsolationNotice = document.getElementById('ringIsolationNotice');
   const btnToggleFfpTab = document.getElementById('btnToggleFfpTab');
   const btnResetRemoteTabMap = document.getElementById('btnResetRemoteTabMap');
   const remoteLastSignalText = document.getElementById('remoteLastSignalText');
   const remoteSvgContainer = document.getElementById('remoteSvgContainer');
+
+  btnToggleRingEnabled?.addEventListener('click', () => {
+    const next = !appState.ringEnabled;
+    if (next && appState.activeControllerProfile === '8bitdo_micro') {
+      // Switch away from 8BitDo Micro profile so Ring and Micro never conflict
+      updateState({ ringEnabled: true, activeControllerProfile: 'default' });
+      refreshProfileDropdown();
+      showToastBanner('BLUETOOTH RING ENABLED (ISOLATED FROM 8BITDO MICRO)');
+    } else {
+      updateState({ ringEnabled: next });
+      showToastBanner(next ? 'BLUETOOTH RING ENABLED' : 'BLUETOOTH RING ISOLATED (OFF)');
+    }
+    saveSettings(appState);
+    syncRemoteStateUI();
+  });
 
   // Wire interactive click listeners to all buttons on the unified Option B schematic
   remoteSvgContainer?.querySelectorAll('.remote-visual-btn').forEach((vBtn) => {
@@ -1484,7 +1568,18 @@ export function initControllerScreen() {
     const activeMode = getActiveRemoteMode();
     const remoteSingleModeBadge = document.getElementById('remoteSingleModeBadge');
     if (remoteSingleModeBadge) {
-      remoteSingleModeBadge.textContent = `[ 1:1 ${activeMode} ]`;
+      remoteSingleModeBadge.textContent = appState.ringEnabled ? `[ 1:1 ${activeMode} ]` : '[ ISOLATED / OFF ]';
+    }
+    if (btnToggleRingEnabled) {
+      const enabled = Boolean(appState.ringEnabled && appState.activeControllerProfile !== '8bitdo_micro');
+      btnToggleRingEnabled.textContent = enabled ? 'BT Ring: ON' : 'BT Ring: OFF (Isolated)';
+      btnToggleRingEnabled.classList.toggle('radar-btn-active', enabled);
+    }
+    if (ringIsolationNotice) {
+      const enabled = Boolean(appState.ringEnabled && appState.activeControllerProfile !== '8bitdo_micro');
+      ringIsolationNotice.textContent = enabled
+        ? 'Bluetooth Ring is ACTIVE on Live & Playback. Keyboard/8BitDo Micro keys matching Ring bindings are routed to the Ring.'
+        : 'Bluetooth Ring is ISOLATED (OFF) so 8BitDo Micro and keyboard shortcuts are never hijacked. Enable above when pairing a Ring.';
     }
     if (btnToggleFfpTab) {
       const isLocked = Boolean(appState.reticleFfpMode);
@@ -1603,16 +1698,24 @@ export function initControllerScreen() {
     microMappingTableBody.querySelectorAll('.micro-action-select').forEach((sel) => {
       sel.addEventListener('change', () => {
         const slotId = sel.dataset.microBtn;
+        const prevActionId = getMicroSlotAction(slotId);
         const nextSlotMap = Object.assign({}, appState.microSlotActions || {}, { [slotId]: sel.value });
         const slot = MICRO_BUTTON_DEFS.find((d) => d.id === slotId);
         if (slot) {
-          const nextBindings = getActiveBindings();
+          const nextBindings = JSON.parse(JSON.stringify(getActiveBindings()));
           const targetAction = sel.value;
           const actDef = ACTION_DEFINITIONS.find((a) => a.id === targetAction);
+          // Reassign the slot's physical key cleanly from old action -> new action
+          const physicalKey = (prevActionId && nextBindings[prevActionId]?.key && nextBindings[prevActionId].key !== 'none')
+            ? nextBindings[prevActionId].key
+            : slot.defaultKey;
+          if (prevActionId && prevActionId !== targetAction && nextBindings[prevActionId]?.key === physicalKey) {
+            nextBindings[prevActionId].key = 'none';
+          }
           if (!nextBindings[targetAction]) {
-            nextBindings[targetAction] = { gamepad: actDef?.defaultGamepad || 'none', key: slot.defaultKey };
-          } else if (!nextBindings[targetAction].key || nextBindings[targetAction].key === 'none') {
-            nextBindings[targetAction].key = slot.defaultKey;
+            nextBindings[targetAction] = { gamepad: actDef?.defaultGamepad || 'none', key: physicalKey };
+          } else {
+            nextBindings[targetAction].key = physicalKey;
           }
           updateState({ controllerBindings: nextBindings, microSlotActions: nextSlotMap });
           saveSettings(appState);
@@ -1670,8 +1773,14 @@ export function initControllerScreen() {
   });
 
   subscribeState((state, patch) => {
+    if (patch.currentScreen !== undefined && state.currentScreen !== 'controller') {
+      cancelRebinding();
+    }
     if (patch.dpadMode !== undefined) {
       syncMicroStateUI();
+    }
+    if (patch.ringEnabled !== undefined || patch.activeControllerProfile !== undefined) {
+      syncRemoteStateUI();
     }
   });
 
@@ -1714,8 +1823,9 @@ export function initControllerScreen() {
     showToastBanner('RING & REMOTE BUTTON MAPPINGS RESET TO DEFAULTS');
   });
 
-  // Listen for real-time remote button signals
+  // Listen for real-time remote button signals (strictly gated to Controller screen UI)
   window.addEventListener('spotr-remote-button', (e) => {
+    if (appState.currentScreen !== 'controller') return;
     const { action, signalCode, isLearned, isCancelled } = e.detail;
 
     // A. Re-render table if button was learned or cancelled
@@ -1934,6 +2044,8 @@ export function executeMappedAction(actionId) {
         document.getElementById('btnReticleBackToLive')?.click();
       } else if (screen === 'controller') {
         document.getElementById('btnControllerBackToLive')?.click();
+      } else if (screen === 'calibration') {
+        document.getElementById('btnCalibBackToLive')?.click();
       }
       break;
 
@@ -2043,8 +2155,7 @@ export function executeMappedAction(actionId) {
 
     case 'rezero_heatmap':
       rezeroHeatmap();
-      if (!appState.heatmapEnabled) updateState({ heatmapEnabled: true });
-      showReticleFfpToast('HEATMAP RE-ZEROED');
+      showReticleFfpToast('DETECTOR RE-ZEROED');
       break;
 
     case 'capture_snapshot':
@@ -2084,7 +2195,7 @@ export function executeMappedAction(actionId) {
 export const QUICK_TOOLS = [
   {
     id: 'heatmap',
-    name: 'HEATMAP DETECTION',
+    name: 'HITS DETECTION',
     check: (s) => s.heatmapEnabled,
     toggle: () => document.getElementById('btnToggleHeatmap')?.click()
   },

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spotr-v0.1.17';
+const CACHE_NAME = 'spotr-v0.62.0';
 const ASSETS = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/renderer/zoomWindow.js',
   './js/renderer/imageFilters.js',
   './js/renderer/overlayManager.js',
+  './js/renderer/timestampOverlay.js',
   './js/audio/voiceManifest.js',
   './js/audio/voiceAudioEngine.js',
   './js/audio/soundSampler.js',
@@ -30,6 +31,7 @@ const ASSETS = [
   './js/ui/detectionsScreen.js',
   './js/ui/cctvScrubBar.js',
   './js/ui/reticleScreen.js',
+  './js/ui/calibrationScreen.js',
   './js/ui/controllerScreen.js',
   './js/ui/ringController.js',
   './js/ui/splashScreen.js',
@@ -49,11 +51,10 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 function fetchWithTimeout(request, timeoutMs = 2500) {
@@ -76,19 +77,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Bypass service worker caching for RTSP live streams and local API endpoints
+  // Bypass service worker completely for cross-origin requests (e.g. direct camera wake http://192.168.0.1/...)
+  // and for all local /api/ streaming/control endpoints
   const reqUrl = new URL(event.request.url);
-  if (reqUrl.pathname.startsWith('/api/')) {
+  if (reqUrl.origin !== self.location.origin || reqUrl.pathname.startsWith('/api/')) {
     return;
   }
+
+  // Strip query string when storing cache keys so ?nosplash / ?screen= never duplicate entries
+  const cleanCacheUrl = `${reqUrl.origin}${reqUrl.pathname}`;
 
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       // 1. If asset is in cache, serve immediately (0ms instant boot, works offline on camera Wi-Fi)
       if (cachedResponse) {
-        // In the background, refresh cache only if browser reports internet connectivity
         if (navigator.onLine) {
-          fetch(event.request)
+          const refreshPromise = fetchWithTimeout(event.request, 2500)
             .then((networkResponse) => {
               if (
                 networkResponse &&
@@ -96,10 +100,11 @@ self.addEventListener('fetch', (event) => {
                 (networkResponse.type === 'basic' || networkResponse.type === 'cors')
               ) {
                 const clone = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+                return caches.open(CACHE_NAME).then((cache) => cache.put(cleanCacheUrl, clone));
               }
             })
             .catch(() => {});
+          event.waitUntil(refreshPromise);
         }
         return cachedResponse;
       }
@@ -110,12 +115,12 @@ self.addEventListener('fetch', (event) => {
           if (indexCached) return indexCached;
           return caches.match('./', { ignoreSearch: true }).then((rootCached) => {
             if (rootCached) return rootCached;
-            return fetchWithTimeout(event.request, 2500);
+            return fetchWithTimeout(event.request, 2500).catch(() => new Response('Offline', { status: 503 }));
           });
         });
       }
 
-      // 3. Fallback to network with short timeout so requests never hang when on local camera Wi-Fi without internet
+      // 3. Fallback to network with short timeout so requests never hang on local camera Wi-Fi
       return fetchWithTimeout(event.request, 2500)
         .then((networkResponse) => {
           if (
@@ -124,11 +129,14 @@ self.addEventListener('fetch', (event) => {
             (networkResponse.type === 'basic' || networkResponse.type === 'cors')
           ) {
             const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+            caches.open(CACHE_NAME).then((cache) => cache.put(cleanCacheUrl, clone)).catch(() => {});
           }
           return networkResponse;
         })
-        .catch(() => caches.match(event.request, { ignoreSearch: true }));
+        .catch(() =>
+          caches.match(event.request, { ignoreSearch: true })
+            .then((fallback) => fallback || new Response('Offline', { status: 503 }))
+        );
     })
   );
 });

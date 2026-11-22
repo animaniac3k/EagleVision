@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPOTR v0.62.0 — 1-Page Field Cheat Sheet (Printable)</title>
+  <style>
+    @page {
+      size: letter landscape;
+      margin: 7mm 8mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      font-size: 9pt;
+      line-height: 1.32;
+      padding: 14px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .toolbar {
+      max-width: 1060px;
+      margin: 0 auto 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      background: #0f172a;
+      color: #f8fafc;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .toolbar button, .toolbar a {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #334155;
+      background: #f97316;
+      color: #090d14;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .toolbar a { background: #1e293b; color: #f8fafc; }
+
+    .sheet {
+      max-width: 1060px;
+      margin: 0 auto;
+      border: 2px solid #0f172a;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #ea580c;
+      padding-bottom: 6px;
+    }
+    .hdr h1 { font-size: 16pt; font-weight: 900; letter-spacing: 1.5px; }
+    .hdr h1 span { color: #ea580c; }
+    .hdr-meta { font-family: ui-monospace, monospace; font-size: 8.5pt; font-weight: 700; text-align: right; color: #334155; }
+
+    .grid-3 { display: grid; grid-template-columns: 1.05fr 1.15fr 1fr; gap: 10px; }
+    .box {
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      background: #f8fafc;
+    }
+    .box-accent { border-top: 3px solid #ea580c; }
+    .box-green { border-top: 3px solid #059669; }
+    .box-sky { border-top: 3px solid #0284c7; }
+    .box h2 {
+      font-family: ui-monospace, monospace;
+      font-size: 8.8pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #0f172a;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 3px;
+    }
+    ul { padding-left: 14px; display: flex; flex-direction: column; gap: 3px; font-size: 8.3pt; }
+    li strong { color: #0f172a; }
+    code {
+      font-family: ui-monospace, monospace;
+      font-size: 7.8pt;
+      background: #e2e8f0;
+      padding: 0 3px;
+      border-radius: 3px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    th, td { padding: 3.5px 5px; border-bottom: 1px solid #cbd5e1; text-align: left; }
+    th { background: #e2e8f0; font-family: ui-monospace, monospace; font-size: 7.2pt; text-transform: uppercase; }
+    .kbd {
+      display: inline-block;
+      padding: 0.5px 4px;
+      background: #ffffff;
+      border: 1px solid #64748b;
+      border-radius: 3px;
+      font-family: ui-monospace, monospace;
+      font-size: 7.4pt;
+      font-weight: 800;
+    }
+    .foot {
+      border-top: 1px solid #cbd5e1;
+      padding-top: 5px;
+      display: flex;
+      justify-content: space-between;
+      font-family: ui-monospace, monospace;
+      font-size: 7.5pt;
+      color: #475569;
+    }
+
+    @media print {
+      body { padding: 0; }
+      .toolbar { display: none !important; }
+      .sheet { max-width: none; height: 194mm; border-width: 1.5px; }
+    }
+    @media screen and (max-width: 820px) {
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span><strong>SPOTR v0.62.0</strong> — Laminated 1-Page Field Card (Low-Ink Print Ready)</span>
+    <div style="display:flex; gap:8px;">
+      <a href="./user_manual.html">Full 5-Page Manual</a>
+      <button type="button" onclick="window.print()">Print Field Card</button>
+    </div>
+  </div>
+
+  <main class="sheet">
+    <header class="hdr">
+      <div>
+        <h1>SPOTR<span>™</span> — RANGE FIELD CHEAT SHEET</h1>
+      </div>
+      <div class="hdr-meta">
+        RELEASE v0.62.0 • ANDROID vCode 62 • OFFLINE PWA<br/>
+        LAMINATE &amp; KEEP IN RANGE BAG
+      </div>
+    </header>
+
+    <div class="grid-3">
+      <!-- Column 1: Range Boot & Live Dock -->
+      <div style="display:flex; flex-direction:column; gap:9px;">
+        <section class="box box-sky">
+          <h2>1. 30-Second Range Setup</h2>
+          <ul>
+            <li><strong>USB UVC Scope:</strong> Plug in USB-C/OTG cable → accept Android USB prompt → select camera in <strong>Setup → Camera</strong>.</li>
+            <li><strong>Bresser Wi-Fi Scope:</strong> Join camera Wi-Fi SSID → open <strong>Setup → Camera → Wi-Fi / RTSP</strong> → tap <strong>Wake &amp; Connect</strong> (<code>192.168.0.1</code>). Android 10+ auto-binds local Wi-Fi even with LTE on.</li>
+            <li><strong>Confirm Feed:</strong> Top-center <strong>Source Status Pill</strong> turns green (<code>LIVE</code>).</li>
+            <li><strong>Zero &amp; Calibrate:</strong> Long-press <strong>Hits</strong> → pick <strong>Indoor</strong>, <strong>Calm Range</strong>, or <strong>Wind / Mirage</strong> (or tap <strong>✦ Auto-Tune</strong>).</li>
+          </ul>
+        </section>
+
+        <section class="box box-accent">
+          <h2>2. Live Screen Gloved Controls</h2>
+          <ul>
+            <li><strong>Top-Left Bar:</strong> ⚙ Setup · 👁 Clean View · 🔒 <strong>Touch Lock</strong> (hold 1s to unlock) · 📷 <strong>1-Tap Snapshot</strong>.</li>
+            <li><strong>Reticle · FFP:</strong> Toggle crosshair; tap FFP pill to lock subtensions 1:1 with zoom.</li>
+            <li><strong>Hits | 🗑:</strong> Toggle live pins; <strong>long-press Hits</strong> for Calibration; 🗑 Re-Zeros (2-tap confirm).</li>
+            <li><strong>Voice:</strong> Cycles <code>OFF → POI → POA</code> (Cartesian clicks + clock bearings).</li>
+            <li><strong>Loupe:</strong> Cycles <code>ON → AA (Auto Aim) → OFF</code>. Drag corners to resize.</li>
+            <li><strong>Replay · 20s ▴:</strong> Opens unsaved <code>LIVE BUFFER</code>; tap <code>20s ▴</code> for duration/RAM meter.</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- Column 2: Calibration & Screen 2 Archive -->
+      <div style="display:flex; flex-direction:column; gap:9px;">
+        <section class="box box-green">
+          <h2>3. Calibration Presets (Screen 6)</h2>
+          <table>
+            <thead>
+              <tr><th>Condition</th><th>Preset</th><th>Best For</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Stable light</td><td><strong>Indoor</strong></td><td>25–50m indoor bays, zero breeze</td></tr>
+              <tr><td>Normal range</td><td><strong>Calm Range</strong></td><td>Outdoor 50–100m, light air</td></tr>
+              <tr><td>Mirage / gusty</td><td><strong>Wind / Mirage</strong></td><td>Heat shimmer, swaying backers</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li><strong>Noise Meter:</strong> Keep green bar well left of white threshold gate; tap <strong>✦ Auto-Tune</strong> if wind shifts.</li>
+            <li><strong>Ignore Zones:</strong> Draw boxes over flapping tape, range flags, or adjacent targets.</li>
+          </ul>
+        </section>
+
+        <section class="box box-accent">
+          <h2>4. Playback &amp; Hits Map (Screen 2)</h2>
+          <ul>
+            <li><strong>Playback Tab:</strong> Scrub 46px track, tap <strong>0.5x</strong> slow-mo or <strong>-1 / +1</strong> frame step. Tap <strong>Save Clip</strong> only for shots worth keeping; <strong>Export</strong> saves <code>.webm</code>.</li>
+            <li><strong>Hits Tab:</strong> <strong>Pins: ON/OFF</strong> peeks underneath pins without disabling live detection.</li>
+            <li><strong>⌖ Aim Loupe:</strong> Snaps Live PiP Loupe onto selected impact &amp; returns to Live.</li>
+            <li><strong>2-Tap Safety:</strong> <strong>Re-Zero</strong>, <strong>Clear (🗑)</strong> &amp; Reticle <strong>Reset</strong> require 2 taps ("Sure?").</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- Column 3: Controllers & Troubleshooting -->
+      <div style="display:flex; flex-direction:column; gap:9px;">
+        <section class="box box-sky">
+          <h2>5. Quick Keys &amp; Controllers</h2>
+          <table>
+            <thead>
+              <tr><th>Input</th><th>Live</th><th>Playback / Hits</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="kbd">L1/R1</span> · <span class="kbd">-/+</span></td><td>Zoom − / +</td><td>Zoom − / +</td></tr>
+              <tr><td><span class="kbd">✕</span> · <span class="kbd">Space</span></td><td>Quick Tool</td><td>Play / Pause</td></tr>
+              <tr><td><span class="kbd">◯</span> · <span class="kbd">Esc</span></td><td>Clean View</td><td>Back to Live</td></tr>
+              <tr><td><span class="kbd">▢</span> · <span class="kbd">O</span>/<span class="kbd">S</span></td><td>Reticle</td><td>0.5x Slow-Mo</td></tr>
+              <tr><td><span class="kbd">◄/►</span></td><td>Cycle Tool</td><td>Step -1/+1 · Hit</td></tr>
+              <tr><td><span class="kbd">Share</span> · <span class="kbd">R</span></td><td>Instant Replay</td><td>Back to Live</td></tr>
+              <tr><td><span class="kbd">Z / H / V</span></td><td>Loupe/Hits/Voice</td><td>—</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li><strong>8BitDo Micro:</strong> Bottom switch → <strong>K</strong> mode. Select profile in Setup → Controllers.</li>
+            <li><strong>Bluetooth Ring:</strong> <strong>OFF (Isolated)</strong> by default so it never hijacks 8BitDo/keyboard. Enable in Controllers only when using a Ring.</li>
+          </ul>
+        </section>
+
+        <section class="box box-green">
+          <h2>6. Field Troubleshooting</h2>
+          <ul>
+            <li><strong>Wi-Fi Camera Won't Wake:</strong> Confirm Wi-Fi SSID connected, verify <code>192.168.0.1</code>, tap <strong>Wake &amp; Connect</strong> again (auto-retries 4x on drop).</li>
+            <li><strong>Rain / Accidental Touches:</strong> Tap top-left 🔒 <strong>Touch Lock</strong> (hold 1s to unlock).</li>
+            <li><strong>iOS / iPad RTSP:</strong> Run <code>start_spotr.bat --lan</code> on Windows laptop &amp; open laptop LAN IP on iPad Safari.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <div>SPOTR v0.62.0 • 100% OFFLINE ON-DEVICE PROCESSING • ZERO CLOUD TELEMETRY</div>
+      <div>FULL MANUAL: docs/USER_MANUAL.pdf</div>
+    </footer>
+  </main>
+</body>
+</html>
