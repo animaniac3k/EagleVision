@@ -46,6 +46,9 @@ const RECENT_ISLAND_WINDOW_MS = 550;
 const MAX_DETECTION_HITS = 30;
 
 let nextHitSeq = 1;
+let lastHitCooldownPerfMs = 0;
+let lastHitCooldownNormX = -1;
+let lastHitCooldownNormY = -1;
 let rezeroHandler = null;
 const heatmapTelemetryListeners = new Set();
 let latestProjection = {
@@ -78,6 +81,9 @@ export function getLiveViewportProjection() {
  * Re-anchors the heatmap background reference immediately and clears accumulated thermal persistence.
  */
 export function rezeroHeatmap() {
+  lastHitCooldownPerfMs = 0;
+  lastHitCooldownNormX = -1;
+  lastHitCooldownNormY = -1;
   if (rezeroHandler) rezeroHandler();
 }
 
@@ -156,6 +162,9 @@ export function buildDetectionCalloutPhrase({ xClicks = 0, xDir = 'right', yClic
  */
 export function clearDetectionHits() {
   nextHitSeq = 1;
+  lastHitCooldownPerfMs = 0;
+  lastHitCooldownNormX = -1;
+  lastHitCooldownNormY = -1;
   updateState({ detectionHits: [], selectedHitId: null });
 }
 
@@ -457,24 +466,21 @@ export function initCompositor(videoEl) {
     const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
     const last = hits.length ? hits[hits.length - 1] : null;
 
-    if (last && (nowWall - last.timestampMs) < 1500 && Math.hypot(detSourceNormX - last.normX, detSourceNormY - last.normY) < 0.055) {
-      const updated = hits.slice();
-      updated[updated.length - 1] = {
-        ...last,
-        timestampMs: nowWall,
-        perfMs: nowPerf,
-        normX: (last.normX + detSourceNormX) * 0.5,
-        normY: (last.normY + detSourceNormY) * 0.5,
-        xClicks: metrics.xClicks,
-        xDir: metrics.xDir,
-        yClicks: metrics.yClicks,
-        yDir: metrics.yDir,
-        calloutMode: metrics.calloutMode,
-        dirLabel: metrics.dirLabel
-      };
-      updateState({ detectionHits: updated });
+    // Suppress duplicate re-triggers while the same impact spot cools down,
+    // without drifting the locked pin coordinates or shifting its original impact timestamp.
+    if (
+      last &&
+      lastHitCooldownPerfMs > 0 &&
+      (nowPerf - lastHitCooldownPerfMs) < 1500 &&
+      Math.hypot(detSourceNormX - lastHitCooldownNormX, detSourceNormY - lastHitCooldownNormY) < 0.055
+    ) {
+      lastHitCooldownPerfMs = nowPerf;
       return;
     }
+
+    lastHitCooldownPerfMs = nowPerf;
+    lastHitCooldownNormX = detSourceNormX;
+    lastHitCooldownNormY = detSourceNormY;
 
     let thumbDataUrl = '';
     try {
@@ -1417,7 +1423,7 @@ export function initCompositor(videoEl) {
       const detectorActive = Boolean(appState.heatmapEnabled || appState.heatmapSpeechEnabled);
       const hits = Array.isArray(appState.detectionHits) ? appState.detectionHits : [];
       const latestPerf = hits.length ? (hits[hits.length - 1].perfMs || 0) : 0;
-      const pulseTick = appState.heatmapEnabled && latestPerf && (performance.now() - latestPerf < 1400)
+      const pulseTick = appState.heatmapEnabled && !appState.uiDecluttered && latestPerf && (performance.now() - latestPerf < 1400)
         ? Math.floor(performance.now() / 33)
         : 0;
 
@@ -1480,7 +1486,7 @@ export function initCompositor(videoEl) {
         if (overlayKey !== lastLiveOverlayKey) {
           lastLiveOverlayKey = overlayKey;
           liveOverlayCtx.clearRect(0, 0, cw, ch);
-          if (appState.heatmapEnabled) {
+          if (appState.heatmapEnabled && !appState.uiDecluttered) {
             drawLiveHitPins(liveOverlayCtx, sx, sy, cropW, cropH, vw, vh, cw, ch, false);
           }
           if (tsShow) {

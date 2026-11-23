@@ -1,8 +1,8 @@
-# SPOTR — Tactical Camera & Scope Overlay System (`v0.63.1`)
+# SPOTR — Tactical Camera & Scope Overlay System (`v0.63.2`)
 
 > **Repository Note:** The `EagleVision` repository hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*).
 
-An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 66`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for reliable field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
+An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 67`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for reliable field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
 
 ---
 
@@ -17,7 +17,7 @@ An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`
 
 ---
 
-## Key Features (`v0.63.1`)
+## Key Features (`v0.63.2`)
 
 - **Clean Translucent Glass Live Workspace**:
   - **Bottom Control Dock:** Compact translucent glass dock (`Reticle · FFP`, `Hits | 🗑 | ⚙`, `Voice OFF/POI/POA`, `Loupe ON/AA/OFF`, `Zoom −/1.0x/+`, and consolidated **`Review (N) | 20s ▴`**) keeping the sight picture and entire top-right corner completely unobstructed.

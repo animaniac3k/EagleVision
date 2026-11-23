@@ -1,4 +1,4 @@
-# SPOTR Android / ChromeOS APK Project (`v0.63.1` / `versionCode 66`)
+# SPOTR Android / ChromeOS APK Project (`v0.63.2` / `versionCode 67`)
 
 Builds the standalone Android package (`com.spotr.tactical`) for Android tablets, phones, and ChromeOS devices (including **Lenovo IdeaPad Duet 3**).
 

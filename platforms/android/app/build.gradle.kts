@@ -11,8 +11,8 @@ android {
         applicationId = "com.spotr.tactical"
         minSdk = 26
         targetSdk = 35
-        versionCode = 66
-        versionName = "0.63.1"
+        versionCode = 67
+        versionName = "0.63.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

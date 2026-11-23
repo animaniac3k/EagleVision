@@ -42,10 +42,10 @@
     SPOTR<tspan fill="#f97316" font-size="13" font-weight="700" dy="-7">™</tspan><tspan fill="#f8fafc" font-size="22" font-weight="800" dy="7"> — SYSTEM ARCHITECTURE &amp; DATA FLOW</tspan>
   </text>
   <text x="54" y="75" fill="#94a3b8" font-family="'Segoe UI', -apple-system, Roboto, sans-serif" font-size="13" font-weight="500">
-    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — v0.63.1 • Slow-Hardware Tuned PWA + Python OpenCV &amp; Android MediaCodec Gateways
+    <tspan fill="#2dd4bf" font-weight="700">RECON • DETECT • ALERT • OPTICS</tspan> — v0.63.2 • Slow-Hardware Tuned PWA + Python OpenCV &amp; Android MediaCodec Gateways
   </text>
   <rect x="1156" y="36" width="234" height="38" rx="6" fill="#09111a" stroke="#f97316" stroke-width="1.5"/>
-  <text x="1273" y="60" text-anchor="middle" fill="#fdba74" font-family="monospace" font-size="12.5" font-weight="bold">v0.63.1 • ANDROID vCode 66</text>
+  <text x="1273" y="60" text-anchor="middle" fill="#fdba74" font-family="monospace" font-size="12.5" font-weight="bold">v0.63.2 • ANDROID vCode 67</text>
 
   <!-- COLUMN 1: INGESTION, INPUTS & STATE (x=30..365) -->
   <g transform="translate(30, 114)">
@@ -209,7 +209,7 @@
       <rect width="475" height="28" rx="6" fill="#052e16"/>
       <circle cx="16" cy="14" r="4.5" fill="#22c55e"/>
       <text x="30" y="19" fill="#f1f5f9" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">OFFLINE PWA &amp; NATIVE PACKAGING</text>
-      <text x="14" y="48" fill="#4ade80" font-family="monospace" font-size="11.5" font-weight="bold">sw.js (spotr-v0.63.1) • MainActivity.kt • server.py</text>
+      <text x="14" y="48" fill="#4ade80" font-family="monospace" font-size="11.5" font-weight="bold">sw.js (spotr-v0.63.2) • MainActivity.kt • server.py</text>
       <text x="14" y="68" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Pre-caches all 40 core assets; bypasses cross-origin IPs</text>
       <text x="14" y="86" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Android: FLAG_KEEP_SCREEN_ON + Low-Latency WifiLock</text>
       <text x="14" y="104" fill="#cbd5e1" font-family="'Segoe UI', sans-serif" font-size="11">• Android 10+: Binds camera Wi-Fi AP even with LTE active</text>
@@ -225,7 +225,7 @@
   <g transform="translate(30, 822)">
     <rect width="1380" height="136" rx="8" fill="#0f1722" stroke="#1e3a4c" stroke-width="1.5" filter="url(#shadow)"/>
     <rect width="1380" height="28" rx="8" fill="#141e2b"/>
-    <text x="18" y="19" fill="#f8fafc" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">4. SIX-SCREEN INTERFACE TOPOLOGY (v0.63.1)</text>
+    <text x="18" y="19" fill="#f8fafc" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="700">4. SIX-SCREEN INTERFACE TOPOLOGY (v0.63.2)</text>
 
     <g transform="translate(16, 40)">
       <rect x="0" y="0" width="214" height="82" rx="5" fill="#09111a" stroke="#f97316" stroke-width="1.5"/>
