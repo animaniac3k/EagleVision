@@ -125,22 +125,15 @@
         </button>
       </nav>
 
-      <!-- TOP-RIGHT: Saved Clips & Spatial Hits -->
+      <!-- TOP-RIGHT: Unified Review (Playback + Hits) -->
       <nav class="floating-strip strip-top-right">
-        <div class="archive-split-pill">
-          <button id="btnSwitchScreen" class="radar-btn radar-btn-pill archive-pill-half" title="Open Saved Video Clips">
-            <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
-            </svg>
-            <span>Clips</span>
-            <span id="clipCountBadge" style="opacity:0.85; font-family:var(--font-mono);">0</span>
-          </button>
-          <span class="archive-pill-sep" aria-hidden="true"></span>
-          <button id="btnOpenHitsTab" class="radar-btn radar-btn-pill archive-pill-half" title="Open Spatial Motion Hits Map">
-            <span id="hitCountBadge" class="hit-count-num">0</span>
-            <span>Hits</span>
-          </button>
-        </div>
+        <button id="btnSwitchScreen" class="radar-btn radar-btn-pill" title="Open Unified Review (Playback &amp; Spatial Hits)">
+          <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/>
+          </svg>
+          <span>Review</span>
+          <span id="hitCountBadge" class="hit-count-num">0</span>
+        </button>
       </nav>
 
       <!-- STREAM TELEMETRY HUD OVERLAY -->
@@ -311,138 +304,143 @@
     </main>
 
     <!-- =================================================================== -->
-    <!-- SCREEN 2: UNIFIED PLAYBACK & SPATIAL HITS                           -->
+    <!-- SCREEN 2: UNIFIED REVIEW (PLAYBACK + SPATIAL HITS)                  -->
     <!-- =================================================================== -->
     <section id="screenGallery" class="screen-view hidden">
       <div id="galleryClipsStage" class="gallery-fullscreen-stage">
-        <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
-        <div id="galleryReticleLayer" class="stage-reticle-layer hidden" style="opacity: 0.75;">
-          <svg id="galleryReticleSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
-          <img id="galleryReticleCustomImg" class="hidden" alt="Custom Reticle Overlay" />
+        <div id="reviewFrameBox" class="review-frame-box">
+          <canvas id="galleryPlayerCanvas" width="1920" height="1080"></canvas>
+          <img id="reviewStillImage" class="review-still-image hidden" alt="Captured impact reference frame" />
+          <div id="galleryReticleLayer" class="stage-reticle-layer hidden" style="opacity: 0.75;">
+            <svg id="galleryReticleSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
+            <img id="galleryReticleCustomImg" class="hidden" alt="Custom Reticle Overlay" />
+          </div>
+          <div id="reviewPinsLayer" class="hits-pins-layer"></div>
+        </div>
+        <div id="reviewEmptyBanner" class="hits-empty-banner hidden">
+          <strong>No recordings or hits yet</strong>
+          <span>Tap Replay on Live to inspect the RAM buffer, or enable Hits to capture impact markers.</span>
         </div>
       </div>
 
-      <!-- Spatial Detections Map Stage (Hidden unless 'Hits' tab selected) -->
-      <div id="hitsStage" class="hits-fullscreen-stage hidden">
-        <div id="hitsMapViewport" class="hits-map-viewport">
-          <div id="hitsTransformLayer" class="hits-transform-layer">
-            <img id="hitsRefImage" class="hits-ref-image hidden" alt="Detection reference frame" />
-            <div id="hitsReticleLayer" class="stage-reticle-layer" style="opacity: 0.75;">
-              <svg id="hitsReticleSvg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet"></svg>
-              <img id="hitsReticleCustomImg" class="hidden" alt="Custom Reticle Overlay" />
+      <!-- Unified Non-Overlapping Top HUD Bar -->
+      <header class="review-top-hud">
+        <!-- Top-Left: Navigation, Unified Review Drawer & Shared Zoom -->
+        <nav class="review-hud-left">
+          <button id="btnBackToLive" class="radar-btn radar-btn-pill" title="Return to Live Camera Stream">
+            <span>← Live</span>
+          </button>
+
+          <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-pill" title="Open Unified Hits &amp; Clips Drawer">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+            <span>Review</span>
+            <span id="drawerHitsBadge" class="hit-count-num">0</span>
+          </button>
+
+          <div id="galleryZoomPod" class="control-pod control-pod-top review-zoom-pod" style="border-radius:var(--radius-pill);">
+            <button id="galleryZoomMinus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom Out">−</button>
+            <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
+            <button id="galleryZoomPlus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom In">+</button>
+            <button id="galleryZoomReset" class="radar-btn radar-btn-sm hidden" style="border-radius:var(--radius-pill);" title="Reset Zoom">1:1</button>
+          </div>
+        </nav>
+
+        <!-- Top-Right: Unified Source Info, Reticle/Pins/Timestamps, Re-Zero/Clear & Export -->
+        <div class="review-hud-right">
+          <div id="galleryClipInfoPill" class="gallery-info-pill">
+            <div class="review-source-meta">
+              <div id="activeClipTitle" class="clip-name">NO SOURCE</div>
+              <div id="activeClipMeta" class="clip-meta">—</div>
             </div>
-            <div id="hitsPinsLayer" class="hits-pins-layer"></div>
+            <button id="btnResumeVideoSource" type="button" class="radar-btn radar-btn-sm radar-btn-primary hidden" title="Return to loaded video buffer/clip">▶ Video</button>
+            <div class="review-pill-sep"></div>
+            <button id="btnTogglePlaybackReticle" class="radar-btn radar-btn-sm radar-btn-active" title="Reticle Overlay: ON (click to hide)" aria-pressed="true">Reticle</button>
+            <button id="btnToggleReviewPins" class="radar-btn radar-btn-sm radar-btn-active" title="Cycle Hit Pins: SYNC (with video) → ALL → OFF">Pins: SYNC</button>
+            <button id="btnToggleHitsTimestamps" type="button" class="radar-btn radar-btn-sm btn-icon-only" title="Timestamp on Hits: OFF" aria-label="Toggle Hit Timestamps" aria-pressed="false">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <polyline points="12 7 12 12 15.5 14"/>
+              </svg>
+            </button>
+            <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background &amp; Clear Logged Hits">Re-Zero</button>
+            <button id="btnHitsClear" class="radar-btn radar-btn-sm btn-icon-only radar-btn-danger" title="Clear All Logged Hits" aria-label="Clear All Logged Hits">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+            <div class="review-pill-sep"></div>
+            <button id="btnSaveBufferClip" class="radar-btn radar-btn-sm radar-btn-primary hidden" title="Save RAM Buffer Clip to Archive">Save</button>
+            <button id="btnGallerySnapshot" class="radar-btn radar-btn-sm" title="Save Annotated PNG Snapshot (Frame + Reticle + Visible Pins)">📷</button>
+            <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video (.webm)">Export</button>
+            <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger hidden" title="Delete Active Saved Recording">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
           </div>
-          <div id="hitsEmptyBanner" class="hits-empty-banner">
-            <strong>No motion detections logged yet</strong>
-            <span>Turn on Hits on the Live view to capture numbered motion hits.</span>
-          </div>
         </div>
-      </div>
+      </header>
 
-      <!-- Top-Left: Navigation, Archive Mode (Playback | Hits), Slide-Over Drawer & Zoom -->
-      <nav class="floating-strip strip-top-left">
-        <button id="btnBackToLive" class="radar-btn radar-btn-pill" title="Return to Live Camera Stream">
-          <span>← Live</span>
-        </button>
-
-        <div class="gallery-tab-switch" role="tablist" aria-label="Archive Section">
-          <button id="tabArchiveClips" type="button" class="gallery-tab-btn active">Playback</button>
-          <button id="tabArchiveHits" type="button" class="gallery-tab-btn">Hits <span id="galleryHitsCountBadge" class="hit-count-num">0</span></button>
-        </div>
-
-        <button id="btnToggleGalleryDrawer" class="radar-btn radar-btn-pill" title="Show / Hide Playback Sources">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-          <span>Clips</span>
-        </button>
-
-        <button id="btnToggleHitsDrawer" class="radar-btn radar-btn-pill hidden" title="Show / Hide Detection Log">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
-          <span>Log</span>
-        </button>
-
-        <div id="galleryZoomPod" class="control-pod control-pod-top" style="border-radius:var(--radius-pill);">
-          <button id="galleryZoomMinus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom Out">−</button>
-          <span id="galleryZoomBadge" class="zoom-readout">1.0x</span>
-          <button id="galleryZoomPlus" class="radar-btn" style="border-radius:var(--radius-pill); border-color:transparent; background:transparent;" title="Zoom In">+</button>
-          <button id="galleryZoomReset" class="radar-btn radar-btn-sm hidden" style="border-radius:var(--radius-pill);" title="Reset Zoom">1:1</button>
-        </div>
-      </nav>
-
-      <!-- Top-Right: Active Clip Info (Playback tab) or Reticle/Hits/Mask Pill (Hits tab) -->
-      <div class="floating-strip strip-top-right">
-        <div id="galleryClipInfoPill" class="gallery-info-pill">
-          <div style="text-align:right;">
-            <div id="activeClipTitle" class="clip-name">NO CLIP SELECTED</div>
-            <div id="activeClipMeta" class="clip-meta">—</div>
-          </div>
-          <div style="width:1px; height:26px; background:var(--radar-border);"></div>
-          <button id="btnTogglePlaybackReticle" class="radar-btn radar-btn-sm" title="Show / Hide Reticle in Playback">Reticle: OFF</button>
-          <button id="btnSaveBufferClip" class="radar-btn radar-btn-sm radar-btn-primary hidden" title="Save RAM Buffer Clip to Archive">Save Clip</button>
-          <button id="btnGallerySnapshot" class="radar-btn radar-btn-sm" title="Save Annotated PNG Snapshot">📷</button>
-          <button id="btnGalleryDownload" class="radar-btn radar-btn-sm radar-btn-active" title="Export Video (.webm)">Export</button>
-          <button id="btnGalleryDelete" class="radar-btn radar-btn-sm radar-btn-danger" title="Delete Active Recording">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div id="hitsTopRightPill" class="gallery-info-pill hidden">
-          <button id="btnToggleHitsReticle" class="radar-btn radar-btn-sm radar-btn-active" title="Show / Hide Reticle (Synced Across Screens)">Reticle: ON</button>
-          <button id="btnToggleHitsVisible" class="radar-btn radar-btn-sm" title="Toggle Hit Detection &amp; Markers ON/OFF (Synced with Live)">Hits: OFF</button>
-          <button id="btnToggleHitsTimestamps" type="button" class="radar-btn radar-btn-sm btn-icon-only" title="Timestamp on Hits: OFF (Synced with Calibration)" aria-label="Toggle Hit Timestamps" aria-pressed="false">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9"/>
-              <polyline points="12 7 12 12 15.5 14"/>
-            </svg>
-          </button>
-          <button id="btnHitsRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background &amp; Clear Logged Hits">Re-Zero</button>
-          <button id="btnHitsClear" class="radar-btn radar-btn-sm btn-icon-only radar-btn-danger" title="Clear All Logged Hits" aria-label="Clear All Logged Hits">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Collapsible Floating Left Drawer for Saved Clips -->
+      <!-- Unified Collapsible Left Slide-Over Drawer (Hits | Clips) -->
       <aside id="galleryDrawer" class="gallery-floating-drawer hidden">
-        <header class="panel-header">
-          <span class="panel-title">Saved Clips</span>
-          <button id="btnCloseGalleryDrawer" class="radar-btn radar-btn-sm" style="border-color:transparent; background:transparent;" title="Hide Clips List">✕</button>
+        <header class="panel-header" style="gap:8px;">
+          <div class="review-drawer-tabs" role="tablist" aria-label="Review Drawer Tabs">
+            <button id="drawerTabHits" type="button" class="gallery-tab-btn active">Hits (<span id="drawerHitsTabCount">0</span>)</button>
+            <button id="drawerTabClips" type="button" class="gallery-tab-btn">Clips (<span id="drawerClipsTabCount">0</span>)</button>
+          </div>
+          <button id="btnCloseGalleryDrawer" class="radar-btn radar-btn-sm" style="border-color:transparent; background:transparent; min-width:30px; padding:0;" title="Hide Review Drawer">✕</button>
         </header>
-        <div id="clipsList" class="clips-list-container"></div>
+
+        <div id="drawerPanelHits" class="review-drawer-panel">
+          <div class="review-pin-mode-bar">
+            <span>Pin Reveal</span>
+            <div class="review-pin-mode-btns">
+              <button id="btnPinModeSync" type="button" class="radar-btn radar-btn-sm radar-btn-active" title="Reveal pins in sync with video playhead">With Video</button>
+              <button id="btnPinModeAll" type="button" class="radar-btn radar-btn-sm" title="Show all session hits at once">All</button>
+              <button id="btnPinModeOff" type="button" class="radar-btn radar-btn-sm" title="Hide hit pins">Off</button>
+            </div>
+          </div>
+          <div id="hitsLogList" class="clips-list-container"></div>
+        </div>
+
+        <div id="drawerPanelClips" class="review-drawer-panel hidden">
+          <div id="clipsList" class="clips-list-container"></div>
+        </div>
       </aside>
 
-      <!-- Collapsible Floating Left Drawer for Spatial Detections Log (Closed by default) -->
-      <aside id="hitsDrawer" class="gallery-floating-drawer hidden">
-        <header class="panel-header">
-          <span class="panel-title">Detection Log</span>
-          <button id="btnCloseHitsDrawer" class="radar-btn radar-btn-sm" style="border-color:transparent; background:transparent;" title="Hide Log">✕</button>
-        </header>
-        <div id="hitsLogList" class="clips-list-container"></div>
-      </aside>
+      <!-- Selected Hit Floating Callout Pill -->
+      <div id="reviewHitCallout" class="review-hit-callout hidden">
+        <span id="reviewHitCalloutNum" class="review-hit-callout-num">#1</span>
+        <span id="reviewHitCalloutText">Center</span>
+        <span id="reviewHitCalloutMeta" class="review-hit-callout-meta"></span>
+      </div>
 
-      <!-- Bottom Floating Playback Bar (Clips vs Hits Action Pill) -->
+      <!-- Unified Bottom Floating Transport & Hit Scrubber Bar -->
       <footer class="strip-bottom">
         <div id="galleryClipsBar" class="gallery-transport-bar">
-          <div class="player-btn-group">
+          <div id="reviewVideoBtns" class="player-btn-group">
             <button id="btnGalleryPlayPause" class="radar-btn radar-btn-sm radar-btn-primary" title="Play / Pause">⏸</button>
             <button id="btnGallerySlowMo" class="radar-btn radar-btn-sm" title="Toggle 0.5x Slow Motion">0.5x</button>
-            <button id="btnGalleryPrevEvt" class="radar-btn radar-btn-sm" title="Previous Event">◀ Evt</button>
-            <button id="btnGalleryNextEvt" class="radar-btn radar-btn-sm" title="Next Event">Evt ▶</button>
             <button id="btnGalleryStepBack" class="radar-btn radar-btn-sm" title="Step Backward 1 Frame">-1</button>
             <button id="btnGalleryStep" class="radar-btn radar-btn-sm" title="Step Forward 1 Frame">+1</button>
           </div>
 
-          <div class="cctv-scrub-wrap">
+          <div id="reviewHitNavGroup" class="player-btn-group">
+            <button id="btnHitPrev" class="radar-btn radar-btn-sm" title="Jump to Previous Hit">◀ Hit</button>
+            <span id="hitSelectedSummary" class="hits-summary-readout">—</span>
+            <button id="btnHitNext" class="radar-btn radar-btn-sm" title="Jump to Next Hit">Hit ▶</button>
+          </div>
+
+          <div id="reviewEvtNavGroup" class="player-btn-group hidden">
+            <button id="btnGalleryPrevEvt" class="radar-btn radar-btn-sm" title="Previous Event">◀ Evt</button>
+            <button id="btnGalleryNextEvt" class="radar-btn radar-btn-sm" title="Next Event">Evt ▶</button>
+          </div>
+
+          <div id="reviewScrubWrap" class="cctv-scrub-wrap">
             <div class="cctv-scrub-track" id="galleryScrubTrack">
               <div class="cctv-waveform-container" id="galleryWaveform"></div>
               <div class="cctv-markers-container" id="galleryMarkers"></div>
@@ -450,18 +448,10 @@
             </div>
             <span id="galleryTimeReadout" class="slider-val">0.0s / 20.0s</span>
           </div>
-        </div>
 
-        <!-- Compact Single-Row Action Bar for Spatial Detections Map -->
-        <div id="hitsBottomBar" class="hits-bottom-bar hidden">
-          <div class="hits-nav-group">
-            <button id="btnHitPrev" class="radar-btn radar-btn-sm" title="Previous Detection">◀</button>
-            <span id="hitSelectedSummary" class="hits-summary-readout">—</span>
-            <button id="btnHitNext" class="radar-btn radar-btn-sm" title="Next Detection">▶</button>
-          </div>
-
-          <div class="hits-actions-group">
-            <button id="btnHitSnapshot" class="radar-btn radar-btn-sm" title="Save Annotated Detections PNG Snapshot">📷</button>
+          <div id="reviewStillBanner" class="review-still-banner hidden">
+            <span class="review-still-pill">STILL SNAPSHOT</span>
+            <span id="reviewStillReason">Earlier hit outside rolling buffer</span>
           </div>
         </div>
       </footer>
@@ -486,7 +476,7 @@
         </nav>
 
         <div class="setup-header-actions">
-          <span class="setup-version-badge">v0.62.2</span>
+          <span class="setup-version-badge">v0.63.0</span>
         </div>
       </header>
 
@@ -773,7 +763,7 @@
         <div class="setup-header-actions">
           <button id="btnReticleToSettings" class="radar-btn radar-btn-sm hidden" aria-hidden="true">Settings</button>
           <button id="btnResetReticle" class="radar-btn radar-btn-sm" title="Reset Reticle Preset">↺ Reset</button>
-          <span class="setup-version-badge">v0.62.2</span>
+          <span class="setup-version-badge">v0.63.0</span>
         </div>
       </header>
 
@@ -974,7 +964,7 @@
 
         <div class="setup-header-actions">
           <button id="btnControllerBackToSettings" class="radar-btn radar-btn-sm hidden" aria-hidden="true">Settings</button>
-          <span class="setup-version-badge">v0.62.2</span>
+          <span class="setup-version-badge">v0.63.0</span>
         </div>
       </header>
 
@@ -1421,7 +1411,7 @@
 
         <div class="setup-header-actions">
           <button type="button" id="btnCalibRezero" class="radar-btn radar-btn-sm" title="Re-Zero Background Reference">↺ Re-Zero</button>
-          <span class="setup-version-badge">v0.62.2</span>
+          <span class="setup-version-badge">v0.63.0</span>
         </div>
       </header>
 

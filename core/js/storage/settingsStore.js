@@ -62,6 +62,7 @@ export function loadSavedSettings() {
     parsed.timestampOpacity = clampNum(parsed.timestampOpacity, 15, 100, 60, true);
     parsed.timestampAdaptive = parsed.timestampAdaptive !== false;
     parsed.showHitTimestamps = Boolean(parsed.showHitTimestamps);
+    parsed.reviewPinMode = ['sync', 'all', 'off'].includes(parsed.reviewPinMode) ? parsed.reviewPinMode : 'sync';
     if (parsed.reticleConfig) {
       parsed.reticleConfig = Object.assign(
         {
@@ -145,6 +146,7 @@ export function saveSettingsNow(state) {
       timestampOpacity: state.timestampOpacity ?? 60,
       timestampAdaptive: state.timestampAdaptive !== false,
       showHitTimestamps: Boolean(state.showHitTimestamps),
+      reviewPinMode: ['sync', 'all', 'off'].includes(state.reviewPinMode) ? state.reviewPinMode : 'sync',
       touchpadSensitivity: state.touchpadSensitivity ?? 50,
       reticleAimSpeed: state.reticleAimSpeed ?? 50,
       ringPanSpeed: state.ringPanSpeed ?? 70,

@@ -236,9 +236,10 @@ export function initRingController() {
   }
 
   function executeDirectionalAction(act) {
-    // A. Unified Playback / Hits Gallery
+    // A. Unified Review Screen (Video Playback + Spatial Hits)
     if (appState.currentScreen === 'gallery') {
-      if (appState.galleryArchiveTab === 'hits') {
+      const stillVisible = !document.getElementById('reviewStillBanner')?.classList.contains('hidden');
+      if (stillVisible) {
         if (act === 'LEFT') document.getElementById('btnHitPrev')?.click();
         else if (act === 'RIGHT') document.getElementById('btnHitNext')?.click();
         else if (act === 'DOWN') document.getElementById('btnBackToLive')?.click();
@@ -473,15 +474,12 @@ export function initRingController() {
       logRawSignal(() => `wheel dx=${e.deltaX.toFixed(1)} dy=${e.deltaY.toFixed(1)}`);
       const targetEl = e.target instanceof Element ? e.target : null;
       if (!learningAction) {
-        if (
-          appState.currentScreen !== 'live' &&
-          !(appState.currentScreen === 'gallery' && appState.galleryArchiveTab !== 'hits')
-        ) {
+        if (appState.currentScreen !== 'live' && appState.currentScreen !== 'gallery') {
           return;
         }
         if (
           targetEl &&
-          targetEl.closest('#screenSettings, #screenCalibration, #screenReticle, #screenController, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #replayTunePopover')
+          targetEl.closest('#screenSettings, #screenCalibration, #screenReticle, #screenController, #galleryDrawer, #replayTunePopover')
         ) {
           return;
         }
@@ -538,7 +536,7 @@ export function initRingController() {
     if (!el || !(el instanceof Element)) return false;
     return Boolean(
       el.closest(
-        '#screenSettings, #screenCalibration, #screenReticle, #galleryDrawer, #hitsDrawer, #hitsMapViewport, #replayTunePopover, #zoomTargetCrosshair, #pipHeader, .pip-controls, .pip-resize-handle, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
+        '#screenSettings, #screenCalibration, #screenReticle, #galleryDrawer, #replayTunePopover, #zoomTargetCrosshair, #pipHeader, .pip-controls, .pip-resize-handle, .cm-table-wrap, .remote-device-box, button, a, input, select, textarea'
       )
     );
   }

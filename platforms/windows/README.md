@@ -1,4 +1,4 @@
-# SPOTR Windows / Desktop Platform Runner (`v0.62.2`)
+# SPOTR Windows / Desktop Platform Runner (`v0.63.0`)
 
 Contains the portable launcher and Python 3 + OpenCV RTSP streaming gateway.
 

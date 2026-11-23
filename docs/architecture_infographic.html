@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (v0.62.2) — Architecture &amp; Data Flow Infographic</title>
+  <title>SPOTR (v0.63.0) — Architecture &amp; Data Flow Infographic</title>
   <style>
     :root {
       --bg: #050a0f;
@@ -195,7 +195,7 @@
   <div class="wrap">
     <header class="card card-orange banner">
       <div>
-        <div class="eyebrow">System Architecture Infographic • Release v0.62.2 (Android vCode 64)</div>
+        <div class="eyebrow">System Architecture Infographic • Release v0.63.0 (Android vCode 65)</div>
         <h1>SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
         <p class="subtitle">Offline-First PWA &amp; Native Android/ChromeOS App • Lenovo Duet 3 Slow-Hardware Tuned • Isolated Hardware Inputs</p>
       </div>
@@ -223,8 +223,8 @@
           <p>Dual-canvas 60 FPS scope, FFP reticle, PiP loupe, translucent glass dock (Hits | 🗑 | ⚙) &amp; icon-only Setup / Clean View.</p>
         </div>
         <div class="screen-chip">
-          <h3>2. Archive (#screenGallery)</h3>
-          <p>Unified LIVE BUFFER (RAM) + saved clips (.webm export) &amp; Spatial Hits Map (synced Reticle &amp; Hits toggles, PNG export).</p>
+          <h3>2. Review (#screenGallery)</h3>
+          <p>Consolidated LIVE BUFFER (RAM), saved clips (.webm) &amp; time-synced Hit Pins (SYNC/ALL/OFF, still fallback, unified drawer).</p>
         </div>
         <div class="screen-chip">
           <h3>3. Setup (#screenSettings)</h3>
@@ -368,14 +368,14 @@
 
         <article class="card">
           <div class="node-hdr">
-            <span>UNIFIED PLAYBACK &amp; HITS MAP</span>
+            <span>UNIFIED REVIEW (PLAYBACK + HITS)</span>
             <span class="badge badge-amber">Screen 2</span>
           </div>
           <div class="node-body">
             <ul>
-              <li><strong>Playback Tab:</strong> Opens <code>LIVE BUFFER (RAM)</code> unsaved; 0.5x slow-mo, -1/+1 frame step, audio-peak CCTV scrubber, on-demand Save Clip &amp; <code>.webm</code> export (picker invoked before encoding).</li>
-              <li><strong>Memory Cleanup:</strong> Frees 50–300 MB <code>activeBufferClip</code> immediately upon returning to Live.</li>
-              <li><strong>Spatial Hits Map:</strong> Synced <code>Reticle: ON/OFF</code> &amp; <code>Hits: ON/OFF</code>, 1-tap <strong>Re-Zero</strong> &amp; <strong>Clear</strong>, in-place age timers, PNG snapshot export.</li>
+              <li><strong>Single Unified Stage:</strong> Renders <code>LIVE BUFFER (RAM)</code> or saved clips with FFP reticle, numbered spatial hit pins (<code>Pins: SYNC → ALL → OFF</code>), and clickable numbered timeline markers.</li>
+              <li><strong>Unified Drawer &amp; Still Fallback:</strong> One <code>☰ Review</code> drawer (<code>Hits | Clips</code> tabs); hits outside the RAM buffer jump to matching saved clips or render their stored <code>STILL SNAPSHOT</code> with 1-tap <code>▶ Video</code> resume.</li>
+              <li><strong>Top-Right Controls &amp; Cleanup:</strong> Non-overlapping flex top HUD with <code>Reticle</code>, <code>Pins</code>, <code>🕒</code>, <code>Re-Zero</code>, <code>🗑</code>, <code>Save</code>, <code>📷</code>, <code>Export</code>; frees 50–300 MB buffer copy on return to Live.</li>
             </ul>
           </div>
         </article>
@@ -387,7 +387,7 @@
           </div>
           <div class="node-body">
             <ul>
-              <li><strong>Android APK (v0.62.2 / vCode 64):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
+              <li><strong>Android APK (v0.63.0 / vCode 65):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
               <li><strong>Windows/Desktop (server.py):</strong> <code>TCP_NODELAY</code> + coalesced MJPEG writes, localhost-by-default security (<code>--lan</code> opt-in for iOS/iPad), SSRF &amp; scheme validation.</li>
             </ul>
           </div>
@@ -397,7 +397,7 @@
 
     <footer class="card footer-bar">
       <div>
-        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.62.2)</strong>
+        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.63.0)</strong>
         Pre-caches all 40 core assets for 100% offline field use. Bypasses cross-origin camera requests (192.168.0.1) so camera wake probes never hang, and preserves active hits across SW updates.
       </div>
       <div>

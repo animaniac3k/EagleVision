@@ -1,7 +1,7 @@
 /**
  * Central Reactive State Store for SPOTR
  */
-export const APP_VERSION = 'v0.62.2';
+export const APP_VERSION = 'v0.63.0';
 
 const listeners = new Set();
 
@@ -92,8 +92,9 @@ export const appState = {
   heatmapAutoSave: false, // Auto-snapshot rolling RAM buffer on localized hit (rate-limited)
   heatmapIgnoreMasks: [], // Normalized exclude zones: Array<{ x, y, w, h }> in [0..1]
   detectionHits: [],      // Session spatial detection log: Array<{ id, timestampMs, normX, normY, clockHour, clicks, dirLabel, thumbDataUrl }>
-  selectedHitId: null,    // Currently highlighted detection hit ID in Detections drawer/map
-  galleryArchiveTab: 'clips', // 'clips' | 'hits' inside Screen 2 archive
+  selectedHitId: null,    // Currently highlighted detection hit ID in Unified Review
+  reviewPinMode: 'sync',  // 'sync' (reveal with video playhead) | 'all' (show full group) | 'off'
+  reviewDrawerTab: 'hits',// 'hits' | 'clips' inside Screen 2 unified Review drawer
   voicePitch: 1.25,       // Female voice pitch (1.0..1.6)
   voiceRate: 0.80,        // Voice speech rate (0.6..1.0)
   voiceAlertKeyword: 'Detection', // Customizable alert keyword (e.g. Contact, Target, Alert)

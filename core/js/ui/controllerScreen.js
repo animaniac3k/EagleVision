@@ -2063,9 +2063,7 @@ export function executeMappedAction(actionId) {
       const vpEl = screen === 'reticle'
         ? document.getElementById('reticlePreviewStage')
         : screen === 'gallery'
-          ? (appState.galleryArchiveTab === 'hits'
-              ? document.getElementById('hitsMapViewport')
-              : document.getElementById('galleryClipsStage'))
+          ? (document.getElementById('reviewFrameBox') || document.getElementById('galleryClipsStage'))
           : document.getElementById('viewportContainer');
       const vw = vpEl?.clientWidth || window.innerWidth || 1920;
       const vh = vpEl?.clientHeight || window.innerHeight || 1080;

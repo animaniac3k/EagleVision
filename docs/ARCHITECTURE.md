@@ -1,4 +1,4 @@
-# SPOTR Software Architecture Document (v0.62.2)
+# SPOTR Software Architecture Document (v0.63.0)
 
 > **Repository Note:** This repository (`EagleVision`) hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*). All former specification notes from `docs/project_plan.txt` have been consolidated here as the single technical source of truth.
 
@@ -8,7 +8,7 @@
 
 **SPOTR** is a zero-dependency, offline-first Progressive Web Application (PWA) paired with:
 - A local Python 3 + OpenCV RTSP gateway (`platforms/windows/server.py`, with root proxy `server.py`), and
-- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 64` / `v0.62.2`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
+- A native Android & ChromeOS APK host (`platforms/android`, `com.spotr.tactical`, `versionCode 65` / `v0.63.0`) featuring an embedded NanoHTTPD server (`SpotrServer.kt`), native RTSP + `MediaCodec` H.264/H.265/MJPEG decoding, and native USB UVC capture via `libuvc`.
 
 Target hardware ranges from **low-power tablets** (e.g., **Lenovo IdeaPad Duet 3** 4 GB RAM, ARM SoCs) to rugged Android phones and desktop/laptop systems. Every subsystem is engineered for **field reliability**, **battery conservation**, and **zero cloud dependency**.
 
@@ -45,9 +45,9 @@ flowchart TD
         VOICE["Lazy Studio Voice Engine<br/>(voice-sprite.mp3 + Web Speech)"]
     end
 
-    subgraph Archive["5. Rolling RAM Buffer & Screen 2 Archive"]
+    subgraph Archive["5. Rolling RAM Buffer & Screen 2 Unified Review"]
         RAM["memoryRingBuffer.js<br/>Live-Only Capture (RAM-Capped)"]
-        PLAY["Screen 2: Playback & Spatial Hits<br/>(videoBrowser.js + detectionsScreen.js)"]
+        PLAY["Screen 2: Unified Review (Playback + Hits)<br/>(videoBrowser.js + detectionsScreen.js)"]
     end
 
     Inputs --> STATE
@@ -72,12 +72,8 @@ stateDiagram-v2
     [*] --> SplashScreen: App Launch
     SplashScreen --> LiveScreen: Auto-dismiss / Tap / Key
 
-    LiveScreen --> UnifiedPlayback: Tap Replay (LIVE BUFFER) or Clips
-    LiveScreen --> HitsMap: Tap Top-Right Hits Badge
-    UnifiedPlayback --> HitsMap: Switch Tab (Playback ↔ Hits)
-    HitsMap --> UnifiedPlayback: Switch Tab (Hits ↔ Playback)
-    UnifiedPlayback --> LiveScreen: ← Live / Circle / Esc
-    HitsMap --> LiveScreen: ← Live / Circle / Esc
+    LiveScreen --> UnifiedReview: Tap Replay or Top-Right Review Pill
+    UnifiedReview --> LiveScreen: ← Live / Circle / Esc
 
     LiveScreen --> SettingsScreen: Setup Gear
     LiveScreen --> CalibrationScreen: Dock Gear / Long-Press Hits
@@ -92,8 +88,8 @@ stateDiagram-v2
 
 | Screen | Container ID | Primary Purpose | Background Pipeline State |
 | :--- | :--- | :--- | :--- |
-| **1. Live** | `#screenLive` | 60 FPS scope viewport, FFP reticle, PiP loupe, translucent glass bottom dock (`Hits \| 🗑 \| ⚙`), icon-only Setup & Clean View | Compositor active, RAM buffer active (if enabled), RTSP/UVC active |
-| **2. Playback & Hits** | `#screenGallery` | Unified `LIVE BUFFER (RAM)` + IndexedDB clips (`0.5x` slow-mo, `-1/+1` step, `.webm` export) & Spatial Hits Map (`Reticle: ON/OFF`, synced `Hits: ON/OFF`, PNG export) | Live compositor paused, RAM buffer paused, gateway JPEG encoding paused |
+| **1. Live** | `#screenLive` | 60 FPS scope viewport, FFP reticle, PiP loupe, translucent glass bottom dock (`Hits \| 🗑 \| ⚙`), icon-only Setup & Clean View, simplified `Review` pill | Compositor active, RAM buffer active (if enabled), RTSP/UVC active |
+| **2. Unified Review** | `#screenGallery` | Consolidated `LIVE BUFFER (RAM)` + saved clips (`0.5x` slow-mo, `-1/+1` step, `.webm` export) & time-synced Spatial Hit Pins (`Pins: SYNC/ALL/OFF`, still-snapshot fallback for older hits, unified `Hits \| Clips` drawer) | Live compositor paused, RAM buffer paused, gateway JPEG encoding paused |
 | **3. Setup** | `#screenSettings` | Camera sources (USB / Wi-Fi RTSP), Voice tuning, Display & Theme (6 swatches + custom picker, Display & Hit Timestamps) | Live compositor paused, RAM buffer paused, gateway paused |
 | **4. Reticle** | `#screenReticle` | Parametric crosshair studio (FFP/SFP, 4 center styles, unified color theme swatches, custom image DataURL persistence) | Live compositor paused, RAM buffer paused, gateway paused |
 | **5. Controllers** | `#screenController` | DualShock 4/5 WebHID, 8BitDo Micro K-Mode, isolated Bluetooth Ring toggle (`ringEnabled`, OFF by default), visual remap & JSON profile import/export | Live compositor paused, RAM buffer paused, gateway paused |
@@ -120,7 +116,7 @@ Both the Windows/Desktop gateway (`platforms/windows/server.py`) and the Android
 
 ---
 
-## 5. Slow-Hardware & Battery Optimizations (v0.62.2)
+## 5. Slow-Hardware & Battery Optimizations (v0.63.0)
 
 Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo IdeaPad Duet 3) cool, responsive, and OOM-free during multi-hour range sessions:
 
@@ -153,5 +149,5 @@ Designed specifically to keep **4 GB ARM/ChromeOS tablets** (such as the Lenovo 
 ## 7. Offline & Security Model
 
 - **100% On-Device Processing:** Video capture, 20 Hz luminance diffing, voice audio sprites, timestamps, and IndexedDB clips stay completely local.
-- **Service Worker (`core/sw.js`, `spotr-v0.62.2`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits.
+- **Service Worker (`core/sw.js`, `spotr-v0.63.0`):** Pre-caches all 40 core assets, bypasses all cross-origin requests (so camera wake probes to `http://192.168.0.1` are never intercepted or cached), and refreshes local assets safely via Stale-While-Revalidate without wiping active session hits.
 - **Localhost & SSRF Hardening:** Both gateways validate `rtsp://` schemes, whitelist `tcp`/`udp` transport, restrict `/api/rtsp/wake` to private/link-local/loopback hosts, block directory listing and `..` path traversal, and bind `127.0.0.1` by default.

@@ -39,7 +39,9 @@ export function renderCctvTrack({
   markersEl,
   timeline,
   durationSec,
-  onSeek
+  hitMarkers = [],
+  onSeek,
+  onSelectHit
 }) {
   if (waveformEl) waveformEl.innerHTML = '';
   if (markersEl) markersEl.innerHTML = '';
@@ -68,11 +70,16 @@ export function renderCctvTrack({
     }
   }
 
-  // 2. Render Clustered Event Markers (Single Amber Pip & Line per second window)
+  // 2. Render Clustered Event Markers (skip ones already covered by a numbered hit marker within 0.8s)
+  const validHitMarkers = Array.isArray(hitMarkers)
+    ? hitMarkers.filter((h) => Number.isFinite(h?.tSec) && h.tSec >= 0 && h.tSec <= dur + 0.5)
+    : [];
+
   if (markersEl && clusteredEvents.length > 0) {
     const frag = document.createDocumentFragment();
     clusteredEvents.forEach((cluster) => {
       const t = cluster.start;
+      if (validHitMarkers.some((hm) => Math.abs(hm.tSec - t) <= 0.8)) return;
       const pct = Math.max(0, Math.min(100, (t / dur) * 100));
 
       const marker = document.createElement('div');
@@ -93,6 +100,31 @@ export function renderCctvTrack({
         });
       }
       frag.appendChild(marker);
+    });
+    markersEl.appendChild(frag);
+  }
+
+  // 3. Render Numbered Hit Markers directly on timeline
+  if (markersEl && validHitMarkers.length > 0) {
+    const frag = document.createDocumentFragment();
+    validHitMarkers.forEach((hm) => {
+      const pct = Math.max(0, Math.min(100, (hm.tSec / dur) * 100));
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = `cctv-hit-marker${hm.selected ? ' selected' : ''}`;
+      badge.dataset.hitId = String(hm.id);
+      badge.style.left = `${pct}%`;
+      badge.textContent = String(hm.num);
+      badge.title = `Hit #${hm.num} at ${hm.tSec.toFixed(1)}s — Click to jump`;
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof onSelectHit === 'function') {
+          onSelectHit(hm.id, hm.tSec);
+        } else if (typeof onSeek === 'function') {
+          onSeek(hm.tSec);
+        }
+      });
+      frag.appendChild(badge);
     });
     markersEl.appendChild(frag);
   }
