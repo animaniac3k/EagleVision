@@ -5,7 +5,7 @@
  * directly in the unified Screen 2 Playback view (unsaved until the user
  * chooses Save Clip). Background auto-save on hit remains off by default.
  */
-import { appState, subscribeState } from '../state.js';
+import { appState, updateState, subscribeState } from '../state.js';
 import { snapshotMemoryBuffer } from './memoryRingBuffer.js';
 import { saveVideoClip } from '../storage/videoStore.js';
 import { refreshGalleryClips, openLiveBufferInPlayer } from '../ui/videoBrowser.js';
@@ -119,11 +119,17 @@ export function initInstantReplay() {
       document.getElementById('btnBackToLive')?.click();
       return;
     }
-    const snap = await snapshotMemoryBuffer();
-    if (!snap || !snap.jpegFrames?.length) return;
-    await openLiveBufferInPlayer({
-      ...snap,
-      timeline: buildWallTimeline(snap)
-    });
+    if (appState.bufferEnabled) {
+      const snap = await snapshotMemoryBuffer().catch(() => null);
+      if (snap && snap.jpegFrames?.length) {
+        await openLiveBufferInPlayer({
+          ...snap,
+          timeline: buildWallTimeline(snap)
+        });
+        return;
+      }
+    }
+    // Fallback when RAM buffer is OFF or empty: still open Unified Review for saved clips / hit stills
+    updateState({ currentScreen: 'gallery' });
   });
 }

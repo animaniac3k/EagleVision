@@ -1,8 +1,8 @@
-# SPOTR — Tactical Camera & Scope Overlay System (`v0.63.0`)
+# SPOTR — Tactical Camera & Scope Overlay System (`v0.63.1`)
 
 > **Repository Note:** The `EagleVision` repository hosts **SPOTR** (*Recon • Detect • Alert • Optical Precision*).
 
-An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 65`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for reliable field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
+An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`platforms/android`, `versionCode 66`), and local **Python 3 + OpenCV RTSP gateway** (`platforms/windows/server.py`) engineered for reliable field use and slow/4 GB ARM tablets (such as the **Lenovo IdeaPad Duet 3**).
 
 ---
 
@@ -17,11 +17,11 @@ An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`
 
 ---
 
-## Key Features (`v0.63.0`)
+## Key Features (`v0.63.1`)
 
 - **Clean Translucent Glass Live Workspace**:
-  - **Bottom Control Dock:** Compact translucent glass dock (`Reticle · FFP`, `Hits | 🗑 | ⚙`, `Voice OFF/POI/POA`, `Loupe ON/AA/OFF`, `Zoom −/1.0x/+`, `Replay · 20s ▴`) keeping the sight picture unobstructed.
-  - **Quiet Top-Left & Simplified Top-Right Controls:** Icon-only **Setup** (`⚙`) & **Clean View** (`👁`) on top-left, and a single unified **`Review`** pill with live hit badge on top-right.
+  - **Bottom Control Dock:** Compact translucent glass dock (`Reticle · FFP`, `Hits | 🗑 | ⚙`, `Voice OFF/POI/POA`, `Loupe ON/AA/OFF`, `Zoom −/1.0x/+`, and consolidated **`Review (N) | 20s ▴`**) keeping the sight picture and entire top-right corner completely unobstructed.
+  - **Quiet Top-Left Controls:** Icon-only **Setup** (`⚙`) & **Clean View** (`👁`) on top-left; the consolidated bottom-dock **`Review`** button carries the live hit badge and opens the RAM buffer (or saved clips / hit stills when buffer is off).
   - **6 Tactical UI Themes + Custom Color Picker** with WCAG-computed button text contrast.
 
 - **Multi-Source Camera Ingestion & Resilient Native Gateways**:
@@ -35,7 +35,7 @@ An offline-first Progressive Web App (PWA), native **Android & ChromeOS APK** (`
   - Live 1:1 thermal heatmap debug view, **1-Tap `✦ Auto-Tune`**, live noise-floor meter, draggable **Ignore Zones**, and 1:1 synced Hit Pin + Cartesian/clock-face Voice Callouts (`OFF → POI → POA`).
 
 - **Consolidated Unified Review Screen (Screen 2 — Playback + Spatial Hits)**:
-  - **Single Stage & Timeline:** Reviews `LIVE BUFFER (RAM)`, saved IndexedDB clips (`0.5x` slow-mo, `-1/+1` stepping, `.webm` export), and numbered Spatial Hit Pins on one canvas with clickable numbered shot markers right on the scrubber.
+  - **Live-Matched Stage & Timeline:** Matches Live view's cover framing and inherits your active Live zoom & pan on entry; reviews `LIVE BUFFER (RAM)`, saved IndexedDB clips (`0.5x` slow-mo, `-1/+1` stepping, `.webm` export), and numbered Spatial Hit Pins on one canvas with clickable numbered shot markers right on the scrubber.
   - **Time-Synced Pins & Smart Still Fallback:** `Pins` cycles `SYNC` (pins reveal on the exact impact frame) → `ALL` → `OFF`; clicking an earlier hit outside the rolling RAM buffer automatically loads its matching saved clip or stored still snapshot.
   - **Unified Slide-Over Drawer & Top-Right Bar:** One `☰ Review` drawer (`Hits | Clips`) with `BUFFER`/`CLIP`/`STILL` badges, plus top-right `Reticle`, `Pins`, `🕒`, `Re-Zero`, `Clear`, `Save Clip`, `📷` PNG Snapshot, and `Export`.
 

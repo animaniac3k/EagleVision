@@ -10,7 +10,6 @@
  */
 import { appState, updateState, subscribeState } from '../state.js';
 import { createJpegFramePlayer } from '../recorder/jpegFramePlayer.js';
-import { snapshotMemoryBuffer } from '../recorder/memoryRingBuffer.js';
 import {
   listVideoClips,
   getVideoClip,
@@ -112,6 +111,17 @@ function getActiveStillHit() {
   return getSelectedHit(hits);
 }
 
+function syncZoomFromLive() {
+  const liveZ = Math.max(1.0, Math.min(8.0, Number(appState.mainZoom) || 1.0));
+  galleryZoom = Math.round(liveZ * 10) / 10;
+  const maxPan = Math.max(0, (1 - 1 / galleryZoom) / 2);
+  galleryPanX = Math.max(-maxPan, Math.min(maxPan, Number(appState.mainPanX) || 0));
+  galleryPanY = Math.max(-maxPan, Math.min(maxPan, Number(appState.mainPanY) || 0));
+}
+
+let stageOverhangX = 0;
+let stageOverhangY = 0;
+
 function fitReviewFrameBox() {
   const stageEl = document.getElementById('galleryClipsStage');
   const boxEl = document.getElementById('reviewFrameBox');
@@ -125,14 +135,17 @@ function fitReviewFrameBox() {
   const fh = (stillHit?.frameH) || activeClipHeight || appState.streamHeight || 9;
   const aspect = fw > 0 && fh > 0 ? fw / fh : 16 / 9;
 
+  // Match Live view's cover projection so 1.0x Review has the exact same visual scale as 1.0x Live
   let bw = availW;
   let bh = bw / aspect;
-  if (bh > availH) {
+  if (bh < availH) {
     bh = availH;
     bw = bh * aspect;
   }
   frameBoxW = Math.round(bw);
   frameBoxH = Math.round(bh);
+  stageOverhangX = Math.max(0, (frameBoxW - availW) / 2);
+  stageOverhangY = Math.max(0, (frameBoxH - availH) / 2);
   boxEl.style.width = `${frameBoxW}px`;
   boxEl.style.height = `${frameBoxH}px`;
 }
@@ -184,7 +197,7 @@ function syncPlaybackReticleOverlay() {
     stageHeight: stageH,
     frameWidth: frameW,
     frameHeight: frameH,
-    fitMode: 'contain',
+    fitMode: 'cover',
     customImgWidth: imgW,
     customImgHeight: imgH
   });
@@ -548,7 +561,7 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
         <div class="clip-card" style="cursor:default;">
           <div>
             <div class="clip-name">NO SAVED RECORDINGS</div>
-            <div class="clip-meta">Tap Replay on Live to inspect RAM buffer, or enable Auto-Save in Calibration.</div>
+            <div class="clip-meta">Tap Review on Live to inspect RAM buffer, or enable Auto-Save in Calibration.</div>
           </div>
         </div>
       `;
@@ -564,9 +577,9 @@ export async function refreshGalleryClips(autoSelectFirst = false) {
     if (galleryVisible && (!currentClip || autoSelectFirst)) {
       if (cachedClips.length) {
         currentClip = cachedClips[0];
-        await selectClip(currentClip, true);
+        await selectClip(currentClip, true, 0, { preserveZoom: true });
       } else if (activeBufferClip) {
-        await selectClip(activeBufferClip, true);
+        await selectClip(activeBufferClip, true, 0, { preserveZoom: true });
       }
     } else if (!currentClip && cachedClips.length) {
       selectedClipId = cachedClips[0].id;
@@ -647,16 +660,18 @@ function updateClipCardSelectionUI() {
   });
 }
 
-async function selectClip(clip, autoPlay = true, initialSeekSec = 0) {
+async function selectClip(clip, autoPlay = true, initialSeekSec = 0, { preserveZoom = false } = {}) {
   stopPlayerLoop();
   galleryPlayer?.unload();
   clearPlaybackTrackUI();
 
   stillOverrideHitId = null;
   selectedClipId = clip.id;
-  galleryZoom = 1.0;
-  galleryPanX = 0;
-  galleryPanY = 0;
+  if (!preserveZoom) {
+    galleryZoom = 1.0;
+    galleryPanX = 0;
+    galleryPanY = 0;
+  }
   syncGalleryZoomUiFn?.();
 
   const canvasEl = document.getElementById('galleryPlayerCanvas');
@@ -729,18 +744,18 @@ export async function openLiveBufferInPlayer(snap) {
   };
   stillOverrideHitId = null;
   selectedClipId = LIVE_BUFFER_ID;
+  syncZoomFromLive();
   openingLiveBuffer = true;
   setDrawerOpenFn?.(false);
   updateState({ currentScreen: 'gallery' });
   openingLiveBuffer = false;
   await refreshGalleryClips(false);
-  await selectClip(activeBufferClip, true, 0);
+  await selectClip(activeBufferClip, true, 0, { preserveZoom: true });
   renderClipList();
   return true;
 }
 
 export function initVideoBrowser() {
-  const btnSwitchScreen = document.getElementById('btnSwitchScreen');
   const btnBackToLive = document.getElementById('btnBackToLive');
 
   const galleryStage = document.getElementById('galleryClipsStage');
@@ -756,16 +771,22 @@ export function initVideoBrowser() {
   const stillImgEl = document.getElementById('reviewStillImage');
   const emptyBanner = document.getElementById('reviewEmptyBanner');
 
-  galleryPlayer = createJpegFramePlayer(canvasEl, () => ({
-    zoom: galleryZoom,
-    panX: galleryPanX,
-    panY: galleryPanY,
-    showTimestamp: appState.showDisplayTimestamp !== false,
-    baseWallMs: activeClipWallStartMs,
-    tsPosition: appState.timestampPosition || 'bottom-right',
-    tsOpacity: Math.max(0.15, Math.min(1, Number(appState.timestampOpacity ?? 60) / 100)),
-    tsAdaptive: appState.timestampAdaptive !== false
-  }));
+  galleryPlayer = createJpegFramePlayer(canvasEl, () => {
+    const scaleX = frameBoxW > 0 && canvasEl?.width ? canvasEl.width / frameBoxW : 1;
+    const scaleY = frameBoxH > 0 && canvasEl?.height ? canvasEl.height / frameBoxH : 1;
+    return {
+      zoom: galleryZoom,
+      panX: galleryPanX,
+      panY: galleryPanY,
+      showTimestamp: appState.showDisplayTimestamp !== false,
+      baseWallMs: activeClipWallStartMs,
+      tsPosition: appState.timestampPosition || 'bottom-right',
+      tsOpacity: Math.max(0.15, Math.min(1, Number(appState.timestampOpacity ?? 60) / 100)),
+      tsAdaptive: appState.timestampAdaptive !== false,
+      tsSafeInsetX: Math.round(stageOverhangX * scaleX),
+      tsSafeInsetY: Math.round(stageOverhangY * scaleY)
+    };
+  });
 
   const scrubber = document.getElementById('galleryScrubber');
   const btnPlayPause = document.getElementById('btnGalleryPlayPause');
@@ -1307,30 +1328,6 @@ export function initVideoBrowser() {
     }
   });
 
-  // Live Top-Right Simplified "Review" Pill: opens best available source (RAM buffer -> saved clip -> latest hit still)
-  btnSwitchScreen?.addEventListener('click', async () => {
-    stillOverrideHitId = null;
-    if (appState.bufferEnabled) {
-      const snap = await snapshotMemoryBuffer().catch(() => null);
-      if (snap && snap.jpegFrames?.length) {
-        const startWall = Number.isFinite(snap.startWallMs)
-          ? snap.startWallMs
-          : Math.round(snap.startTs + (Date.now() - performance.now()));
-        const durMs = Math.max(0, Math.round((snap.durationSec || 0) * 1000));
-        await openLiveBufferInPlayer({
-          ...snap,
-          timeline: {
-            ...(snap.timeline || { soundPeaks: [], events: [] }),
-            wallStartMs: startWall,
-            wallEndMs: Number.isFinite(snap.endWallMs) ? snap.endWallMs : startWall + durMs
-          }
-        });
-        return;
-      }
-    }
-    updateState({ currentScreen: 'gallery' });
-  });
-
   btnBackToLive?.addEventListener('click', () => {
     isPlaying = false;
     stopPlayerLoop();
@@ -1446,11 +1443,13 @@ export function initVideoBrowser() {
       }
     }
     if (state.currentScreen === 'gallery' && !openingLiveBuffer && patch.currentScreen === 'gallery') {
+      syncZoomFromLive();
       requestAnimationFrame(() => {
         fitReviewFrameBox();
+        syncGalleryZoomUI();
         if (selectedClipId === LIVE_BUFFER_ID && activeBufferClip) {
           if (!galleryPlayer.getFrameCount()) {
-            selectClip(activeBufferClip, true, 0);
+            selectClip(activeBufferClip, true, 0, { preserveZoom: true });
           }
           refreshGalleryClips(false).catch(() => {});
         } else {

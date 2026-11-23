@@ -134,7 +134,9 @@ export function createJpegFramePlayer(canvasEl, getViewportTransform) {
         opacity: tf.tsOpacity ?? 0.6,
         adaptive,
         bgLuma,
-        isLive: false
+        isLive: false,
+        safeInsetX: tf.tsSafeInsetX || 0,
+        safeInsetY: tf.tsSafeInsetY || 0
       });
     }
   }

@@ -772,9 +772,39 @@ input[type="range"].cctv-slider-input::-moz-range-thumb {
 }
 
 .replay-dock-group.is-buffer-off #btnReplay20s {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-  color: var(--radar-text-muted) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: var(--radar-text) !important;
   box-shadow: none !important;
+}
+
+.replay-dock-group #btnReplay20s .hit-count-num {
+  background: rgba(9, 13, 19, 0.24);
+  border-color: rgba(9, 13, 19, 0.36);
+  color: inherit;
+  min-width: 18px;
+  height: 18px;
+  font-size: 11px;
+  padding: 0 5px;
+}
+
+.replay-dock-group #btnReplay20s .hit-count-num.has-hits {
+  background: #090d13;
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fbbf24;
+  box-shadow: 0 0 8px rgba(9, 13, 19, 0.55);
+}
+
+.replay-dock-group.is-buffer-off #btnReplay20s .hit-count-num {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.48);
+  color: #fbbf24;
+}
+
+.replay-dock-group.is-buffer-off #btnReplay20s .hit-count-num.has-hits {
+  background: #f59e0b;
+  border-color: #fbbf24;
+  color: #090d13;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
 }
 
 .replay-dock-group.is-buffer-off .replay-tune-caret {

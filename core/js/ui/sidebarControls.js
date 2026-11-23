@@ -504,7 +504,7 @@ export function initSidebarAndTopControls(videoEl) {
   const replayBtnLabel = document.getElementById('replayBtnLabel');
   const replayTuneDurChip = document.getElementById('replayTuneDurChip');
   const updateReplayBtnLabel = (sec, enabled = appState.bufferEnabled) => {
-    if (replayBtnLabel) replayBtnLabel.textContent = 'Replay';
+    if (replayBtnLabel) replayBtnLabel.textContent = 'Review';
     if (replayTuneDurChip) replayTuneDurChip.textContent = enabled ? `${sec}s` : 'OFF';
   };
   updateReplayBtnLabel(appState.bufferMaxSeconds || 20, appState.bufferEnabled);

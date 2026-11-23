@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR — Visual Field Manual (v0.63.0)</title>
+  <title>SPOTR — Visual Field Manual (v0.63.1)</title>
   <style>
     @page {
       size: letter landscape;
@@ -302,7 +302,7 @@
 
   <nav class="reader-toolbar">
     <div class="reader-toolbar-left">
-      <span style="color:#f97316;">SPOTR™</span> VISUAL FIELD MANUAL · v0.63.0
+      <span style="color:#f97316;">SPOTR™</span> VISUAL FIELD MANUAL · v0.63.1
     </div>
     <div class="reader-toolbar-actions">
       <a class="tb-btn" href="./field_cheat_sheet.html">1-Page Field Cheat Sheet</a>
@@ -336,8 +336,8 @@
             </div>
           </div>
           <div style="text-align:right; font-family:ui-monospace, monospace; font-size:8.5pt; color:var(--text-muted);">
-            <span class="pill p-orange">RELEASE v0.63.0</span><br/>
-            <span style="display:inline-block; margin-top:4px;">ANDROID vCode 65 • CHROMEOS • WINDOWS • PWA</span>
+            <span class="pill p-orange">RELEASE v0.63.1</span><br/>
+            <span style="display:inline-block; margin-top:4px;">ANDROID vCode 66 • CHROMEOS • WINDOWS • PWA</span>
           </div>
         </div>
 
@@ -402,7 +402,7 @@
     </section>
 
     <!-- =================================================================== -->
-    <!-- PAGE 2: LIVE SCOPE SCREEN (ANNOTATED v0.63.0 VISUAL MAP)            -->
+    <!-- PAGE 2: LIVE SCOPE SCREEN (ANNOTATED v0.63.1 VISUAL MAP)            -->
     <!-- =================================================================== -->
     <section class="page">
       <div class="hdr">
@@ -437,22 +437,18 @@
             <rect x="44" y="12" width="28" height="26" rx="13" fill="rgba(17,24,39,0.85)" stroke="#334155"/>
             <text x="58" y="29" fill="#e2e8f0" font-size="10" font-weight="700" text-anchor="middle">👁</text>
 
-            <!-- Top-Right Strip: Unified Review Pill -->
-            <rect x="520" y="12" width="108" height="26" rx="13" fill="rgba(17,24,39,0.85)" stroke="#334155"/>
-            <text x="562" y="29" fill="#e2e8f0" font-size="9" font-weight="700" text-anchor="middle">Review</text>
-            <circle cx="604" cy="25" r="8" fill="#f59e0b"/>
-            <text x="604" y="28.5" fill="#090d14" font-size="8.5" font-weight="800" text-anchor="middle">3</text>
+            <!-- Top-Right Corner Unobstructed for Digital Loupe (PiP) -->
 
             <!-- PiP Loupe Window -->
-            <rect x="476" y="56" width="150" height="104" rx="8" fill="#0b1220" stroke="#475569" stroke-width="1.5"/>
-            <rect x="484" y="63" width="34" height="16" rx="8" fill="#090d14" stroke="#334155"/>
-            <text x="501" y="74" fill="#f8fafc" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">3.0x</text>
-            <rect x="572" y="63" width="46" height="16" rx="8" fill="#090d14" stroke="#334155"/>
-            <text x="595" y="74" fill="#cbd5e1" font-size="8.5" font-family="monospace" text-anchor="middle">−  +</text>
-            <circle cx="551" cy="114" r="20" fill="none" stroke="#334155"/>
-            <circle cx="551" cy="114" r="5" fill="#10b981"/>
-            <line x1="540" y1="114" x2="562" y2="114" stroke="#fff" stroke-opacity="0.5"/>
-            <line x1="551" y1="103" x2="551" y2="125" stroke="#fff" stroke-opacity="0.5"/>
+            <rect x="476" y="18" width="150" height="104" rx="8" fill="#0b1220" stroke="#475569" stroke-width="1.5"/>
+            <rect x="484" y="25" width="34" height="16" rx="8" fill="#090d14" stroke="#334155"/>
+            <text x="501" y="36" fill="#f8fafc" font-size="8" font-family="monospace" font-weight="700" text-anchor="middle">3.0x</text>
+            <rect x="572" y="25" width="46" height="16" rx="8" fill="#090d14" stroke="#334155"/>
+            <text x="595" y="36" fill="#cbd5e1" font-size="8.5" font-family="monospace" text-anchor="middle">−  +</text>
+            <circle cx="551" cy="76" r="20" fill="none" stroke="#334155"/>
+            <circle cx="551" cy="76" r="5" fill="#10b981"/>
+            <line x1="540" y1="76" x2="562" y2="76" stroke="#fff" stroke-opacity="0.5"/>
+            <line x1="551" y1="65" x2="551" y2="87" stroke="#fff" stroke-opacity="0.5"/>
 
             <!-- Translucent Glass Bottom Dock -->
             <rect x="26" y="330" width="588" height="36" rx="11" fill="rgba(17,24,39,0.85)" stroke="#334155"/>
@@ -464,36 +460,34 @@
             <text x="245" y="351.5" fill="#6ee7b7" font-size="8" font-weight="700" text-anchor="middle">🔊 POI</text>
             <rect x="278" y="336" width="74" height="24" rx="7" fill="rgba(249,115,22,0.22)" stroke="#f97316"/>
             <text x="315" y="351.5" fill="#fdba74" font-size="8" font-weight="700" text-anchor="middle">Loupe AA</text>
-            <rect x="358" y="336" width="108" height="24" rx="7" fill="rgba(255,255,255,0.06)" stroke="#334155"/>
-            <text x="412" y="351.5" fill="#f8fafc" font-size="8.2" font-family="monospace" font-weight="700" text-anchor="middle">−   1.0x   +</text>
-            <rect x="472" y="336" width="134" height="24" rx="7" fill="#f97316"/>
-            <text x="539" y="351.5" fill="#090d14" font-size="8.2" font-weight="800" text-anchor="middle">⏪ Replay · 20s ▴</text>
+            <rect x="358" y="336" width="104" height="24" rx="7" fill="rgba(255,255,255,0.06)" stroke="#334155"/>
+            <text x="410" y="351.5" fill="#f8fafc" font-size="8.2" font-family="monospace" font-weight="700" text-anchor="middle">−  1.0x  +</text>
+            <rect x="468" y="336" width="138" height="24" rx="7" fill="#f97316"/>
+            <text x="537" y="351.5" fill="#090d14" font-size="8.2" font-weight="800" text-anchor="middle">⏪ Review 3 | 20s ▴</text>
 
             <!-- Callout Badges -->
             <circle cx="42" cy="49" r="9" fill="#f97316"/><text x="42" y="52.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">1</text>
-            <circle cx="574" cy="49" r="9" fill="#f97316"/><text x="574" y="52.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">2</text>
-            <circle cx="464" cy="108" r="9" fill="#38bdf8"/><text x="464" y="111.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">3</text>
-            <circle cx="72" cy="318" r="9" fill="#f97316"/><text x="72" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">4</text>
-            <circle cx="164" cy="318" r="9" fill="#f59e0b"/><text x="164" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">5</text>
-            <circle cx="315" cy="318" r="9" fill="#10b981"/><text x="315" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">6</text>
-            <circle cx="539" cy="318" r="9" fill="#f97316"/><text x="539" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">7</text>
+            <circle cx="464" cy="70" r="9" fill="#38bdf8"/><text x="464" y="73.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">2</text>
+            <circle cx="72" cy="318" r="9" fill="#f97316"/><text x="72" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">3</text>
+            <circle cx="164" cy="318" r="9" fill="#f59e0b"/><text x="164" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">4</text>
+            <circle cx="315" cy="318" r="9" fill="#10b981"/><text x="315" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">5</text>
+            <circle cx="537" cy="318" r="9" fill="#f97316"/><text x="537" y="321.5" fill="#090d14" font-size="8.5" font-weight="900" font-family="monospace" text-anchor="middle">6</text>
           </svg>
         </div>
 
         <div class="card card-orange">
           <div class="ctitle"><span class="pill p-orange">CONTROLS</span> Live View Legend</div>
-          <div class="legend-row"><span class="num-dot">1</span><div><strong>Setup Gear (⚙) &amp; Clean View (👁):</strong> Opens unified Setup hub, or hides UI + reticle together (both top-left pills stay reachable).</div></div>
-          <div class="legend-row"><span class="num-dot">2</span><div><strong>Unified Review Pill:</strong> Single entry into Screen 2 (Playback + Spatial Hits); amber badge glows with total logged impacts.</div></div>
-          <div class="legend-row"><span class="num-dot" style="background:#38bdf8;">3</span><div><strong>Digital Loupe (PiP):</strong> 1.5x–12.0x floating magnifier; drag header to move, corners to resize, drag crosshair to aim.</div></div>
-          <div class="legend-row"><span class="num-dot">4</span><div><strong>Reticle · FFP:</strong> Toggles crosshair overlay and locks First Focal Plane scaling 1:1 with digital zoom.</div></div>
-          <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">5</span><div><strong>Hits | 🗑 | ⚙ &amp; Voice:</strong> Toggle hit markers; 🗑 clears hits &amp; re-zeros immediately; ⚙ (or long-press Hits) opens Calibration. Voice cycles <code>OFF → POI → POA</code>.</div></div>
-          <div class="legend-row"><span class="num-dot" style="background:#10b981;">6</span><div><strong>Loupe Mode (ON / AA / OFF):</strong> Cycles PiP window and <strong>Auto Aim</strong> (automatically snaps loupe onto each new hit).</div></div>
-          <div class="legend-row"><span class="num-dot">7</span><div><strong>Zoom &amp; Replay · 20s ▴:</strong> Pinch or tap <code>−/+/1.0x</code> (tap badge to reset 1:1). Tap <strong>Replay</strong> for unsaved RAM buffer; tap <code>20s ▴</code> for buffer duration/RAM meter.</div></div>
+          <div class="legend-row"><span class="num-dot">1</span><div><strong>Setup Gear (⚙) &amp; Clean View (👁):</strong> Opens unified Setup hub, or hides UI + reticle together (top-right corner stays completely unobstructed).</div></div>
+          <div class="legend-row"><span class="num-dot" style="background:#38bdf8;">2</span><div><strong>Digital Loupe (PiP):</strong> 1.5x–12.0x floating magnifier; drag header to move, corners to resize, drag crosshair to aim.</div></div>
+          <div class="legend-row"><span class="num-dot">3</span><div><strong>Reticle · FFP:</strong> Toggles crosshair overlay and locks First Focal Plane scaling 1:1 with digital zoom.</div></div>
+          <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">4</span><div><strong>Hits | 🗑 | ⚙ &amp; Voice:</strong> Toggle hit markers; 🗑 clears hits &amp; re-zeros immediately; ⚙ (or long-press Hits) opens Calibration. Voice cycles <code>OFF → POI → POA</code>.</div></div>
+          <div class="legend-row"><span class="num-dot" style="background:#10b981;">5</span><div><strong>Loupe Mode (ON / AA / OFF):</strong> Cycles PiP window and <strong>Auto Aim</strong> (automatically snaps loupe onto each new hit).</div></div>
+          <div class="legend-row"><span class="num-dot">6</span><div><strong>Zoom &amp; Consolidated Review (N) | 20s ▴:</strong> Pinch or tap <code>−/+/1.0x</code>. Tap <strong>Review</strong> to open Screen 2 (RAM buffer or saved clips/stills) matching your Live zoom &amp; framing; tap <code>20s ▴</code> for buffer duration/RAM settings.</div></div>
         </div>
       </div>
 
       <div class="ftr">
-        <div>SPOTR v0.63.0 VISUAL MANUAL • PAGE 2: LIVE WORKSPACE</div>
+        <div>SPOTR v0.63.1 VISUAL MANUAL • PAGE 2: LIVE WORKSPACE</div>
         <div>RECON • DETECT • ALERT</div>
       </div>
     </section>
@@ -596,12 +590,12 @@
           </div>
           <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">A</span><div><strong>Single ☰ Review Drawer:</strong> Switch seamlessly between <strong>Hits (N)</strong> (with live age timers &amp; source tags) and <strong>Clips (M)</strong> (<code>LIVE BUFFER</code> + saved IndexedDB clips).</div></div>
           <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">B</span><div><strong>Older Hits Outside RAM Buffer:</strong> Prior hits stay mapped on target. Tapping a hit checks the RAM buffer, then saved clips, or opens its stored <strong>STILL SNAPSHOT</strong> cleanly.</div></div>
-          <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">C</span><div><strong>Shared Zoom &amp; Instant Cleanup:</strong> Pinch/scroll zoom (<code>1.0x–8.0x</code>) locks video, stills, FFP reticle, and pins 1:1. Returning to Live frees the RAM buffer copy immediately.</div></div>
+          <div class="legend-row"><span class="num-dot" style="background:#f59e0b;">C</span><div><strong>Live-Matched Framing &amp; Zoom:</strong> Matches Live's cover projection and inherits your active Live zoom/pan on entry (tap <code>1:1</code> to reset). Returning to Live frees the RAM buffer copy immediately.</div></div>
         </div>
       </div>
 
       <div class="ftr">
-        <div>SPOTR v0.63.0 VISUAL MANUAL • PAGE 3: UNIFIED REVIEW</div>
+        <div>SPOTR v0.63.1 VISUAL MANUAL • PAGE 3: UNIFIED REVIEW</div>
         <div>RECON • DETECT • ALERT</div>
       </div>
     </section>
@@ -732,7 +726,7 @@
       </div>
 
       <div class="ftr">
-        <div>SPOTR v0.63.0 VISUAL MANUAL • PAGE 4: CALIBRATION &amp; RETICLE STUDIO</div>
+        <div>SPOTR v0.63.1 VISUAL MANUAL • PAGE 4: CALIBRATION &amp; RETICLE STUDIO</div>
         <div>RECON • DETECT • ALERT</div>
       </div>
     </section>
@@ -831,8 +825,8 @@
       </div>
 
       <div class="ftr">
-        <div>SPOTR v0.63.0 VISUAL MANUAL • PAGE 5: CONTROLLERS &amp; SHORTCUTS</div>
-        <div>BUILD: ANDROID v0.63.0 (vCode 65) • WINDOWS • OFFLINE PWA</div>
+        <div>SPOTR v0.63.1 VISUAL MANUAL • PAGE 5: CONTROLLERS &amp; SHORTCUTS</div>
+        <div>BUILD: ANDROID v0.63.1 (vCode 66) • WINDOWS • OFFLINE PWA</div>
       </div>
     </section>
 

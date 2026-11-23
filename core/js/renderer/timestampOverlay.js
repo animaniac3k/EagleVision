@@ -87,7 +87,9 @@ export function drawDisplayTimestampOnCanvas(
     adaptive = true,
     bgLuma = 30,
     isLive = false,
-    decluttered = false
+    decluttered = false,
+    safeInsetX = 0,
+    safeInsetY = 0
   } = {}
 ) {
   if (!ctx || !cw || !ch) return;
@@ -102,8 +104,10 @@ export function drawDisplayTimestampOnCanvas(
   const boxH = Math.round(fontSize * 1.55);
   const textW = Math.ceil(ctx.measureText(text).width);
   const boxW = textW + padX * 2;
-  const marginX = 16;
-  const marginEdgeY = 14;
+  const insetX = Math.max(0, Math.round(Number(safeInsetX) || 0));
+  const insetY = Math.max(0, Math.round(Number(safeInsetY) || 0));
+  const marginX = 16 + insetX;
+  const marginEdgeY = 14 + insetY;
 
   let x = cw - boxW - marginX;
   let y = ch - boxH - marginEdgeY;

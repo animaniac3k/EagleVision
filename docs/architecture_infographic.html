@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPOTR (v0.63.0) — Architecture &amp; Data Flow Infographic</title>
+  <title>SPOTR (v0.63.1) — Architecture &amp; Data Flow Infographic</title>
   <style>
     :root {
       --bg: #050a0f;
@@ -195,7 +195,7 @@
   <div class="wrap">
     <header class="card card-orange banner">
       <div>
-        <div class="eyebrow">System Architecture Infographic • Release v0.63.0 (Android vCode 65)</div>
+        <div class="eyebrow">System Architecture Infographic • Release v0.63.1 (Android vCode 66)</div>
         <h1>SPOTR — RECON • DETECT • ALERT • OPTICS</h1>
         <p class="subtitle">Offline-First PWA &amp; Native Android/ChromeOS App • Lenovo Duet 3 Slow-Hardware Tuned • Isolated Hardware Inputs</p>
       </div>
@@ -387,7 +387,7 @@
           </div>
           <div class="node-body">
             <ul>
-              <li><strong>Android APK (v0.63.0 / vCode 65):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
+              <li><strong>Android APK (v0.63.1 / vCode 66):</strong> <code>SpotrServer.kt</code> chunked asset streaming, RFC 2617 Digest auth, RFC 2435 MJPEG-over-RTP, fast semi-planar NV21 copy, HW→SW decoder fallback, <code>FLAG_KEEP_SCREEN_ON</code> &amp; low-latency <code>WifiLock</code>.</li>
               <li><strong>Windows/Desktop (server.py):</strong> <code>TCP_NODELAY</code> + coalesced MJPEG writes, localhost-by-default security (<code>--lan</code> opt-in for iOS/iPad), SSRF &amp; scheme validation.</li>
             </ul>
           </div>
@@ -397,7 +397,7 @@
 
     <footer class="card footer-bar">
       <div>
-        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.63.0)</strong>
+        <strong>OFFLINE PWA ENGINE (core/sw.js • spotr-v0.63.1)</strong>
         Pre-caches all 40 core assets for 100% offline field use. Bypasses cross-origin camera requests (192.168.0.1) so camera wake probes never hang, and preserves active hits across SW updates.
       </div>
       <div>
